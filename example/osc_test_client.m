@@ -1,7 +1,10 @@
 % osc function demo, client side
 
 % an osc_address is a destination for packets -- IP or domain-name and port
-a = osc_new_address('127.0.0.1', 3334)
+osc_ip = '127.0.0.1';
+osc_port_in = 7001;
+
+a = osc_new_address(osc_ip, osc_port_in);
 
 % an osc message is a struct in matlab 
 % there are basically two fields, path and data.
@@ -9,7 +12,8 @@ a = osc_new_address('127.0.0.1', 3334)
 % strings, etc.
 m = struct( ...
         'path', '/foobar', ...
-        'data', {{logical(0), int32(1), 3.14159, logical(1), 'hello world'}} ...
+        'data', {{logical(0), int32(1), 3.14159, logical(1),...
+        'hello world'}} ...
         )
 
 % types are inferred automatically from the native matlab type

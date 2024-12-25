@@ -1,4 +1,7 @@
 % creating a server -- just specify what port to listen on
+
+port_num_in = 7001;
+port_num_out = 9001;
 s = osc_new_server(3334)
 
 for t = 1:10
