@@ -2,7 +2,7 @@
 
 port_num_in = 7001;
 port_num_out = 9001;
-s = osc_new_server(3334)
+s = osc_new_server(port_num_out)
 
 for t = 1:10
 
@@ -21,7 +21,7 @@ for t = 1:10
   m = osc_recv(s, 10.0)
 
   % check to see if anything is there...
-  if length(m) > 0
+  if ~isempty(m)
 
     % the address of the first message..
     m{1}.path
