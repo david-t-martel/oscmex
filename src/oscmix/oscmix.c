@@ -7,13 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(_WIN32) || defined(_WIN64)
-#include <string.h>
-#define strcasecmp _stricmp
-#define strncasecmp _strnicmp
-#else
-#include <strings.h>
-#endif
 #include "device.h"
 #include "intpack.h"
 #include "oscmix.h"
@@ -225,7 +218,7 @@ setenum(const struct oscnode *path[], int reg, struct oscmsg *msg)
 		{
 			for (val = 0; val < node->nameslen; ++val)
 			{
-				if (strcasecmp(str, node->names[val]) == 0)
+				if (stricmp(str, node->names[val]) == 0)
 					break;
 			}
 			if (val == node->nameslen)
