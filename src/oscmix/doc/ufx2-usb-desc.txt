@@ -1,0 +1,44 @@
+==================================================
+Device Name       : Fireface UFX II (24180534)
+Description       : RME UFX II
+Device Type       : Vendor Specific
+Connected         : Yes
+Safe To Unplug    : No
+Disabled          : No
+USB Hub           : No
+Drive Letter      : 
+Serial Number     : 3A16975644A3300
+Registry Time 1   : 12/25/2024 11:52:13 PM
+Registry Time 2   : 10/15/2024 2:55:36 PM
+VendorID          : 2a39
+ProductID         : 3fc4
+Firmware Revision : 3.01
+WCID              : 
+USB Class         : ff
+USB SubClass      : 00
+USB Protocol      : 00
+Hub / Port        : 
+Computer Name     : DTM-P1GEN7
+Vendor Name       : RME
+Product Name      : 
+ParentId Prefix   : 
+Service Name      : madifaceu64
+Service Description: @oem201.inf,%madiface_usb.SvcDesc%;RME MADIface USB Audio Device
+Driver Filename   : madiface_usb_64.sys
+Device Class      : 
+Device Mfg        : RME
+Friendly Name     : 
+Power             : 100 mA
+USB Version       : 2.00
+Driver Description: RME UFX II
+Driver Version    : 0.9.845.0
+Driver InfSection : madiface_10j
+Driver InfPath    : oem201.inf
+Instance ID       : USB\VID_2A39&PID_3FC4\3A16975644A3300
+Capabilities      : Removable, UniqueID
+Install Time      : 12/2/2024 4:46:47 AM
+First Install Time: 10/15/2024 2:55:40 PM
+Connect Time      : 12/26/2024 12:41:01 AM
+Disconnect Time   : 
+==================================================
+
