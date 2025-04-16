@@ -4,6 +4,7 @@
       "name": "Win64-Intel",
       "includePath": [
         "${workspaceFolder}/**",
+        "${workspaceFolder}/src/**",
         // --- Project Dependencies ---
         "${workspaceFolder}/src/asio/common",
         "${workspaceFolder}/src/asio/host",

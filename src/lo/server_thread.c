@@ -43,7 +43,7 @@
 #ifdef HAVE_WIN32_THREADS
 static unsigned __stdcall thread_func(void *data);
 #else
-static void* thread_func(void *data);
+static void *thread_func(void *data);
 #endif
 
 lo_server_thread lo_server_thread_new(const char *port,
@@ -59,7 +59,7 @@ static lo_server_thread alloc_server_thread(lo_server s)
     if (!s)
         return NULL;
 
-    st = (lo_server_thread) malloc(sizeof(struct _lo_server_thread));
+    st = (lo_server_thread)malloc(sizeof(struct _lo_server_thread));
 
     st->s = s;
     st->active = 0;
@@ -81,8 +81,8 @@ lo_server_thread lo_server_thread_new_multicast(const char *group,
 
 #if defined(WIN32) || defined(_MSC_VER) || defined(HAVE_GETIFADDRS)
 lo_server_thread lo_server_thread_new_multicast_iface(const char *group, const char *port,
-						      const char *iface, const char *ip,
-						      lo_err_handler err_h)
+                                                      const char *iface, const char *ip,
+                                                      lo_err_handler err_h)
 {
     lo_server_thread st = alloc_server_thread(
         lo_server_new_multicast_iface(group, port, iface, ip, err_h));
@@ -122,8 +122,10 @@ void lo_server_thread_set_error_context(lo_server_thread st,
 
 void lo_server_thread_free(lo_server_thread st)
 {
-    if (st) {
-        if (st->active) {
+    if (st)
+    {
+        if (st->active)
+        {
             lo_server_thread_stop(st);
         }
         lo_server_free(st->s);
@@ -163,30 +165,31 @@ void lo_server_thread_set_callbacks(lo_server_thread st,
 
 int lo_server_thread_start(lo_server_thread st)
 {
-    if (!st->active) {
+    if (!st->active)
+    {
         st->active = 1;
         st->done = 0;
 
         // Create the server thread
 #ifdef HAVE_LIBPTHREAD
         int result;
-        result=pthread_create(&(st->thread), NULL, &thread_func, st);
+        result = pthread_create(&(st->thread), NULL, &thread_func, st);
         if (result)
         {
-            fprintf (stderr,
-                "Failed to create thread: pthread_create(), %s",
-                strerror (result));
+            fprintf(stderr,
+                    "Failed to create thread: pthread_create(), %s",
+                    strerror(result));
             return -result;
         }
 #else
 #ifdef HAVE_WIN32_THREADS
-        st->thread = (HANDLE)_beginthreadex (NULL, 0, &thread_func, st, 0, NULL);
+        st->thread = (HANDLE)_beginthreadex(NULL, 0, &thread_func, st, 0, NULL);
 
         if (st->thread == NULL)
         {
-            fprintf (stderr,
-                "Failed to create thread: Win _beginthreadex(), %s",
-                strerror (errno));
+            fprintf(stderr,
+                    "Failed to create thread: Win _beginthreadex(), %s",
+                    strerror(errno));
             return -1;
         }
 #else
@@ -201,7 +204,8 @@ int lo_server_thread_stop(lo_server_thread st)
 {
     int result;
 
-    if (st->active) {
+    if (st->active)
+    {
         // Signal thread to stop
         st->active = 0;
 
@@ -210,21 +214,22 @@ int lo_server_thread_stop(lo_server_thread st)
         // and then releases the thread's resources
         result = pthread_join(st->thread, NULL);
 
-        if (result) {
+        if (result)
+        {
             fprintf(stderr, "Failed to stop thread: pthread_join(), %s",
                     strerror(result));
             return -result;
         }
 #else
 #ifdef HAVE_WIN32_THREADS
-        result = WaitForSingleObject (st->thread, INFINITE);
-        CloseHandle (st->thread);
+        result = WaitForSingleObject(st->thread, INFINITE);
+        CloseHandle(st->thread);
         st->thread = NULL;
 
         if (result != 0)
         {
-            fprintf (stderr, "Failed to join thread: waitForSingleObject(), %d",
-                result);
+            fprintf(stderr, "Failed to join thread: waitForSingleObject(), %d",
+                    result);
             return -1;
         }
 #else
@@ -259,20 +264,21 @@ int lo_server_thread_events_pending(lo_server_thread st)
 #ifdef HAVE_WIN32_THREADS
 static unsigned __stdcall thread_func(void *data)
 #else
-static void* thread_func(void *data)
+static void *thread_func(void *data)
 #endif
 {
-    lo_server_thread st = (lo_server_thread) data;
+    lo_server_thread st = (lo_server_thread)data;
 
-    if (st->cb_init) {
-        if ( (st->cb_init)(st, st->user_data) )
+    if (st->cb_init)
+    {
+        if ((st->cb_init)(st, st->user_data))
         {
             st->done = 1;
 #ifdef HAVE_LIBPTHREAD
-            pthread_exit (NULL);
+            pthread_exit(NULL);
 #else
 #ifdef HAVE_WIN32_THREADS
-            _endthread ();
+            _endthread();
 #else
 #error "No threading implementation selected."
 #endif
@@ -281,12 +287,14 @@ static void* thread_func(void *data)
         }
     }
 
-    while (st->active) {
+    while (st->active)
+    {
         lo_server_recv_noblock(st->s, 100);
     }
     st->done = 1;
 
-    if (st->cb_cleanup) {
+    if (st->cb_cleanup)
+    {
         (st->cb_cleanup)(st, st->user_data);
     }
 
@@ -294,7 +302,7 @@ static void* thread_func(void *data)
     pthread_exit(NULL);
 #else
 #ifdef HAVE_WIN32_THREADS
-    _endthread ();
+    _endthread();
 #else
 #error "No threading implementation selected."
 #endif
