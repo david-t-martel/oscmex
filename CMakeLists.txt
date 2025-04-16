@@ -23,6 +23,13 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # Include external dependencies
 add_subdirectory(src/cmake) # Include liblo build
 
+# Build liblo library from src/lo
+file(GLOB LIBLO_SOURCES
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/lo/*.c"
+)
+add_library(liblo STATIC ${LIBLO_SOURCES})
+target_include_directories(liblo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+
 # Include directories
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -39,13 +46,13 @@ file(GLOB AUDIO_ENGINE_SOURCES
 # Define AudioEngine library
 add_library(AudioEngine SHARED ${AUDIO_ENGINE_SOURCES})
 
-# Link with oneAPI components
+# Link with oneAPI components and liblo
 target_link_libraries(AudioEngine PRIVATE
 	TBB::tbb
 	IPP::ipp
+	liblo
 
 	# MKL::mkl_core MKL::mkl_intel_thread MKL::mkl_intel_ilp64  # When needed
-	liblo::liblo
 )
 
 # Compiler-specific optimizations

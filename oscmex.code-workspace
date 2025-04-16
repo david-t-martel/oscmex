@@ -16,7 +16,8 @@
 			"*.cpp": "cpp",
 			"*.h": "cpp",
 			"*.hpp": "cpp",
-			"*.c": "c"
+			"*.c": "c",
+			"utility": "cpp"
 		},
 		"terminal.integrated.defaultProfile.windows": "Command Prompt"
 	}

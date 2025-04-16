@@ -212,7 +212,7 @@ namespace lo
             b.swap(*this);
             return *this;
         }
-        void swap(Address &b) throw() { std::swap(this->address, b.address); }
+        void swap(Address &b) noexcept { std::swap(this->address, b.address); }
 
         bool is_valid() const { return address != nullptr; }
 
@@ -461,7 +461,7 @@ namespace lo
             m.swap(*this);
             return *this;
         }
-        void swap(Message &m) throw() { std::swap(this->message, m.message); }
+        void swap(Message &m) noexcept { std::swap(this->message, m.message); }
 
         bool is_valid() const { return message != nullptr; }
 
@@ -1239,7 +1239,7 @@ namespace lo
             b.swap(*this);
             return *this;
         }
-        void swap(Blob &b) throw() { std::swap(this->blob, b.blob); }
+        void swap(Blob &b) noexcept { std::swap(this->blob, b.blob); }
 
         bool is_valid() const { return blob != nullptr; }
 
@@ -1374,7 +1374,7 @@ namespace lo
             b.swap(*this);
             return *this;
         }
-        void swap(Bundle &b) throw() { std::swap(this->bundle, b.bundle); }
+        void swap(Bundle &b) noexcept { std::swap(this->bundle, b.bundle); }
 
         bool is_valid() const { return bundle != nullptr; }
 

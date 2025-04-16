@@ -58,11 +58,14 @@ test_bidirectional_tcp_CFLAGS = -Wall -I$(top_srcdir)
 test_bidirectional_tcp_SOURCES = test_bidirectional_tcp.c
 test_bidirectional_tcp_LDADD = liblo.la
 
-cpp_test_CXXFLAGS = -I$(top_srcdir)
+CXX = icpx
+CXXFLAGS += -std=c++17
+
+cpp_test_CXXFLAGS = -I$(top_srcdir) -std=c++17
 cpp_test_SOURCES = cpp_test.cpp
 cpp_test_LDADD = liblo.la
 
-cpp_test_exceptions_CXXFLAGS = -I$(top_srcdir) -DLO_USE_EXCEPTIONS
+cpp_test_exceptions_CXXFLAGS = -I$(top_srcdir) -DLO_USE_EXCEPTIONS -std=c++17
 cpp_test_exceptions_SOURCES = cpp_test.cpp
 cpp_test_exceptions_LDADD = liblo.la
 
