@@ -1,0 +1,37 @@
+{
+  "configurations": [
+    {
+      "name": "Win64-Intel",
+      "includePath": [
+        "${workspaceFolder}/**",
+        // --- Adjust these paths based on your actual library locations ---
+        "${workspaceFolder}/**", // Example ASIO SDK path
+        "C:/Program Files/ffmpeg/include", // Example FFmpeg include path
+        "C:/path/to/oscpack/include", // Example OSC library include path
+        // Add path to your GUI library includes if applicable (e.g., Qt, wxWidgets)
+        "C:/path/to/gui_library/include"
+      ],
+      "defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE"
+        // Add any other necessary preprocessor defines
+      ],
+      // --- Crucial: Point this to your Intel icx/icpx compiler ---
+      // Option 1: Rely on PATH if Intel environment variables are set (Recommended if possible)
+      "compilerPath": "icx.exe",
+      // Option 2: Specify the full path (Adjust based on your oneAPI installation)
+      // "compilerPath": "C:/Program Files (x86)/Intel/oneAPI/compiler/latest/windows/bin/icx.exe",
+      "windowsSdkVersion": "10.0.22621.0", // Adjust if using a different Windows SDK version
+      "cStandard": "c17",
+      "cppStandard": "c++17", // Or "c++20" if you are using C++20 features
+      // Intel oneAPI compiler is Clang-based
+      "intelliSenseMode": "windows-clang-x64",
+      // Optional: Add specific compiler arguments if needed for IntelliSense accuracy
+      "compilerArgs": [
+        // e.g., "/Qstd=c++17" if not automatically detected
+      ]
+    }
+  ],
+  "version": 4
+}

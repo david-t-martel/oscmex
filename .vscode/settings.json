@@ -5,6 +5,44 @@
         ".fantomasignore": "ignore",
         "*.rmd": "markdown",
         "socket.h": "c",
-        "stdbool.h": "c"
-    }
+        "stdbool.h": "c",
+        "*.cpp": "cpp",
+        "*.h": "cpp", // Treat .h as C++ headers if desired
+        "*.hpp": "cpp",
+        "*.c": "c" // Keep .c files associated with C if needed for dependencies like liblo
+    },
+    // Specifies which configuration IntelliSense uses by default.
+    // You'll define "Win32" or "Win64" configurations in c_cpp_properties.json
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools", // If using CMake Tools extension
+    // Or manually: "C_Cpp.default.configurationProvider": "ms-vscode.cpptools",
+
+    // Helps the C++ extension find source files if they aren't directly in the workspace root
+    "C_Cpp.files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        // Add build output directories if needed
+        "**/build/**": true,
+        "**/out/**": true
+    },
+
+    // If using CMake Tools extension, point to the source directory containing the main CMakeLists.txt
+    // Adjust the path if your main CMakeLists.txt for the AudioEngine is deeper
+    "cmake.sourceDirectory": "${workspaceFolder}/src/AudioEngine", // Or potentially "${workspaceFolder}/src" if CMake covers more
+
+    // Default terminal for build tasks (optional, PowerShell is default on Windows)
+    "terminal.integrated.defaultProfile.windows": "Command Prompt" // Or "PowerShell" or specific VS Dev Prompt
+
+    // --- You will likely need to configure these more specifically ---
+    // --- in c_cpp_properties.json and potentially tasks.json/launch.json ---
+    // Example placeholder - actual paths depend on your system setup
+    // "C_Cpp.default.includePath": [
+    //     "${workspaceFolder}/src/**",
+    //     "C:/path/to/asio_sdk/common",
+    //     "C:/path/to/ffmpeg/include",
+    //     "C:/path/to/oscpack/include" // Or other OSC lib include
+    // ],
 }
