@@ -288,10 +288,8 @@ private:
 	int m_rmePort = 0;
 	bool m_configured = false;
 
-	// --- OSC Library Specific Members ---
-	// Example using conceptual oscpack types
-	Ip::UdpSocket *m_transmitSocket = nullptr; // Use UdpTransmitSocket
-											   // --- End OSC Library Specific Members ---
+	// --- Using liblo for OSC communication ---
+	lo_address m_oscAddress = nullptr;
 };
 
 // =========================================================================
@@ -663,10 +661,9 @@ bool RmeOscController::configure(const std::string &ip, int port)
 {
 	m_rmeIp = ip;
 	m_rmePort = port;
-	// --- OSC Library Init ---
-	// m_transmitSocket = new Ip::UdpTransmitSocket(IpEndpointName(m_rmeIp.c_str(), m_rmePort));
-	// --- End OSC Library Init ---
-	if (!m_transmitSocket)
+	// --- Using liblo for OSC communication ---
+	m_oscAddress = lo_address_new(ip.c_str(), std::to_string(port).c_str());
+	if (!m_oscAddress)
 	{ /* Handle error */
 		return false;
 	}
@@ -676,22 +673,23 @@ bool RmeOscController::configure(const std::string &ip, int port)
 }
 bool RmeOscController::sendCommand(const std::string &address, const std::vector<std::any> &args)
 {
-	if (!m_configured || !m_transmitSocket)
+	if (!m_configured || !m_oscAddress)
 		return false;
 	std::cout << "OSC SEND -> " << m_rmeIp << ":" << m_rmePort << " " << address; // Debug
-	// --- OSC Library Formatting/Sending ---
-	// char buffer[1024];
-	// osc::OutboundPacketStream p(buffer, 1024);
-	// p << osc::BeginBundleImmediate << osc::BeginMessage(address.c_str());
-	// for (const auto& arg : args) {
-	//     if (arg.type() == typeid(float)) p << std::any_cast<float>(arg);
-	//     else if (arg.type() == typeid(int)) p << std::any_cast<int>(arg);
-	//     // Add other types (string, bool, etc.)
-	// }
-	// p << osc::EndMessage << osc::EndBundle;
-	// m_transmitSocket->Send(p.Data(), p.Size());
-	// --- End OSC Library Formatting/Sending ---
-	std::cout << " (Conceptual Send)\n";
+	// --- Using liblo for OSC communication ---
+	lo_message msg = lo_message_new();
+	for (const auto &arg : args)
+	{
+		if (arg.type() == typeid(float))
+			lo_message_add_float(msg, std::any_cast<float>(arg));
+		else if (arg.type() == typeid(int))
+			lo_message_add_int32(msg, std::any_cast<int>(arg));
+		// Add other types (string, bool, etc.)
+	}
+	lo_send_message(m_oscAddress, address.c_str(), msg);
+	lo_message_free(msg);
+	// --- End liblo communication ---
+	std::cout << " (Sent)\n";
 	return true; // Placeholder
 }
 bool RmeOscController::setMatrixCrosspointGain(int hw_input, int hw_output, float gain_db)
