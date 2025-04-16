@@ -4,6 +4,7 @@
 #include <lo/lo.h>
 #include <lo/lo_throw.h>
 
+// Standard library includes
 #include <functional>
 #include <memory>
 #include <list>
@@ -17,6 +18,10 @@
 #ifndef LO_USE_EXCEPTIONS
 #include <cassert>
 #endif
+#include <cstdarg>
+#include <cstdint>
+#include <cstdlib>
+#include <utility>
 
 /**
  * \file lo_cpp.h The liblo C++ wrapper

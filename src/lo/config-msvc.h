@@ -68,7 +68,7 @@
 #define LO_BIGENDIAN "0"
 
 /* Libtool compatibility version */
-#define LO_SO_VERSION @LO_SO_VERSION@
+#define LO_SO_VERSION @LO_SO_VERSION @
 
 /* Define to 1 if your C compiler doesn't accept -c and -o together. */
 /* #undef NO_MINUS_C_MINUS_O */
@@ -83,7 +83,8 @@
 #define PACKAGE_NAME "liblo"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "liblo " "@VERSION@"
+#define PACKAGE_STRING "liblo " \
+					   "@VERSION@"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "liblo"
