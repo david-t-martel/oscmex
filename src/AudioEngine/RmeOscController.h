@@ -413,6 +413,14 @@ namespace AudioEngine
 		bool m_levelMetersEnabled = false;							 // Whether level meters are enabled
 		DspStatus m_dspStatus;										 // Current DSP status
 		std::map<std::string, std::atomic<bool>> m_pendingResponses; // For handling query responses
+
+		// Clamp helpers for parameter bounds (from rme_osc_commands.md)
+		float clampVolumeDb(float db) const { return std::max(-65.0f, std::min(6.0f, db)); }
+		int clampPan(int pan) const { return std::max(-100, std::min(100, pan)); }
+		float clampGain(float gain, bool mic) const { return std::max(0.0f, std::min(mic ? 75.0f : 24.0f, gain)); }
+		float clampEQGain(float gain) const { return std::max(-20.0f, std::min(20.0f, gain)); }
+		float clampEQFreq(float freq) const { return std::max(20.0f, std::min(20000.0f, freq)); }
+		float clampEQQ(float q) const { return std::max(0.4f, std::min(9.9f, q)); }
 	};
 
 }

@@ -680,124 +680,109 @@ namespace AudioEngine
 
 	bool RmeOscController::setMatrixCrosspointGain(int hw_input, int hw_output, float gain_db)
 	{
-		// Match the mix routing path format in oscmix.c
-		std::string address = "/mix/" + std::to_string(hw_output) + "/input/" + std::to_string(hw_input);
-
-		// In the oscmix.c code, setmix() function handles volume differently:
-		// If gain_db <= -65, it sets to -INFINITY
-		// Otherwise, it converts using 10^(vol/20)
-		// But the OSC message is sent as a float in dB
-
-		// Match the behavior in setmix() in oscmix.c
-		if (gain_db <= -65.0f)
+		// Clamp gain to valid range (-65.0 to +6.0 dB)
+		float clamped_db = clampVolumeDb(gain_db);
+		if (clamped_db != gain_db)
 		{
-			gain_db = -INFINITY;
+			std::cerr << "[RmeOscController] Matrix gain dB clamped from " << gain_db << " to " << clamped_db << std::endl;
 		}
-
-		return sendCommand(address, {std::any(gain_db)});
+		std::string address = "/mix/" + std::to_string(hw_output) + "/input/" + std::to_string(hw_input);
+		if (clamped_db <= -65.0f)
+		{
+			clamped_db = -INFINITY;
+		}
+		return sendCommand(address, {std::any(clamped_db)});
 	}
 
 	bool RmeOscController::setChannelMute(ChannelType type, int channel, bool mute)
 	{
+		// No bounds needed for bool
 		std::string address = buildChannelAddress(type, channel, ParamType::MUTE);
 		if (address.empty())
 			return false;
-
-		// Boolean values are sent as integers in OSC
 		return sendCommand(address, {std::any(mute)});
 	}
 
 	bool RmeOscController::setChannelStereo(ChannelType type, int channel, bool stereo)
 	{
+		// No bounds needed for bool
 		std::string address = buildChannelAddress(type, channel, ParamType::STEREO);
 		if (address.empty())
 			return false;
-
-		// In oscmix.c, stereo links always affect two channels (odd + even)
-		// Here we just send to the requested channel and let the device handle the pairing
 		return sendCommand(address, {std::any(stereo)});
 	}
 
 	bool RmeOscController::setChannelVolume(ChannelType type, int channel, float volume_db)
 	{
+		// Clamp volume to valid range (-65.0 to +6.0 dB)
+		float clamped_db = clampVolumeDb(volume_db);
+		if (clamped_db != volume_db)
+		{
+			std::cerr << "[RmeOscController] Volume dB clamped from " << volume_db << " to " << clamped_db << std::endl;
+		}
 		std::string address = buildChannelAddress(type, channel, ParamType::VOLUME);
 		if (address.empty())
 			return false;
-
-		// Convert dB to normalized range (0-1) for RME
-		float volume_norm = dbToNormalized(volume_db);
-
-		// In oscmix.c, volume is sent as a normalized (0-1) float value
+		float volume_norm = dbToNormalized(clamped_db);
 		return sendCommand(address, {std::any(volume_norm)});
 	}
 
 	bool RmeOscController::setInputPhantomPower(int channel, bool enabled)
 	{
+		// No bounds needed for bool
 		std::string address = buildChannelAddress(ChannelType::INPUT, channel, ParamType::PHANTOM_POWER);
 		if (address.empty())
 			return false;
-
-		// In oscmix.c, this is only valid for certain inputs (check the INPUT_48V flag)
-		// Here we send it anyway and let the device decide if it's valid
 		return sendCommand(address, {std::any(enabled)});
 	}
 
 	bool RmeOscController::setInputHiZ(int channel, bool enabled)
 	{
+		// No bounds needed for bool
 		std::string address = buildChannelAddress(ChannelType::INPUT, channel, ParamType::HI_Z);
 		if (address.empty())
 			return false;
-
-		// In oscmix.c, this is only valid for certain inputs (check the INPUT_HIZ flag)
-		// Here we send it anyway and let the device decide if it's valid
 		return sendCommand(address, {std::any(enabled)});
 	}
 
 	bool RmeOscController::setChannelEQ(ChannelType type, int channel, bool enabled)
 	{
+		// No bounds needed for bool
 		std::string address = buildChannelAddress(type, channel, ParamType::EQ_ENABLE);
 		if (address.empty())
 			return false;
-
 		return sendCommand(address, {std::any(enabled)});
 	}
 
 	bool RmeOscController::setChannelEQBand(ChannelType type, int channel, int band, float freq, float gain, float q)
 	{
-		// Validate band number
-		if (band < 1 || band > 3)
+		// Clamp EQ parameters to valid ranges
+		float clamped_freq = clampEQFreq(freq);
+		float clamped_gain = clampEQGain(gain);
+		float clamped_q = clampEQQ(q);
+		if (clamped_freq != freq)
 		{
-			std::cerr << "RmeOscController: Invalid EQ band number (must be 1-3)" << std::endl;
-			return false;
+			std::cerr << "[RmeOscController] EQ freq clamped from " << freq << " to " << clamped_freq << std::endl;
 		}
-
-		// EQ must be enabled first
-		if (!setChannelEQ(type, channel, true))
+		if (clamped_gain != gain)
 		{
-			return false;
+			std::cerr << "[RmeOscController] EQ gain clamped from " << gain << " to " << clamped_gain << std::endl;
 		}
-
-		// Base address for this channel type
+		if (clamped_q != q)
+		{
+			std::cerr << "[RmeOscController] EQ Q clamped from " << q << " to " << clamped_q << std::endl;
+		}
+		// ...existing code for address and batch...
 		std::string baseAddr = (type == ChannelType::INPUT) ? "/input/" : (type == ChannelType::OUTPUT) ? "/output/"
 																										: "/playback/";
 		baseAddr += std::to_string(channel);
-
-		// Create a batch of commands to send all at once
 		std::vector<RmeOscCommandConfig> commands;
-
-		// Send frequency parameter
 		std::string freqAddr = baseAddr + "/eq/band" + std::to_string(band) + "freq";
-		commands.push_back({freqAddr, {std::any((int)freq)}});
-
-		// Send gain parameter (oscmix.c scales by 0.1)
+		commands.push_back({freqAddr, {std::any((int)clamped_freq)}});
 		std::string gainAddr = baseAddr + "/eq/band" + std::to_string(band) + "gain";
-		commands.push_back({gainAddr, {std::any(gain * 10.0f)}});
-
-		// Send Q parameter (oscmix.c scales by 0.1)
+		commands.push_back({gainAddr, {std::any(clamped_gain * 10.0f)}});
 		std::string qAddr = baseAddr + "/eq/band" + std::to_string(band) + "q";
-		commands.push_back({qAddr, {std::any(q * 10.0f)}});
-
-		// Send all commands as a batch
+		commands.push_back({qAddr, {std::any(clamped_q * 10.0f)}});
 		return sendBatch(commands);
 	}
 

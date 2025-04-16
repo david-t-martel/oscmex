@@ -6,10 +6,6 @@
 #include <array>
 #include <vector>
 
-#ifndef WIN32
-#include <unistd.h>
-#endif
-
 #include <lo/lo.h>
 #include <lo/lo_cpp.h>
 
@@ -53,17 +49,18 @@ void init(lo::Server &s)
     {
     public:
         test3(int j, std::string s) : _s(s), _j(j) {};
-        int operator () (lo_arg **argv, int argc, lo_message msg)
+        int operator()(lo_arg **argv, int argc, lo_message msg)
         {
             std::cout << _s << ": " << _j << ", " << argv[0]->i << std::endl;
             return 0;
         }
+
     private:
         std::string _s;
         int _j;
     };
 
-    s.add_method("/test0", "i", test3(j,"/test0"));
+    s.add_method("/test0", "i", test3(j, "/test0"));
     s.del_method("/test0", "i");
 
     s.add_method("/test1", "i", test1, 0);
@@ -96,42 +93,48 @@ void init(lo::Server &s)
                  });
 
     j *= 2;
-    s.add_method("/test7", "i", [j](){printf("/test7: %d\n", j); return 0;});
+    s.add_method("/test7", "i", [j]()
+                 {printf("/test7: %d\n", j); return 0; });
     j *= 2;
-    s.add_method("/test8", "i", [j](){printf("/test8a: %d\n", j);});
+    s.add_method("/test8", "i", [j]()
+                 { printf("/test8a: %d\n", j); });
     j *= 2;
-    s.add_method("/test8", "i", [j](){printf("/test8b: %d\n", j);});
+    s.add_method("/test8", "i", [j]()
+                 { printf("/test8b: %d\n", j); });
 
-    j*=2;
+    j *= 2;
     s.add_method("/test9", "i", [j](const char *path, const char *types, lo_arg **argv, int argc)
-                 {printf("/test9.1: %d, %s, %s, %d\n", j, path, types, argv[0]->i); return 1;});
-    j*=2;
+                 {printf("/test9.1: %d, %s, %s, %d\n", j, path, types, argv[0]->i); return 1; });
+    j *= 2;
     s.add_method("/test10", "i", [j](const char *types, lo_arg **argv, int argc)
-                 {printf("/test10.1: %d, %s, %d\n", j, types, argv[0]->i); return 1;});
-    j*=2;
+                 {printf("/test10.1: %d, %s, %d\n", j, types, argv[0]->i); return 1; });
+    j *= 2;
     s.add_method("/test11", "is", [j](const char *types, lo_arg **argv, int argc, lo_message msg)
-                 {printf("/test11.1: %d, %s, %d, %s -- ", j, types, argv[0]->i, &argv[1]->s); lo_message_pp(msg); return 1;});
+                 {printf("/test11.1: %d, %s, %d, %s -- ", j, types, argv[0]->i, &argv[1]->s); lo_message_pp(msg); return 1; });
 
-    j*=2;
+    j *= 2;
     s.add_method("/test9", "i", [j](const char *path, const char *types, lo_arg **argv, int argc)
-                 {printf("/test9.2: %d, %s, %s, %d\n", j, path, types, argv[0]->i);});
-    j*=2;
+                 { printf("/test9.2: %d, %s, %s, %d\n", j, path, types, argv[0]->i); });
+    j *= 2;
     s.add_method("/test10", "i", [j](const char *types, lo_arg **argv, int argc)
-                 {printf("/test10.2: %d, %s, %d\n", j, types, argv[0]->i);});
-    j*=2;
+                 { printf("/test10.2: %d, %s, %d\n", j, types, argv[0]->i); });
+    j *= 2;
     s.add_method("/test11", "is", [j](const char *types, lo_arg **argv, int argc, lo_message msg)
-                 {printf("/test11.2: %d, %s, %d, %s -- ", j, types, argv[0]->i, &argv[1]->s); lo_message_pp(msg);});
+                 {printf("/test11.2: %d, %s, %d, %s -- ", j, types, argv[0]->i, &argv[1]->s); lo_message_pp(msg); });
 
-    j*=2;
+    j *= 2;
     s.add_method("/test12", "i", [j](const lo::Message m)
-                 {printf("/test12 (j=%d) source: %s\n", j, m.source().url().c_str());});
+                 { printf("/test12 (j=%d) source: %s\n", j, m.source().url().c_str()); });
 
-    s.add_method(0, 0, [](const char *path, lo_message m){printf("generic: %s ", path); lo_message_pp(m);});
+    s.add_method(0, 0, [](const char *path, lo_message m)
+                 {printf("generic: %s ", path); lo_message_pp(m); });
 
-    j*=2;
+    j *= 2;
     s.add_bundle_handlers(
-        [j](lo_timetag time){ printf("Bundle start handler! (j=%d)\n", j); },
-        [j](){ printf("Bundle end handler! (j=%d)\n", j); } );
+        [j](lo_timetag time)
+        { printf("Bundle start handler! (j=%d)\n", j); },
+        [j]()
+        { printf("Bundle end handler! (j=%d)\n", j); });
 }
 
 int main()
@@ -139,18 +142,23 @@ int main()
     int context = 999;
     lo::ServerThread st(9000,
                         [=](int num, const char *msg, const char *where)
-                        {printf("error handler: %d\n", context);});
-    context=888;
-    if (!st.is_valid()) {
+                        { printf("error handler: %d\n", context); });
+    context = 888;
+    if (!st.is_valid())
+    {
         printf("Nope.\n");
         return 1;
     }
 
-    st.set_callbacks([&st](){printf("Thread init: %p.\n",&st); return 0;},
-                     [](){printf("Thread cleanup.\n");});
+    st.set_callbacks([&st]()
+                     {printf("Thread init: %p.\n",&st); return 0; },
+                     []()
+                     { printf("Thread cleanup.\n"); });
 
-    st.set_callbacks([](){printf("Thread init.\n");},
-                     [](){printf("Thread cleanup.\n");});
+    st.set_callbacks([]()
+                     { printf("Thread init.\n"); },
+                     []()
+                     { printf("Thread cleanup.\n"); });
 
     std::cout << "URL: " << st.url() << std::endl;
 
@@ -184,29 +192,28 @@ int main()
     m.add_string(std::string("blah"));
     a.send("/test11", m);
 
-    m.add(lo::Blob(4,"asdf"));
+    m.add(lo::Blob(4, "asdf"));
     m.add(lo::Blob(std::vector<char>(5, 'a')));
-    m.add(lo::Blob(std::array<char,5>{"asdf"}));
+    m.add(lo::Blob(std::array<char, 5>{"asdf"}));
     a.send("/blobtest", m);
 
     a.send(
-        lo::Bundle({
-            {"/test11", lo::Message("is",20,"first in bundle")},
-            {"/test11", lo::Message("is",30,"second in bundle")}
-        })
-    );
+        lo::Bundle({{"/test11", lo::Message("is", 20, "first in bundle")},
+                    {"/test11", lo::Message("is", 30, "second in bundle")}}));
 
-    lo::Bundle b({
-        {"/ok1", lo::Message("is",20,"first in bundle")},
-        lo::Bundle({"/ok2", lo::Message("is",30,"second in bundle")})
-    }, LO_TT_IMMEDIATE);
-    printf("Bundle:\n"); b.print();
+    lo::Bundle b({{"/ok1", lo::Message("is", 20, "first in bundle")},
+                  lo::Bundle({"/ok2", lo::Message("is", 30, "second in bundle")})},
+                 LO_TT_IMMEDIATE);
+    printf("Bundle:\n");
+    b.print();
 
     lo::Bundle::Element e(b.get_element(0));
-    printf("Bundle Message: %s ", e.pm.path.c_str()); e.pm.msg.print();
+    printf("Bundle Message: %s ", e.pm.path.c_str());
+    e.pm.msg.print();
 
     e = b.get_element(1);
-    printf("Bundle Bundle:\n"); e.bundle.print();
+    printf("Bundle Bundle:\n");
+    e.bundle.print();
 
     printf("Bundle timestamp: %u.%u\n",
            e.bundle.timestamp().sec,
@@ -214,13 +221,15 @@ int main()
 
     a.send("/test12", "i", 240);
 
-    char oscmsg[] = {'/','o','k',0,',','i',0,0,0,0,0,4};
+    char oscmsg[] = {'/', 'o', 'k', 0, ',', 'i', 0, 0, 0, 0, 0, 4};
     lo::Message::maybe m2 = lo::Message::deserialise(oscmsg, sizeof(oscmsg));
-    if (m2.first == 0) {
+    if (m2.first == 0)
+    {
         printf("deserialise: %s", oscmsg);
         m2.second.print();
     }
-    else {
+    else
+    {
         printf("Unexpected failure in deserialise(): %d\n", m2.first);
         return 1;
     }
@@ -235,20 +244,26 @@ int main()
     {
 #ifdef LO_USE_EXCEPTIONS
         printf("Testing exceptions.\n");
-        try {
+        try
+        {
 #endif
             lo::ServerThread st2(9000);
-            if (st2.is_valid()) {
+            if (st2.is_valid())
+            {
                 printf("st2 unexpectedly valid on port 9000.\n");
                 return 1;
             }
 #ifdef LO_USE_EXCEPTIONS
             printf("Exception not thrown when expected!\n");
             return 1;
-        } catch(lo::Invalid e) {
+        }
+        catch (lo::Invalid e)
+        {
             printf("Invalid! (unexpected)\n");
             return 1;
-        } catch(lo::Error e) {
+        }
+        catch (lo::Error e)
+        {
             printf("Expected error opening st2 on port 9000.\n");
         }
 #endif
