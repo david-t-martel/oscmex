@@ -1,0 +1,1022 @@
+{
+  "description": "OSC Command structure for RME Fireface UCX II via TotalMix FX (v1.96+). Based on generic RME OSC list, validated against UCX II manual features.",
+  "note": "Channel offsets (e.g., in /1/volumeX) are relative to the current bank start in TotalMix FX. The exact mapping to physical I/O depends on TotalMix configuration and bank settings. Max channels depend on TotalMix OSC bank size setting.",
+  "oscCommands": [
+    {
+      "Category": "GlobalNavigation",
+      "Name": "/1/businput",
+      "Function": "Select Input Bus data view",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Selects top row channels for bank control"
+    },
+    {
+      "Category": "GlobalNavigation",
+      "Name": "/1/busPlayback",
+      "Function": "Select Playback Bus data view",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Selects middle row channels for bank control"
+    },
+    {
+      "Category": "GlobalNavigation",
+      "Name": "/1/busOutput",
+      "Function": "Select Output Bus data view",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Selects bottom row channels for bank control"
+    },
+    {
+      "Category": "GlobalNavigation",
+      "Name": "/1/track+",
+      "Function": "Shift selected channel +1 (within current view)",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to single channel views (Page 2/4)"
+    },
+    {
+      "Category": "GlobalNavigation",
+      "Name": "/1/track-",
+      "Function": "Shift selected channel -1 (within current view)",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to single channel views (Page 2/4)"
+    },
+    {
+      "Category": "GlobalNavigation",
+      "Name": "/1/bank+",
+      "Function": "Change bank start +bank size",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to Mixer view (Page 1)"
+    },
+    {
+      "Category": "GlobalNavigation",
+      "Name": "/1/bank-",
+      "Function": "Change bank start -bank size",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to Mixer view (Page 1)"
+    },
+    {
+      "Category": "GlobalControl",
+      "Name": "/1/globalMute",
+      "Function": "Mute Enable (globally)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalControl",
+      "Name": "/1/globalSolo",
+      "Function": "Solo Enable (globally)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalControl",
+      "Name": "/1/trim",
+      "Function": "Trim mode for all channels",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Global Trim Gains"
+    },
+    {
+      "Category": "ControlRoom",
+      "Name": "/1/mainDim",
+      "Function": "DIM Main Output",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "ControlRoom",
+      "Name": "/1/mainSpeakerB",
+      "Function": "Assign channel for speaker B / Toggle Speaker B",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "ControlRoom",
+      "Name": "/1/speakerBLinked",
+      "Function": "Speaker B volume linked to main",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "ControlRoom",
+      "Name": "/1/mainRecall",
+      "Function": "Recall Main Out Volume",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "ControlRoom",
+      "Name": "/1/mainMuteFx",
+      "Function": "Mute FX return on Main Out",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "ControlRoom",
+      "Name": "/1/mainMono",
+      "Function": "Mono for Main Out",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "ControlRoom",
+      "Name": "/1/mainExtIn",
+      "Function": "Enable External Input Path to Main Out",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "ControlRoom",
+      "Name": "/1/mainTalkback",
+      "Function": "Enable Talkback",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "MixerFaders",
+      "Name": "/1/volume{N}",
+      "Function": "Mix-Fader/Output Volume (Banked)",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "N=1-24 (or more depending on bank size setting). Channel offset within bank."
+    },
+    {
+      "Category": "MixerFaders",
+      "Name": "/1/mastervolume",
+      "Function": "Main Out Volume Fader",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Controls the output assigned as 'Main Out' in Control Room"
+    },
+    {
+      "Category": "MixerPan",
+      "Name": "/1/pan{N}",
+      "Function": "Mix-Pan/Balance/Output Balance (Banked)",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "N=1-24 (or more). Channel offset within bank."
+    },
+    {
+      "Category": "MixerMute",
+      "Name": "/1/mute/1/{N}",
+      "Function": "Channel Mute (Banked)",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "N=1-24 (or more). Channel offset within bank. Only effective in TotalMix (Monitoring)."
+    },
+    {
+      "Category": "InputGain",
+      "Name": "/1/micgain{N}",
+      "Function": "Microphone or digital Input Gain (Banked)",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "N=1-24 (or more). Channel offset within bank. Certain Inputs only (UCX II: Analog 1-4 Mic/Line/Inst). Scale device dependent."
+    },
+    {
+      "Category": "InputControl",
+      "Name": "/1/phantom/1/{N}",
+      "Function": "Phantom Power (Banked)",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "N=1-24 (or more). Channel offset within bank. Certain Inputs only (UCX II: Analog 1-2 XLR)."
+    },
+    {
+      "Category": "MixerSolo",
+      "Name": "/1/solo/1/{N}",
+      "Function": "Solo/PFL (Banked)",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "N=1-24 (or more). Channel offset within bank. Inputs and Playbacks only. PFL in PFL-Mode."
+    },
+    {
+      "Category": "MixerSelect",
+      "Name": "/1/select/1/{N}",
+      "Function": "Selection for ad-hoc fader group (Banked)",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "N=1-24 (or more). Channel offset within bank."
+    },
+    {
+      "Category": "OutputControl",
+      "Name": "/1/cue/1/{N}",
+      "Function": "Cue Output (Banked)",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "N=1-24 (or more). Channel offset within bank. Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Category": "Labels",
+      "Name": "/1/labelSubmix",
+      "Function": "Name of selected Submix",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Read-only from TotalMix"
+    },
+    {
+      "Category": "Labels",
+      "Name": "/1/trackname{N}",
+      "Function": "Channel Name (Banked)",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "N=1-24 (or more). Channel offset within bank. Read-only from TotalMix."
+    },
+    {
+      "Category": "LevelMeters",
+      "Name": "/1/level{N}Left",
+      "Function": "Level Meter Left (Banked)",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "N=1-24 (or more). Channel offset within bank. Read-only from TotalMix."
+    },
+    {
+      "Category": "LevelMeters",
+      "Name": "/1/level{N}Right",
+      "Function": "Level Meter Right (Banked)",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "N=1-24 (or more). Channel offset within bank. Read-only from TotalMix."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/volume",
+      "Function": "Selected Channel Fader/Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/pan",
+      "Function": "Selected Channel Pan/Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "kOSCScalePrintPan",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/mute",
+      "Function": "Selected Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/solo",
+      "Function": "Selected Channel Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. PFL in PFL-Mode."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/phase",
+      "Function": "Selected Channel Phase Invert Left/Mono",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/phaseRight",
+      "Function": "Selected Channel Phase Invert Right",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/phantom",
+      "Function": "Selected Channel Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Certain Inputs only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/instrument",
+      "Function": "Selected Channel Instrument Option",
+      "ScaleTypeParameter": "kOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. UCX II: Inputs 3/4."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/pad",
+      "Function": "Selected Channel Pad Option",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Certain Inputs only (Mic?)."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/msProc",
+      "Function": "Selected Channel Input MS-Processing",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Monitoring only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/autoset",
+      "Function": "Selected Channel AutoSet Gain Option",
+      "ScaleTypeParameter": "kOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Certain Inputs only (Mic/Inst)."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/loopback",
+      "Function": "Selected Channel Enable Loopback",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Outputs Only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/stereo",
+      "Function": "Selected Channel Set Stereo/Mono",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/cue",
+      "Function": "Selected Channel Cue Output",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Outputs Only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/talkbackSel",
+      "Function": "Selected Channel Include in Talkback",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Outputs Only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/noTrim",
+      "Function": "Selected Channel Exclude from Trim",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Outputs Only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/gain",
+      "Function": "Selected Channel Mic/Digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-. Scale device dependent."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/gainRight",
+      "Function": "Selected Channel Mic/Digital Input Gain (Right)",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-. For stereo channels."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/refLevel",
+      "Function": "Selected Channel Analog Reference Level",
+      "ScaleTypeParameter": "KOSCScaleDirect",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-. Value 0..3."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/width",
+      "Function": "Selected Channel Width",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "kOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-. Inputs/Playbacks only."
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/reverbSend",
+      "Function": "Selected Channel Reverb Send",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-. Inputs/Playbacks only."
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/reverbReturn",
+      "Function": "Selected Channel Reverb Return",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-. Outputs Only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/recordEnable",
+      "Function": "Selected Channel Record Enable (DURec)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/playChannel",
+      "Function": "Selected Channel Playback Track Assign (DURec)",
+      "ScaleTypeParameter": "KOSCScaleDirect",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-. Value 0 for off."
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/lowcutEnable",
+      "Function": "Selected Channel Low Cut Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/lowcutGrade",
+      "Function": "Selected Channel Low Cut Grade/Slope",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/lowcutFreq",
+      "Function": "Selected Channel Low Cut Corner Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "kOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqEnable",
+      "Function": "Selected Channel Parametric EQ enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqType1",
+      "Function": "Selected Channel EQ Band 1 Type",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqGain1",
+      "Function": "Selected Channel EQ Band 1 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "kOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqFreq1",
+      "Function": "Selected Channel EQ Band 1 Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqQ1",
+      "Function": "Selected Channel EQ Band 1 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqGain2",
+      "Function": "Selected Channel EQ Band 2 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqFreq2",
+      "Function": "Selected Channel EQ Band 2 Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqQ2",
+      "Function": "Selected Channel EQ Band 2 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqType3",
+      "Function": "Selected Channel EQ Band 3 Type",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqGain3",
+      "Function": "Selected Channel EQ Band 3 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqFreq3",
+      "Function": "Selected Channel EQ Band 3 Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/eqQ3",
+      "Function": "Selected Channel EQ Band 3 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/compexpEnable",
+      "Function": "Selected Channel Compressor/Expander Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/compexpGain",
+      "Function": "Selected Channel Comp/Exp Make-up Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/compexpAttack",
+      "Function": "Selected Channel Compressor Attack Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/compexpRelease",
+      "Function": "Selected Channel Compressor Release Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/compTrsh",
+      "Function": "Selected Channel Compressor Threshold",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/compRatio",
+      "Function": "Selected Channel Compressor Ratio",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/expTrsh",
+      "Function": "Selected Channel Expander Threshold",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/expRatio",
+      "Function": "Selected Channel Expander Ratio",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/alevEnable",
+      "Function": "Selected Channel Auto Level Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/alevMaxgain",
+      "Function": "Selected Channel Auto Level Max Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/alevHeadroom",
+      "Function": "Selected Channel Auto Level Headroom",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStripFX",
+      "Name": "/2/alevRisetime",
+      "Function": "Selected Channel Auto Level Rise Speed",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /2/track+/-"
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/trackname",
+      "Function": "Selected Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /2/track+/-. Read-only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/labelSubmix",
+      "Function": "Name of selected Submix",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Read-only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/levelLeft",
+      "Function": "Selected Channel Level Left",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-. Read-only."
+    },
+    {
+      "Category": "ChannelStrip",
+      "Name": "/2/levelRight",
+      "Function": "Selected Channel Level Right",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "Applies to channel selected via /2/track+/-. Read-only."
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbEnable",
+      "Function": "Global Reverb Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbType",
+      "Function": "Global Reverb Type (Room)",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbPredelay",
+      "Function": "Global Reverb Pre-Delay",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbLowcut",
+      "Function": "Global Reverb Low Cut Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbHighcut",
+      "Function": "Global Reverb High-Cut Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbRoomscale",
+      "Function": "Global Reverb Room Scale",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbAttack",
+      "Function": "Global Reverb Attack Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Envelope types only"
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbHold",
+      "Function": "Global Reverb Hold Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Envelope types only"
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbRelease",
+      "Function": "Global Reverb Release Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Envelope types only"
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbTime",
+      "Function": "Global Reverb Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Space type only"
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbHighdamp",
+      "Function": "Global Reverb High-Damp Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Space type only"
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbSmooth",
+      "Function": "Global Reverb Smoothness",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbWidth",
+      "Function": "Global Reverb Stereo Width",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/reverbVolume",
+      "Function": "Global Reverb Volume",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/echoEnable",
+      "Function": "Global Echo Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/echoType",
+      "Function": "Global Echo Type Selection",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/echoDelaytime",
+      "Function": "Global Echo Delay Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/echoFeedback",
+      "Function": "Global Echo Feedback Value",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/echoWidth",
+      "Function": "Global Echo Stereo Width",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalFX",
+      "Name": "/3/echoVolume",
+      "Function": "Global Echo Volume",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalControl",
+      "Name": "/3/undo",
+      "Function": "Trigger Undo",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "GlobalControl",
+      "Name": "/3/redo",
+      "Function": "Trigger Redo",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "Snapshots",
+      "Name": "/snapshots/{S}/1",
+      "Function": "Load Snapshot {N}",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "S=1-8 corresponds to Snapshot N=8-1 (reverse order)"
+    },
+    {
+      "Category": "Groups",
+      "Name": "/muteGroups/{G}/1",
+      "Function": "Enable Mute Group {N}",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "G=1-4 corresponds to Group N=4-1"
+    },
+    {
+      "Category": "Groups",
+      "Name": "/soloGroups/{G}/1",
+      "Function": "Enable Solo Group {N}",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "G=1-4 corresponds to Group N=4-1"
+    },
+    {
+      "Category": "Groups",
+      "Name": "/faderGroups/{G}/1",
+      "Function": "Enable Fader Group {N}",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "G=1-4 corresponds to Group N=4-1"
+    },
+    {
+      "Category": "DURec",
+      "Name": "/record/RecordStart",
+      "Function": "Start Record (DuRec)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "DURec",
+      "Name": "/record/PlayPause",
+      "Function": "Play/Pause (DuRec)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Alternating Value 0/1 send by TotalMix FX when paused"
+    },
+    {
+      "Category": "DURec",
+      "Name": "/record/Stop",
+      "Function": "Stop Play/Record (DuRec)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": null
+    },
+    {
+      "Category": "DURec",
+      "Name": "/record/Time",
+      "Function": "Current Time (DuRec)",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Read-only"
+    },
+    {
+      "Category": "DURec",
+      "Name": "/record/State",
+      "Function": "Current DuRec State",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Read-only. Strings: \"Not ready\", \"Stop\", \"Record\", \"Play\", \"Pause\""
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/leftChannel",
+      "Function": "Select Left Channel for Room EQ Edit",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/rightChannel",
+      "Function": "Select Right Channel for Room EQ Edit",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/reqDelay",
+      "Function": "Selected Channel Room EQ Delay",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/reqVolumeCorr",
+      "Function": "Selected Channel Room EQ Volume Correction",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/reqEnable",
+      "Function": "Selected Channel Room EQ Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/reqType{B}",
+      "Function": "Selected Channel Room EQ Band {B} Type",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Remarks": "B=1-9. Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/reqGain{B}",
+      "Function": "Selected Channel Room EQ Band {B} Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Remarks": "B=1-9. Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/reqFreq{B}",
+      "Function": "Selected Channel Room EQ Band {B} Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "B=1-9. Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/reqQ{B}",
+      "Function": "Selected Channel Room EQ Band {B} Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Remarks": "B=1-9. Applies to channel selected via /4/track+/-"
+    },
+    {
+      "Category": "RoomEQ",
+      "Name": "/4/trackname",
+      "Function": "Selected Channel Name (Room EQ Page)",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Remarks": "Applies to channel selected via /4/track+/-. Read-only."
+    }
+  ]
+}

@@ -6,6 +6,7 @@
 #include <memory>
 #include <functional>
 #include <atomic>
+#include <map>
 
 // Include Configuration.h for RmeOscCommandConfig structure
 #include "Configuration.h"
@@ -17,6 +18,8 @@ struct _lo_server_thread;
 typedef struct _lo_server_thread *lo_server_thread;
 struct _lo_message;
 typedef struct _lo_message *lo_message;
+struct _lo_bundle;
+typedef struct _lo_bundle *lo_bundle;
 
 namespace AudioEngine
 {
@@ -64,9 +67,41 @@ namespace AudioEngine
 		};
 
 		/**
+		 * @brief Level meter data structure
+		 */
+		struct LevelMeterData
+		{
+			float peakdB;	// Peak level in dB
+			float rmsdB;	// RMS level in dB
+			float peakFxdB; // FX send peak level in dB (if supported)
+			float rmsFxdB;	// FX send RMS level in dB (if supported)
+			bool clipping;	// Clipping indicator
+
+			LevelMeterData() : peakdB(-144.0f), rmsdB(-144.0f),
+							   peakFxdB(-144.0f), rmsFxdB(-144.0f),
+							   clipping(false) {}
+		};
+
+		/**
+		 * @brief DSP status data
+		 */
+		struct DspStatus
+		{
+			int version;	 // DSP firmware version
+			int loadPercent; // DSP load percentage (0-100)
+
+			DspStatus() : version(0), loadPercent(0) {}
+		};
+
+		/**
 		 * @brief Callback type for OSC message handling
 		 */
 		using OscMessageCallback = std::function<void(const std::string &, const std::vector<std::any> &)>;
+
+		/**
+		 * @brief Callback type for level meter updates
+		 */
+		using LevelMeterCallback = std::function<void(ChannelType, int, const LevelMeterData &)>;
 
 		/**
 		 * @brief Construct a new RmeOscController
@@ -82,7 +117,7 @@ namespace AudioEngine
 		 * @brief Configure the controller with target IP and port
 		 *
 		 * @param ip Target IP address (e.g., "127.0.0.1")
-		 * @param port Target port number (e.g., 9000)
+		 * @param port Target port number (e.g., 7001)
 		 * @return true if configuration succeeded
 		 * @return false if configuration failed
 		 */
@@ -110,6 +145,14 @@ namespace AudioEngine
 		 * @return false if configuration failed
 		 */
 		bool setMessageCallback(OscMessageCallback callback);
+
+		/**
+		 * @brief Set a callback function for level meter updates
+		 *
+		 * @param callback Function to call when level meter data is received
+		 * @return true if callback was set successfully
+		 */
+		bool setLevelMeterCallback(LevelMeterCallback callback);
 
 		/**
 		 * @brief Send an OSC command to the RME device
@@ -260,6 +303,21 @@ namespace AudioEngine
 		}
 
 		/**
+		 * @brief Enable or disable level meter updates
+		 *
+		 * @param enable Whether to enable level meter updates
+		 * @return true if the setting was changed successfully
+		 */
+		bool enableLevelMeters(bool enable);
+
+		/**
+		 * @brief Get current DSP status
+		 *
+		 * @return DspStatus Current DSP status
+		 */
+		DspStatus getDspStatus() const;
+
+		/**
 		 * @brief Send a TotalMix refresh command
 		 * This requests the device to send all current parameter values
 		 *
@@ -292,7 +350,23 @@ namespace AudioEngine
 		 * @return int Return value to indicate message handling status
 		 */
 		int handleOscMessage(const char *path, const char *types,
-							 void *argv, int argc, _lo_message *msg);
+							 lo_arg **argv, int argc, _lo_message *msg);
+
+		/**
+		 * @brief Process a level meter message from the device
+		 *
+		 * @param type Channel type
+		 * @param channel Channel number (1-based)
+		 * @param peakdB Peak level in dB
+		 * @param rmsdB RMS level in dB
+		 * @param peakFxdB FX peak level in dB (may be unused)
+		 * @param rmsFxdB FX RMS level in dB (may be unused)
+		 * @param clipping Clipping indicator
+		 */
+		void processLevelMeter(ChannelType type, int channel,
+							   float peakdB, float rmsdB,
+							   float peakFxdB, float rmsFxdB,
+							   bool clipping);
 
 		/**
 		 * @brief Build an OSC address string for a channel parameter
@@ -320,14 +394,25 @@ namespace AudioEngine
 		 */
 		float normalizedToDb(float normalized) const;
 
+		/**
+		 * @brief Create a new lo_bundle object
+		 *
+		 * @return lo_bundle The new bundle or nullptr if failed
+		 */
+		lo_bundle createBundle();
+
 		// Member variables
-		std::string m_rmeIp;					// Target IP address
-		int m_rmePort = 0;						// Target port
-		bool m_configured = false;				// Configuration state
-		lo_address m_oscAddress;				// liblo OSC address for sending
-		lo_server_thread m_oscServer = nullptr; // liblo OSC server for receiving
-		std::thread *m_oscThread = nullptr;		// OSC thread for receiving
-		OscMessageCallback m_messageCallback;	// Callback for OSC messages
+		std::string m_rmeIp;										 // Target IP address
+		int m_rmePort = 0;											 // Target port
+		bool m_configured = false;									 // Configuration state
+		lo_address m_oscAddress;									 // liblo OSC address for sending
+		lo_server_thread m_oscServer = nullptr;						 // liblo OSC server for receiving
+		std::thread *m_oscThread = nullptr;							 // OSC thread for receiving
+		OscMessageCallback m_messageCallback;						 // Callback for OSC messages
+		LevelMeterCallback m_levelCallback;							 // Callback for level meter updates
+		bool m_levelMetersEnabled = false;							 // Whether level meters are enabled
+		DspStatus m_dspStatus;										 // Current DSP status
+		std::map<std::string, std::atomic<bool>> m_pendingResponses; // For handling query responses
 	};
 
-} // namespace AudioEngine
+}
