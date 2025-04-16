@@ -1,0 +1,2389 @@
+{
+  "rmeOscCommands": [
+    {
+      "Page": 1,
+      "Name": "/1/businput",
+      "Function": "Select Input Bus data",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/busPlayback",
+      "Function": "Select Playback Bus data",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/busOutput",
+      "Function": "Select Output Bus data",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/track+",
+      "Function": "shift bank start +1",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/track-",
+      "Function": "shift bank start-1",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/bank+",
+      "Function": "Change bank start +bank size",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/bank-",
+      "Function": "Change bank start-bank size",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/globalMute",
+      "Function": "Mute Enable (globally)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/globalSolo",
+      "Function": "Solo Enable (globally)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trim",
+      "Function": "Trim mode for all channels",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mainDim",
+      "Function": "DIM",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mainSpeakerB",
+      "Function": "Assign channel for speaker B",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/speakerBLinked",
+      "Function": "Speaker B volume linked to main",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mainRecall",
+      "Function": "Recall Main Out Volume",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mainMuteFx",
+      "Function": "Mute FX return on Main Out",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mainMono",
+      "Function": "Mono for Main Out",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mainExtIn",
+      "Function": "Enable ExtIn -Path",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mainTalkback",
+      "Function": "Enable Talkback",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume1",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "0",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume2",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "1",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume3",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "2",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume4",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "3",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume5",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "4",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume6",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "5",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume7",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "6",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume8",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "7",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/volume9 to /1/volume24",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mastervolume",
+      "Function": "Main Out Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "special",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan1",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "0",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan2",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "1",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan3",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "2",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan4",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "3",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan5",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "4",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan6",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "5",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan7",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "6",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan8",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "7",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/pan9-24",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/1",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "0",
+      "Remarks": "Only effective in TotalMix (Monitoring)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/2",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "1",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/3",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "2",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/4",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "3",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/5",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "4",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/6",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "5",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/7",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "6",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/8",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "7",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/mute/1/9-24",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain1",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "0",
+      "Remarks": "Certain Inputs only (device dependent). Sent to both channels when stereo. Scale depending on channel and device."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain2",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "1",
+      "Remarks": "Certain Inputs only (device dependent). Scale depending on channel and device."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain3",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "2",
+      "Remarks": "Certain Inputs only (device dependent). Scale depending on channel and device."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain4",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "3",
+      "Remarks": "Certain Inputs only (device dependent). Scale depending on channel and device."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain5",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "4",
+      "Remarks": "Certain Inputs only (device dependent). Scale depending on channel and device."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain6",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "5",
+      "Remarks": "Certain Inputs only (device dependent). Scale depending on channel and device."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain7",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "6",
+      "Remarks": "Certain Inputs only (device dependent). Scale depending on channel and device."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain8",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "7",
+      "Remarks": "Certain Inputs only (device dependent). Scale depending on channel and device."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/micgain9-micgain24",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/1",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "0",
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/2",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "1",
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/3",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "2",
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/4",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "3",
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/5",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "4",
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/6",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "5",
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/7",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "6",
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/8",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "7",
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/phantom/1/9-24",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/1",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "0",
+      "Remarks": "PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/2",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "1",
+      "Remarks": "PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/3",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "2",
+      "Remarks": "PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/4",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "3",
+      "Remarks": "PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/5",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "4",
+      "Remarks": "PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/6",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "5",
+      "Remarks": "PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/7",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "6",
+      "Remarks": "PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/8",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "7",
+      "Remarks": "PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/solo/1/9-24",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options. PFL in PFL-Mode. Inputs and Playbacks only."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/1",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "0",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/2",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "1",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/3",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "2",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/4",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "3",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/5",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "4",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/6",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "5",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/7",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "6",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/8",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "7",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/select/1/9-24",
+      "Function": "Selection for ad-hoc fader group",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/1",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "0",
+      "Remarks": "Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/2",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "1",
+      "Remarks": "Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/3",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "2",
+      "Remarks": "Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/4",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "3",
+      "Remarks": "Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/5",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "4",
+      "Remarks": "Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/6",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "5",
+      "Remarks": "Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/7",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "6",
+      "Remarks": "Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/8",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "7",
+      "Remarks": "Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/cue/1/9-24",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleOnOff",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options. Outputs only. Cue on Cue-To-Channel disables Cue."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/labelSubmix",
+      "Function": "Name of selected Submix",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "0",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname1",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "0",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname2",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "1",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname3",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "2",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname4",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "3",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname5",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "4",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname6",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "5",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname7",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "6",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname8",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "7",
+      "Remarks": null
+    },
+    {
+      "Page": 1,
+      "Name": "/1/trackname9-24",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level1Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "0",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level1Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "0",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level2Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "1",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level2Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "1",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level3Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "2",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level3Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "2",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level4Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "3",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level4Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "3",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level5Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "4",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level5Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "4",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level6Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "5",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level6Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "5",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level7Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "6",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level7Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "6",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level8Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "7",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level8Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "7",
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level9Left-level24Left",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 1,
+      "Name": "/1/level9Right-level24Right",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": "8-47",
+      "Remarks": "available when selected in options"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/businput",
+      "Function": "Select Input Bus data",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/busPlayback",
+      "Function": "Select Playback Bus data",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/busOutput",
+      "Function": "Select Output Bus data",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/track+",
+      "Function": "select channel +1",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/track-",
+      "Function": "select channel -1",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/volume",
+      "Function": "Mix-Fader/Output Volume",
+      "ScaleTypeParameter": "KOSCScaleFader",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/pan",
+      "Function": "Mix-Pan/Balance/Output Balance",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "kOSCScalePrintPan",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/mute",
+      "Function": "Channel Mute",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/solo",
+      "Function": "Solo/PFL",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "PFL in PFL-Mode"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/phase",
+      "Function": "Phase Invert Left/Mono",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/phaseRight",
+      "Function": "Phase Invert Right",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/phantom",
+      "Function": "Phantom Power",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/instrument",
+      "Function": "Instrument Option",
+      "ScaleTypeParameter": "kOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/pad",
+      "Function": "Pad Option",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/msProc",
+      "Function": "Input MS-Processing",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Only effective in TotalMix (Monitoring)"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/autoset",
+      "Function": "AutoSet Gain Option",
+      "ScaleTypeParameter": "kOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Certain Inputs only (device dependent)"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/loopback",
+      "Function": "Enable Loopback",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Outputs Only"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/stereo",
+      "Function": "Set Channel Stereo/Mono",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/cue",
+      "Function": "Cue Output",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Outputs Only"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/talkbackSel",
+      "Function": "Include Channel in Talkback",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Outputs Only"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/noTrim",
+      "Function": "Exclude Channel from Trim",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Outputs Only"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/gain",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "Scale depending on channel and device"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/gainRight",
+      "Function": "Microphone or digital Input Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "Only way to set right channel different when channel is stereo"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/refLevel",
+      "Function": "Analog Reference Value",
+      "ScaleTypeParameter": "KOSCScaleDirect",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "Value 0...3 device and channel dependent only effective in TotalMix (Monitoring)"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/width",
+      "Function": "Width-Parameter in TotalMix",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "kOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "Only Inputs and Playbacks"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/reverbSend",
+      "Function": "Reverb Send",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": "Only Inputs and Playbacks"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/reverbReturn",
+      "Function": "Reverb Return",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": "Outputs Only"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/recordEnable",
+      "Function": "Record Enable for Channel",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/playChannel",
+      "Function": "Playback-track (in file) for Channel",
+      "ScaleTypeParameter": "KOSCScaleDirect",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "Value 0 for off"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/lowcutEnable",
+      "Function": "Low Cut Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/lowcutGrade",
+      "Function": "Low Cut Grade",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/lowcutFreq",
+      "Function": "Low Cut Corner Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "kOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqEnable",
+      "Function": "Parametric EQ enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqType1",
+      "Function": "Band 1 characteristics",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Channel": null,
+      "Remarks": "Device depending Bell, Low Shelf, High-Pass, (Low Pass) scaled 0...1"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqGain1",
+      "Function": "Band 1 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "kOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqFreq1",
+      "Function": "Band 1 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqQ1",
+      "Function": "Band 1 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqGain2",
+      "Function": "Band 2 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqFreq2",
+      "Function": "Band 2 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqQ2",
+      "Function": "Band 2 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqType3",
+      "Function": "Band 3 characteristics",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Channel": null,
+      "Remarks": "variants Bell, High Shelf, (Low Pass, High Pass), scaled 0...1"
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqGain3",
+      "Function": "Band 3 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqFreq3",
+      "Function": "Band 3 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/eqQ3",
+      "Function": "Band 3 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/compexpEnable",
+      "Function": "Compressor/Expander en.",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/compexpGain",
+      "Function": "Make-up-gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/compexpAttack",
+      "Function": "Compressor Attack Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/compexpRelease",
+      "Function": "Compressor Release Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/compTrsh",
+      "Function": "Compressor Threshold",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/compRatio",
+      "Function": "Compressor Ratio",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/expTrsh",
+      "Function": "Expander Threshold",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/expRatio",
+      "Function": "Expander Ratio",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/alevEnable",
+      "Function": "Auto Level Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/alevMaxgain",
+      "Function": "Auto Level Max. Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/alevHeadroom",
+      "Function": "Auto Level Headroom",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/alevRisetime",
+      "Function": "Auto Level Rise Speed",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/trackname",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/labelSubmix",
+      "Function": "Name of selected Submix",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 2,
+      "Name": "/2/levelLeft",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 2,
+      "Name": "/2/levelRight",
+      "Function": "Level in dB",
+      "ScaleTypeParameter": "KOSCScaleLevel",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": "Peak Hold can be enabled in TotalMix Settings. Measured on terminals (input pre FX, output post FX)."
+    },
+    {
+      "Page": 3,
+      "Name": "/3/globalMute",
+      "Function": "Mute Enable (globally)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/globalSolo",
+      "Function": "Solo Enable (globally)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbEnable",
+      "Function": "Reverb Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbType",
+      "Function": "Reverb Type (Room)",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbPredelay",
+      "Function": "Reverb Pre-Delay",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbLowcut",
+      "Function": "Reverb Low Cut",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbHighcut",
+      "Function": "Reverb High-Cut",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbRoomscale",
+      "Function": "Reverb Room Scale",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbAttack",
+      "Function": "Reverb Attack Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "only for Envelope types"
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbHold",
+      "Function": "Reverb Hold Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "only for Envelope types"
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbRelease",
+      "Function": "Reverb Release Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "only for Envelope types"
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbTime",
+      "Function": "Reverb Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "only for Space type"
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbHighdamp",
+      "Function": "Reverb High-Damp",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": "only for Space type"
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbSmooth",
+      "Function": "Smoothness",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbWidth",
+      "Function": "Reverb Stereo Width",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/reverbVolume",
+      "Function": "Reverb Volume",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/echoEnable",
+      "Function": "Echo Enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/echoType",
+      "Function": "Echo Type Selection",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/echoDelaytime",
+      "Function": "Echo Delay Time",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/echoFeedback",
+      "Function": "Echo Feedback Value",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/echoWidth",
+      "Function": "Echo Stereo Width",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/echoVolume",
+      "Function": "Echo Volume",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/undo",
+      "Function": "Trigger Undo",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/3/redo",
+      "Function": "Trigger Redo",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/snapshots/8/1",
+      "Function": "Load Snapshot 1",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/snapshots/7/1",
+      "Function": "Load Snapshot 2",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/snapshots/6/1",
+      "Function": "Load Snapshot 3",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/snapshots/5/1",
+      "Function": "Load Snapshot 4",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/snapshots/4/1",
+      "Function": "Load Snapshot 5",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/snapshots/3/1",
+      "Function": "Load Snapshot 6",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/snapshots/2/1",
+      "Function": "Load Snapshot 7",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/snapshots/1/1",
+      "Function": "Load Snapshot 8",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/muteGroups/4/1",
+      "Function": "Enable Mute Group 1",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/muteGroups/3/1",
+      "Function": "Enable Mute Group 2",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/muteGroups/2/1",
+      "Function": "Enable Mute Group 3",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/muteGroups/1/1",
+      "Function": "Enable Mute Group 4",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/soloGroups/4/1",
+      "Function": "Enable Solo Group 1",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/soloGroups/3/1",
+      "Function": "Enable Solo Group 2",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/soloGroups/2/1",
+      "Function": "Enable Solo Group 3",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/soloGroups/1/1",
+      "Function": "Enable Solo Group 4",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/faderGroups/4/1",
+      "Function": "Enable Fader Group 1",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/faderGroups/3/1",
+      "Function": "Enable Fader Group 2",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/faderGroups/2/1",
+      "Function": "Enable Fader Group 3",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/faderGroups/1/1",
+      "Function": "Enable Fader Group 4",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/record/RecordStart",
+      "Function": "Start Record (DuRec)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/record/PlayPause",
+      "Function": "Play/Pause (DuRec)",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "alternating Value 0/1 send by TotalMix FX when paused"
+    },
+    {
+      "Page": 3,
+      "Name": "/record/Stop",
+      "Function": "Stop Play/Record",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/record/Time",
+      "Function": "Current Time (DuRec)",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 3,
+      "Name": "/record/State",
+      "Function": "Current DuRec State",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "Strings \"Not ready\", \"Stop\", \"Record\", \"Play\", \"Pause\""
+    },
+    {
+      "Page": 4,
+      "Name": "/4/track+",
+      "Function": "select channel +1",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/track-",
+      "Function": "select channel -1",
+      "ScaleTypeParameter": "KOSCScaleNoSend",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/leftChannel",
+      "Function": "Selects left channel parameters",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "If leftChannel and rightChannel are active, parameters are displayed from left channel and sent to both channels"
+    },
+    {
+      "Page": 4,
+      "Name": "/4/rightChannel",
+      "Function": "Selects right channel parameters",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": "If leftChannel and rightChannel are active, parameters are displayed from left channel and sent to both channels"
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqDelay",
+      "Function": "Delay Value",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqVolumeCorr",
+      "Function": "Volume Correction",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqEnable",
+      "Function": "Parametric EQ enable",
+      "ScaleTypeParameter": "KOSCScaleToggle",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqType1",
+      "Function": "Band 1 characteristics",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Channel": null,
+      "Remarks": "variants Bell, Low Shelf, High Pass, Low Pass, scaled 0...1"
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain1",
+      "Function": "Band 1 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq1",
+      "Function": "Band 1 Freq",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ1",
+      "Function": "Band 1 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain2",
+      "Function": "Band 2 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq2",
+      "Function": "Band 2 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ2",
+      "Function": "Band 2 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain3",
+      "Function": "Band 3 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq3",
+      "Function": "Band 3 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ3",
+      "Function": "Band 3 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain4",
+      "Function": "Band 4 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq4",
+      "Function": "Band 4 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ4",
+      "Function": "Band 4 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain5",
+      "Function": "Band 5 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq5",
+      "Function": "Band 5 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ5",
+      "Function": "Band 5 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain6",
+      "Function": "Band 6 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq6",
+      "Function": "Band 6 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ6",
+      "Function": "Band 6 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain7",
+      "Function": "Band 7 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq7",
+      "Function": "Band 7 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ7",
+      "Function": "Band 7 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain8",
+      "Function": "Band 8 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq8",
+      "Function": "Band 8 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ8",
+      "Function": "Band 8 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqType9",
+      "Function": "Band 9 characteristics",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCPrintSelection",
+      "Channel": null,
+      "Remarks": "variants Bell, High Shelf, Low Pass, High Pass, scaled 0...1"
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqGain9",
+      "Function": "Band 9 Gain",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintdB",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqFreq9",
+      "Function": "Band 9 Freq.",
+      "ScaleTypeParameter": "KOSCScaleFreq",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/reqQ9",
+      "Function": "Band 9 Q",
+      "ScaleTypeParameter": "KOSCScaleLin01",
+      "ScaleTypeDisplayValue": "KOSCScalePrintVal",
+      "Channel": null,
+      "Remarks": null
+    },
+    {
+      "Page": 4,
+      "Name": "/4/trackname",
+      "Function": "Channel Name",
+      "ScaleTypeParameter": "KOSCScaleString",
+      "ScaleTypeDisplayValue": "KOSCScaleNoSend",
+      "Channel": null,
+      "Remarks": null
+    }
+  ]
+}

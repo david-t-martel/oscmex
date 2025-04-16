@@ -31,6 +31,39 @@ namespace AudioEngine
 	{
 	public:
 		/**
+		 * @brief RME Device Channel Types
+		 */
+		enum class ChannelType
+		{
+			INPUT,	  // Hardware inputs
+			PLAYBACK, // Software playback channels
+			OUTPUT	  // Hardware outputs
+		};
+
+		/**
+		 * @brief Common parameter types for RME devices
+		 */
+		enum class ParamType
+		{
+			GAIN,		   // Input gain (microphone preamp)
+			VOLUME,		   // Channel volume
+			MUTE,		   // Channel mute state
+			STEREO,		   // Channel stereo link
+			PAN,		   // Channel pan position (-100 to +100)
+			PHASE,		   // Phase invert
+			FX_SEND,	   // Effect send level
+			FX_RETURN,	   // Effect return level
+			EQ_ENABLE,	   // EQ on/off
+			EQ_BAND1_TYPE, // First EQ band type
+			EQ_BAND1_FREQ, // First EQ band frequency
+			EQ_BAND1_GAIN, // First EQ band gain
+			EQ_BAND1_Q,	   // First EQ band Q
+			DYN_ENABLE,	   // Dynamics on/off
+			PHANTOM_POWER, // 48V phantom power
+			HI_Z		   // Hi-Z input impedance
+		};
+
+		/**
 		 * @brief Callback type for OSC message handling
 		 */
 		using OscMessageCallback = std::function<void(const std::string &, const std::vector<std::any> &)>;
@@ -122,32 +155,117 @@ namespace AudioEngine
 		/**
 		 * @brief Set channel strip mute state
 		 *
+		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
 		 * @param mute Mute state (true = muted)
 		 * @return true if the command was sent successfully
 		 * @return false if the command failed
 		 */
-		bool setChannelMute(int channel, bool mute);
+		bool setChannelMute(ChannelType type, int channel, bool mute);
+
+		/**
+		 * @brief Set channel strip stereo link state
+		 *
+		 * @param type Channel type (input, playback, output)
+		 * @param channel Channel number (1-based)
+		 * @param stereo Stereo link state (true = linked)
+		 * @return true if the command was sent successfully
+		 * @return false if the command failed
+		 */
+		bool setChannelStereo(ChannelType type, int channel, bool stereo);
 
 		/**
 		 * @brief Set channel strip volume
 		 *
+		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
 		 * @param volume_db Volume in decibels
 		 * @return true if the command was sent successfully
 		 * @return false if the command failed
 		 */
-		bool setChannelVolume(int channel, float volume_db);
+		bool setChannelVolume(ChannelType type, int channel, float volume_db);
+
+		/**
+		 * @brief Legacy method for volume control (output only)
+		 * @deprecated Use setChannelVolume(ChannelType::OUTPUT, ...) instead
+		 */
+		bool setChannelVolume(int channel, float volume_db)
+		{
+			return setChannelVolume(ChannelType::OUTPUT, channel, volume_db);
+		}
+
+		/**
+		 * @brief Set channel phantom power (48V)
+		 *
+		 * @param channel Input channel number (1-based)
+		 * @param enabled Phantom power state
+		 * @return true if the command was sent successfully
+		 * @return false if the command failed or not supported on this input
+		 */
+		bool setInputPhantomPower(int channel, bool enabled);
+
+		/**
+		 * @brief Set input channel Hi-Z mode
+		 *
+		 * @param channel Input channel number (1-based)
+		 * @param enabled Hi-Z state
+		 * @return true if the command was sent successfully
+		 * @return false if the command failed or not supported on this input
+		 */
+		bool setInputHiZ(int channel, bool enabled);
+
+		/**
+		 * @brief Set channel EQ state
+		 *
+		 * @param type Channel type (input, playback, output)
+		 * @param channel Channel number (1-based)
+		 * @param enabled EQ state
+		 * @return true if the command was sent successfully
+		 * @return false if the command failed
+		 */
+		bool setChannelEQ(ChannelType type, int channel, bool enabled);
+
+		/**
+		 * @brief Set channel EQ band parameters
+		 *
+		 * @param type Channel type (input, playback, output)
+		 * @param channel Channel number (1-based)
+		 * @param band Band number (1-3)
+		 * @param freq Frequency in Hz
+		 * @param gain Gain in dB (-20 to +20)
+		 * @param q Q factor (0.4 to 9.9)
+		 * @return true if the command was sent successfully
+		 * @return false if the command failed
+		 */
+		bool setChannelEQBand(ChannelType type, int channel, int band, float freq, float gain, float q);
 
 		/**
 		 * @brief Query channel volume from the device
 		 *
+		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
 		 * @param volume_db Output parameter for volume in decibels
 		 * @return true if the volume was retrieved successfully
 		 * @return false if the query failed
 		 */
-		bool queryChannelVolume(int channel, float &volume_db);
+		bool queryChannelVolume(ChannelType type, int channel, float &volume_db);
+
+		/**
+		 * @brief Legacy method to query channel volume (output only)
+		 * @deprecated Use queryChannelVolume(ChannelType::OUTPUT, ...) instead
+		 */
+		bool queryChannelVolume(int channel, float &volume_db)
+		{
+			return queryChannelVolume(ChannelType::OUTPUT, channel, volume_db);
+		}
+
+		/**
+		 * @brief Send a TotalMix refresh command
+		 * This requests the device to send all current parameter values
+		 *
+		 * @return true if the command was sent successfully
+		 */
+		bool requestRefresh();
 
 		/**
 		 * @brief Send a ping to verify connection status
@@ -176,14 +294,40 @@ namespace AudioEngine
 		int handleOscMessage(const char *path, const char *types,
 							 void *argv, int argc, _lo_message *msg);
 
+		/**
+		 * @brief Build an OSC address string for a channel parameter
+		 *
+		 * @param type Channel type
+		 * @param channel Channel number (1-based)
+		 * @param param Parameter type
+		 * @return OSC address string
+		 */
+		std::string buildChannelAddress(ChannelType type, int channel, ParamType param);
+
+		/**
+		 * @brief Convert dB value to normalized (0-1) value for RME
+		 *
+		 * @param db Value in decibels
+		 * @return float Normalized value (0-1)
+		 */
+		float dbToNormalized(float db) const;
+
+		/**
+		 * @brief Convert normalized (0-1) value to dB value
+		 *
+		 * @param normalized Normalized value (0-1)
+		 * @return float Value in decibels
+		 */
+		float normalizedToDb(float normalized) const;
+
 		// Member variables
 		std::string m_rmeIp;					// Target IP address
 		int m_rmePort = 0;						// Target port
 		bool m_configured = false;				// Configuration state
 		lo_address m_oscAddress;				// liblo OSC address for sending
 		lo_server_thread m_oscServer = nullptr; // liblo OSC server for receiving
-		std::thread *m_oscThread = nullptr;		// Thread for receiving OSC messages
-		OscMessageCallback m_messageCallback;	// Callback for received messages
+		std::thread *m_oscThread = nullptr;		// OSC thread for receiving
+		OscMessageCallback m_messageCallback;	// Callback for OSC messages
 	};
 
 } // namespace AudioEngine

@@ -5,6 +5,8 @@
 #include <thread>
 #include <chrono>
 #include <functional>
+#include <algorithm>
+#include <map>
 
 // Include liblo for OSC communication
 extern "C"
@@ -51,6 +53,9 @@ namespace AudioEngine
 			return false;
 		}
 
+		// Set UDP transmission timeout (default is -1 which can hang indefinitely)
+		lo_address_set_ttl(m_oscAddress, 4); // Reasonable TTL for local network
+
 		m_configured = true;
 		std::cout << "RME OSC Controller configured for " << ip << ":" << port << std::endl;
 		return true;
@@ -79,10 +84,11 @@ namespace AudioEngine
 		}
 
 		// Set up generic message handler
-		lo_server_thread_add_method(m_oscServer, nullptr, nullptr, [](const char *path, const char *types, lo_arg **argv, int argc, lo_message msg, void *user_data) -> int
-									{
-										RmeOscController *controller = static_cast<RmeOscController*>(user_data);
-										return controller->handleOscMessage(path, types, argv, argc, msg); }, this);
+		lo_server_thread_add_method(m_oscServer, nullptr, nullptr,
+									// Use C-style cast here because we know the argument types match
+									(lo_method_handler)[](const char *path, const char *types, lo_arg **argv, int argc, lo_message msg, void *user_data)->int {
+				RmeOscController *controller = static_cast<RmeOscController*>(user_data);
+				return controller->handleOscMessage(path, types, argv, argc, msg); }, this);
 
 		// Start the server thread
 		if (lo_server_thread_start(m_oscServer) < 0)
@@ -154,7 +160,7 @@ namespace AudioEngine
 			m_messageCallback(path, args);
 		}
 
-		return 0; // Return 1 to indicate message handled, 0 otherwise
+		return 0; // Return 0 to indicate we handled the message
 	}
 
 	bool RmeOscController::setMessageCallback(OscMessageCallback callback)
@@ -331,16 +337,20 @@ namespace AudioEngine
 		std::atomic<bool> responseReceived{false};
 		float receivedValue = 0.0f;
 
+		// Package the data for the callback
+		auto responseData = new std::pair<std::atomic<bool> *, float *>(&responseReceived, &receivedValue);
+
 		// Add a method that matches the reply pattern
-		lo_server_add_method(tempServer, address.c_str(), "f", [](const char *path, const char *types, lo_arg **argv, int argc, lo_message msg, void *data) -> int
-							 {
+		lo_server_add_method(tempServer, address.c_str(), "f",
+							 // Use C-style cast for lo_method_handler
+							 (lo_method_handler)[](const char *path, const char *types, lo_arg **argv, int argc, lo_message msg, void *data)->int {
 				auto responseData = static_cast<std::pair<std::atomic<bool>*, float*>*>(data);
 				if (argc >= 1 && types[0] == 'f')
 				{
 					*responseData->second = argv[0]->f;
 					responseData->first->store(true);
 				}
-				return 0; }, new std::pair<std::atomic<bool> *, float *>(&responseReceived, &receivedValue));
+				return 0; }, responseData);
 
 		// Send an empty message to request current value
 		lo_message msg = lo_message_new();
@@ -352,6 +362,7 @@ namespace AudioEngine
 			std::cerr << "RmeOscController: Failed to send query: "
 					  << lo_address_errstr(m_oscAddress) << std::endl;
 			lo_server_free(tempServer);
+			delete responseData;
 			return false;
 		}
 
@@ -368,6 +379,7 @@ namespace AudioEngine
 			{
 				std::cerr << "RmeOscController: Timeout waiting for response to " << address << std::endl;
 				lo_server_free(tempServer);
+				delete responseData;
 				return false;
 			}
 
@@ -376,68 +388,298 @@ namespace AudioEngine
 
 		// Clean up
 		lo_server_free(tempServer);
-
-		// Set the output value
 		outValue = receivedValue;
+		delete responseData;
 		return true;
 	}
 
-	bool RmeOscController::setMatrixCrosspointGain(int hw_input, int hw_output, float gain_db)
+	std::string RmeOscController::buildChannelAddress(ChannelType type, int channel, ParamType param)
 	{
-		// IMPORTANT: The exact address format depends on the RME OSC implementation
-		// Consult the RME TotalMix FX OSC documentation for the correct format
+		std::string prefix;
+		std::string paramName;
 
-		// Example address: /1/matrix/{input}/{output}/gain
-		std::string address = "/1/matrix/" + std::to_string(hw_input) + "/" + std::to_string(hw_output) + "/gain";
-
-		// Convert dB to linear gain (0-1 range for RME)
-		// This conversion may need adjustment based on RME's expected range
-		float gain_linear = std::pow(10.0f, gain_db / 20.0f);
-		gain_linear = std::max(0.0f, std::min(1.0f, gain_linear)); // Clamp to 0-1
-
-		return sendCommand(address, {std::any(gain_linear)});
-	}
-
-	bool RmeOscController::setChannelMute(int channel, bool mute)
-	{
-		// Example address: /1/channel/{ch}/mute
-		std::string address = "/1/channel/" + std::to_string(channel) + "/mute";
-
-		// Boolean values are sent as integers in OSC
-		int muteVal = mute ? 1 : 0;
-
-		return sendCommand(address, {std::any(muteVal)});
-	}
-
-	bool RmeOscController::setChannelVolume(int channel, float volume_db)
-	{
-		// Example address: /1/channel/{ch}/volume
-		std::string address = "/1/channel/" + std::to_string(channel) + "/volume";
-
-		// Convert dB to normalized range (0-1)
-		// This conversion may need adjustment based on RME's expected range
-		// Assuming RME expects 0-1 range where 0 = -inf dB, 1 = 0dB
-		float volume_norm;
-		if (volume_db <= -96.0f)
+		// Build prefix based on channel type
+		switch (type)
 		{
-			volume_norm = 0.0f; // Minimum value (-inf dB)
+		case ChannelType::INPUT:
+			prefix = "/input/";
+			break;
+		case ChannelType::PLAYBACK:
+			prefix = "/playback/";
+			break;
+		case ChannelType::OUTPUT:
+			prefix = "/output/";
+			break;
+		}
+
+		// Build parameter name
+		switch (param)
+		{
+		case ParamType::VOLUME:
+			paramName = "volume";
+			break;
+		case ParamType::MUTE:
+			paramName = "mute";
+			break;
+		case ParamType::STEREO:
+			paramName = "stereo";
+			break;
+		case ParamType::PAN:
+			paramName = "balance"; // For outputs, "balance" for inputs/playback, "pan"
+			if (type != ChannelType::OUTPUT)
+				paramName = "pan";
+			break;
+		case ParamType::PHASE:
+			paramName = "phase";
+			break;
+		case ParamType::FX_SEND:
+			paramName = "fx";
+			break;
+		case ParamType::FX_RETURN:
+			paramName = "fx";
+			break;
+		case ParamType::GAIN:
+			paramName = "gain";
+			break;
+		case ParamType::EQ_ENABLE:
+			paramName = "eq";
+			break;
+		case ParamType::PHANTOM_POWER:
+			paramName = "48v";
+			break;
+		case ParamType::HI_Z:
+			paramName = "hi-z";
+			break;
+		case ParamType::DYN_ENABLE:
+			paramName = "dynamics";
+			break;
+		// EQ bands have special handling
+		case ParamType::EQ_BAND1_TYPE:
+		case ParamType::EQ_BAND1_FREQ:
+		case ParamType::EQ_BAND1_GAIN:
+		case ParamType::EQ_BAND1_Q:
+			// Will be handled separately below
+			paramName = "eq";
+			break;
+		default:
+			std::cerr << "RmeOscController: Unsupported parameter type" << std::endl;
+			return "";
+		}
+
+		// Form the basic address
+		std::string address = prefix + std::to_string(channel) + "/" + paramName;
+
+		// Special handling for EQ parameters which need a sub-path
+		if (param >= ParamType::EQ_BAND1_TYPE && param <= ParamType::EQ_BAND1_Q)
+		{
+			int band = 1; // Default to band 1
+
+			std::string eqParam;
+			switch (param)
+			{
+			case ParamType::EQ_BAND1_TYPE:
+				eqParam = "band1type";
+				break;
+			case ParamType::EQ_BAND1_FREQ:
+				eqParam = "band1freq";
+				break;
+			case ParamType::EQ_BAND1_GAIN:
+				eqParam = "band1gain";
+				break;
+			case ParamType::EQ_BAND1_Q:
+				eqParam = "band1q";
+				break;
+			default:
+				break;
+			}
+
+			address += "/" + eqParam;
+		}
+
+		return address;
+	}
+
+	float RmeOscController::dbToNormalized(float db) const
+	{
+		// Convert dB to normalized range (0-1)
+		// Based on RME's expected range in oscmix.c
+		// volume value handling (typically -65dB to +6dB)
+
+		if (db <= -65.0f)
+		{
+			return 0.0f; // Minimum value (-inf dB)
 		}
 		else
 		{
 			// Map from typical dB range to 0-1
-			// This is a simplified mapping that may need adjustment
-			volume_norm = (volume_db + 96.0f) / 96.0f;
-			volume_norm = std::max(0.0f, std::min(1.0f, volume_norm)); // Clamp to 0-1
+			// This matches RME's volume scaling in the oscmix.c code
+			float norm = (db + 65.0f) / 71.0f;			 // Map from -65..+6 to 0..1
+			return std::max(0.0f, std::min(1.0f, norm)); // Clamp to 0-1
 		}
+	}
+
+	float RmeOscController::normalizedToDb(float normalized) const
+	{
+		// Convert normalized volume back to dB
+		// Inverse of dbToNormalized
+		if (normalized <= 0.0f)
+		{
+			return -INFINITY; // Or use -96.0f as a practical "silence" level
+		}
+		else
+		{
+			return normalized * 71.0f - 65.0f; // Map from 0..1 to -65..+6
+		}
+	}
+
+	bool RmeOscController::setMatrixCrosspointGain(int hw_input, int hw_output, float gain_db)
+	{
+		// Based on the oscmix.c implementation, we need to convert dB to a linear value
+		// and use the appropriate address format
+
+		std::string address = "/mix/" + std::to_string(hw_output) + "/input/" + std::to_string(hw_input);
+
+		// In the oscmix.c code, setmix() function converts dB to linear using powf(10, vol / 20)
+		// It also handles panning, but we'll keep it simple for this implementation
+		return sendCommand(address, {std::any(gain_db)});
+	}
+
+	bool RmeOscController::setChannelMute(ChannelType type, int channel, bool mute)
+	{
+		std::string address = buildChannelAddress(type, channel, ParamType::MUTE);
+		if (address.empty())
+			return false;
+
+		// Boolean values are sent as integers in OSC
+		return sendCommand(address, {std::any(mute)});
+	}
+
+	bool RmeOscController::setChannelStereo(ChannelType type, int channel, bool stereo)
+	{
+		std::string address = buildChannelAddress(type, channel, ParamType::STEREO);
+		if (address.empty())
+			return false;
+
+		// In oscmix.c, stereo links always affect two channels (odd + even)
+		return sendCommand(address, {std::any(stereo)});
+	}
+
+	bool RmeOscController::setChannelVolume(ChannelType type, int channel, float volume_db)
+	{
+		std::string address = buildChannelAddress(type, channel, ParamType::VOLUME);
+		if (address.empty())
+			return false;
+
+		// Convert dB to normalized range (0-1) for RME
+		float volume_norm = dbToNormalized(volume_db);
 
 		return sendCommand(address, {std::any(volume_norm)});
 	}
 
+	bool RmeOscController::setInputPhantomPower(int channel, bool enabled)
+	{
+		std::string address = buildChannelAddress(ChannelType::INPUT, channel, ParamType::PHANTOM_POWER);
+		if (address.empty())
+			return false;
+
+		// In oscmix.c, this is only valid for certain inputs (check the INPUT_48V flag)
+		return sendCommand(address, {std::any(enabled)});
+	}
+
+	bool RmeOscController::setInputHiZ(int channel, bool enabled)
+	{
+		std::string address = buildChannelAddress(ChannelType::INPUT, channel, ParamType::HI_Z);
+		if (address.empty())
+			return false;
+
+		// In oscmix.c, this is only valid for certain inputs (check the INPUT_HIZ flag)
+		return sendCommand(address, {std::any(enabled)});
+	}
+
+	bool RmeOscController::setChannelEQ(ChannelType type, int channel, bool enabled)
+	{
+		std::string address = buildChannelAddress(type, channel, ParamType::EQ_ENABLE);
+		if (address.empty())
+			return false;
+
+		return sendCommand(address, {std::any(enabled)});
+	}
+
+	bool RmeOscController::setChannelEQBand(ChannelType type, int channel, int band, float freq, float gain, float q)
+	{
+		// Validate band number
+		if (band < 1 || band > 3)
+		{
+			std::cerr << "RmeOscController: Invalid EQ band number (must be 1-3)" << std::endl;
+			return false;
+		}
+
+		// Based on oscmix.c, EQ parameters are stored in separate registers
+		// We'll need to send multiple commands
+
+		// EQ must be enabled first
+		if (!setChannelEQ(type, channel, true))
+		{
+			return false;
+		}
+
+		// Base address for this channel type
+		std::string baseAddr = (type == ChannelType::INPUT) ? "/input/" : (type == ChannelType::OUTPUT) ? "/output/"
+																										: "/playback/";
+		baseAddr += std::to_string(channel);
+
+		// Send frequency parameter
+		std::string freqAddr = baseAddr + "/eq/band" + std::to_string(band) + "freq";
+		if (!sendCommand(freqAddr, {std::any((int)freq)}))
+		{
+			return false;
+		}
+
+		// Send gain parameter (oscmix.c scales by 0.1)
+		std::string gainAddr = baseAddr + "/eq/band" + std::to_string(band) + "gain";
+		if (!sendCommand(gainAddr, {std::any(gain * 10.0f)}))
+		{
+			return false;
+		}
+
+		// Send Q parameter (oscmix.c scales by 0.1)
+		std::string qAddr = baseAddr + "/eq/band" + std::to_string(band) + "q";
+		if (!sendCommand(qAddr, {std::any(q * 10.0f)}))
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	bool RmeOscController::queryChannelVolume(ChannelType type, int channel, float &volume_db)
+	{
+		std::string address = buildChannelAddress(type, channel, ParamType::VOLUME);
+		if (address.empty())
+			return false;
+
+		float normalized_volume = 0.0f;
+		if (!querySingleValue(address, normalized_volume, 500))
+		{
+			return false;
+		}
+
+		// Convert normalized volume back to dB
+		volume_db = normalizedToDb(normalized_volume);
+		return true;
+	}
+
+	bool RmeOscController::requestRefresh()
+	{
+		// In oscmix.c, this sends a special command to request all current values
+		return sendCommand("/refresh", {});
+	}
+
 	bool RmeOscController::refreshConnectionStatus()
 	{
-		// Send a generic ping command to see if the connection is still alive
-		// You might need to adjust this based on RME's specific protocol
-		std::string address = "/ping";
+		// Send a ping to verify connection status
+		// Based on TotalMix FX OSC documentation, we'll use a harmless query
+		std::string address = "/hardware/dspload";
 		lo_message msg = lo_message_new();
 		int result = lo_send_message(m_oscAddress, address.c_str(), msg);
 		lo_message_free(msg);
@@ -449,30 +691,6 @@ namespace AudioEngine
 		}
 
 		std::cout << "RME OSC connection is active" << std::endl;
-		return true;
-	}
-
-	bool RmeOscController::queryChannelVolume(int channel, float &volume_db)
-	{
-		std::string address = "/1/channel/" + std::to_string(channel) + "/volume";
-		float normalized_volume = 0.0f;
-
-		if (!querySingleValue(address, normalized_volume, 500))
-		{
-			return false;
-		}
-
-		// Convert normalized volume back to dB
-		// Assuming the same conversion as in setChannelVolume
-		if (normalized_volume <= 0.0f)
-		{
-			volume_db = -INFINITY;
-		}
-		else
-		{
-			volume_db = normalized_volume * 96.0f - 96.0f;
-		}
-
 		return true;
 	}
 
