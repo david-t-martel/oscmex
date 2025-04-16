@@ -4,33 +4,33 @@
       "name": "Win64-Intel",
       "includePath": [
         "${workspaceFolder}/**",
-        // --- Adjust these paths based on your actual library locations ---
-        "${workspaceFolder}/**", // Example ASIO SDK path
-        "C:/Program Files/ffmpeg/include", // Example FFmpeg include path
-        "C:/path/to/oscpack/include", // Example OSC library include path
-        // Add path to your GUI library includes if applicable (e.g., Qt, wxWidgets)
-        "C:/path/to/gui_library/include"
+        // --- Project Dependencies ---
+        "${workspaceFolder}/asio/common",
+        "${workspaceFolder}/asio/host",
+        "C:/Program Files/ffmpeg/include", // VERIFY THIS
+        "${workspaceFolder}/src/liblo",
+        // --- oneAPI Component Includes (Based on standard paths) ---
+        "C:/Program Files (x86)/Intel/oneAPI/tbb/latest/include",
+        "C:/Program Files (x86)/Intel/oneAPI/mkl/latest/include",
+        "C:/Program Files (x86)/Intel/oneAPI/ipp/latest/include",
+        "C:/Program Files (x86)/Intel/oneAPI/ippcp/latest/include",
+        "C:/Program Files (x86)/Intel/oneAPI/dal/latest/include",
+        "C:/Program Files (x86)/Intel/oneAPI/dpl/latest/include",
+        // --- Optional GUI Library ---
+        "C:/path/to/gui_library/include" // ADJUST or REMOVE
       ],
       "defines": [
         "_DEBUG",
         "UNICODE",
         "_UNICODE"
-        // Add any other necessary preprocessor defines
       ],
-      // --- Crucial: Point this to your Intel icx/icpx compiler ---
-      // Option 1: Rely on PATH if Intel environment variables are set (Recommended if possible)
+      // Compiler path relies on PATH set by setvars.bat
       "compilerPath": "icx.exe",
-      // Option 2: Specify the full path (Adjust based on your oneAPI installation)
-      // "compilerPath": "C:/Program Files (x86)/Intel/oneAPI/compiler/latest/windows/bin/icx.exe",
-      "windowsSdkVersion": "10.0.22621.0", // Adjust if using a different Windows SDK version
+      "windowsSdkVersion": "10.0.26100.0", // Updated to match environment
       "cStandard": "c17",
-      "cppStandard": "c++17", // Or "c++20" if you are using C++20 features
-      // Intel oneAPI compiler is Clang-based
+      "cppStandard": "c++17",
       "intelliSenseMode": "windows-clang-x64",
-      // Optional: Add specific compiler arguments if needed for IntelliSense accuracy
-      "compilerArgs": [
-        // e.g., "/Qstd=c++17" if not automatically detected
-      ]
+      "compilerArgs": []
     }
   ],
   "version": 4
