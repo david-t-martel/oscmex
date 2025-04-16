@@ -1,3 +1,4 @@
 # This file is used to ignore files and directories in a Git repository.
 /VST_SDK
 /vst3sdk
+*.zip

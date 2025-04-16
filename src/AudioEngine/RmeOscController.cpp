@@ -100,8 +100,8 @@ namespace AudioEngine
 		lo_server_thread_add_method(m_oscServer, nullptr, nullptr,
 									// Use C-style cast here because we know the argument types match
 									(lo_method_handler)[](const char *path, const char *types, lo_arg **argv, int argc, lo_message msg, void *user_data)->int {
-				RmeOscController *controller = static_cast<RmeOscController*>(user_data);
-				return controller->handleOscMessage(path, types, argv, argc, msg); }, this);
+					RmeOscController *controller = static_cast<RmeOscController*>(user_data);
+					return controller->handleOscMessage(path, types, argv, argc, msg, user_data); }, this);
 
 		// Start the server thread
 		if (lo_server_thread_start(m_oscServer) < 0)

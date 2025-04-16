@@ -109,7 +109,7 @@ static LO_INLINE uint64_t lo_swap64(uint64_t x)
 #ifdef LO_BIGENDIAN
 #undef LO_BIGENDIAN
 #endif
-#if @LO_BIGENDIAN@ == 2
+#if LO_BIGENDIAN == 2
 #ifdef __BIG_ENDIAN__
 #define LO_BIGENDIAN 1
 #else
@@ -120,7 +120,7 @@ static LO_INLINE uint64_t lo_swap64(uint64_t x)
 #endif
 #endif
 #else
-#define LO_BIGENDIAN @LO_BIGENDIAN@
+#define LO_BIGENDIAN LO_BIGENDIAN
 #endif
 
 /* Host to OSC and OSC to Host conversion macros */

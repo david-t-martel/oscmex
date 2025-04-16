@@ -1,4 +1,3 @@
-
 #ifndef _LO_CPP_H_
 #define _LO_CPP_H_
 
