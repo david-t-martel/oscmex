@@ -9,55 +9,73 @@ namespace AudioEngine
 {
 
 	/**
-	 * @brief Configuration structure for a single node
+	 * @brief Node configuration structure
 	 */
 	struct NodeConfig
 	{
-		std::string name;						   // Unique node identifier
-		std::string type;						   // "asio_source", "file_sink", "ffmpeg_processor", etc.
-		std::map<std::string, std::string> params; // Type-specific parameters
+		std::string name;						   // Node name
+		std::string type;						   // Node type string
+		std::map<std::string, std::string> params; // Node parameters
 	};
 
 	/**
-	 * @brief Configuration for a connection between node pads
+	 * @brief Connection configuration structure
 	 */
 	struct ConnectionConfig
 	{
-		std::string sourceNode; // Name of source node
-		int sourcePad = 0;		// Output pad index on source node
-		std::string sinkNode;	// Name of sink node
-		int sinkPad = 0;		// Input pad index on sink node
+		std::string sourceName; // Source node name
+		int sourcePad;			// Source node output pad index
+		std::string sinkName;	// Sink node name
+		int sinkPad;			// Sink node input pad index
 	};
 
 	/**
-	 * @brief Configuration for an OSC command to RME device
+	 * @brief RME OSC command configuration structure
 	 */
 	struct RmeOscCommandConfig
 	{
-		std::string address;		// OSC address (e.g., "/1/matrix/1/1/gain")
-		std::vector<std::any> args; // Command arguments (float, int, string)
+		std::string address;		// OSC address
+		std::vector<std::any> args; // Command arguments
 	};
 
 	/**
-	 * @brief Complete configuration for the audio engine
+	 * @brief Global configuration for the audio engine
 	 */
-	struct Configuration
+	class Configuration
 	{
+	public:
 		// Global settings
-		std::string asioDeviceName;			// ASIO device to use (e.g., "ASIO Fireface UCX II")
-		std::string rmeOscIp = "127.0.0.1"; // IP address for RME OSC control
-		int rmeOscPort = 9000;				// Port for RME OSC control
-		double sampleRate = 48000.0;		// Default or requested sample rate
-		long bufferSize = 512;				// Default or requested buffer size
+		std::string asioDeviceName; // ASIO device name
+		std::string rmeOscIp;		// RME OSC target IP
+		int rmeOscPort;				// RME OSC target port
+		double sampleRate;			// Sample rate in Hz
+		long bufferSize;			// Buffer size in frames
 
-		// Components
-		std::vector<NodeConfig> nodes;				  // Nodes to create
-		std::vector<ConnectionConfig> connections;	  // How to connect nodes
-		std::vector<RmeOscCommandConfig> rmeCommands; // OSC commands to send
+		// Node configurations
+		std::vector<NodeConfig> nodes;
+
+		// Connection configurations
+		std::vector<ConnectionConfig> connections;
+
+		// RME OSC commands to execute at startup
+		std::vector<RmeOscCommandConfig> rmeCommands;
+
+		/**
+		 * @brief Create default configuration
+		 */
+		Configuration();
+
+		/**
+		 * @brief Get a node configuration by name
+		 *
+		 * @param name Node name
+		 * @return Pointer to node config or nullptr if not found
+		 */
+		const NodeConfig *getNodeConfig(const std::string &name) const;
 	};
 
 	/**
-	 * @brief Parses configuration from command line or file
+	 * @brief Configuration parser
 	 */
 	class ConfigurationParser
 	{
@@ -65,29 +83,26 @@ namespace AudioEngine
 		/**
 		 * @brief Parse configuration from command line arguments
 		 *
-		 * @param argc Argument count from main()
-		 * @param argv Argument values from main()
-		 * @param outConfig Configuration to populate
-		 * @return true if parsing succeeded
-		 * @return false if parsing failed
+		 * @param argc Argument count
+		 * @param argv Argument values
+		 * @param config Configuration to populate
+		 * @return true if parsing was successful
 		 */
-		bool parse(int argc, char *argv[], Configuration &outConfig);
+		bool parse(int argc, char *argv[], Configuration &config);
 
 		/**
 		 * @brief Parse configuration from a file
 		 *
 		 * @param filePath Path to configuration file
-		 * @param outConfig Configuration to populate
-		 * @return true if parsing succeeded
-		 * @return false if parsing failed
+		 * @param config Configuration to populate
+		 * @return true if parsing was successful
 		 */
-		bool parseFromFile(const std::string &filePath, Configuration &outConfig);
+		bool parseFromFile(const std::string &filePath, Configuration &config);
 
 	private:
-		// Helper methods for parsing different parts of configuration
-		bool parseNodes(const std::string &jsonNodes, Configuration &outConfig);
-		bool parseConnections(const std::string &jsonConnections, Configuration &outConfig);
-		bool parseRmeCommands(const std::string &jsonCommands, Configuration &outConfig);
+		// Helper methods for parsing different file formats
+		bool parseJson(const std::string &content, Configuration &config);
+		bool parseYaml(const std::string &content, Configuration &config);
 	};
 
 } // namespace AudioEngine
