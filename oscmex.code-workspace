@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../../../Program Files/ffmpeg/include"
 		}
 	],
 	"settings": {

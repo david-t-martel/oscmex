@@ -5,10 +5,11 @@
       "includePath": [
         "${workspaceFolder}/**",
         // --- Project Dependencies ---
-        "${workspaceFolder}/asio/common",
-        "${workspaceFolder}/asio/host",
+        "${workspaceFolder}/src/asio/common",
+        "${workspaceFolder}/src/asio/host",
         "C:/Program Files/ffmpeg/include", // VERIFY THIS
-        "${workspaceFolder}/src/liblo",
+        "${workspaceFolder}/src/lo",
+        "${workspaceFolder}/src/gtk",
         // --- oneAPI Component Includes (Based on standard paths) ---
         "C:/Program Files (x86)/Intel/oneAPI/tbb/latest/include",
         "C:/Program Files (x86)/Intel/oneAPI/mkl/latest/include",
@@ -16,8 +17,6 @@
         "C:/Program Files (x86)/Intel/oneAPI/ippcp/latest/include",
         "C:/Program Files (x86)/Intel/oneAPI/dal/latest/include",
         "C:/Program Files (x86)/Intel/oneAPI/dpl/latest/include",
-        // --- Optional GUI Library ---
-        "C:/path/to/gui_library/include" // ADJUST or REMOVE
       ],
       "defines": [
         "_DEBUG",
