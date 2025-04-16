@@ -76,6 +76,57 @@ endif()
 add_executable(AudioEngineApp src/main.cpp)
 target_link_libraries(AudioEngineApp PRIVATE AudioEngine)
 
+# --- Optional: Build Tools ---
+option(BUILD_LO_TOOLS "Build liblo command-line tools (oscsend, oscdump)" OFF)
+
+if(BUILD_LO_TOOLS)
+	add_executable(oscsend src/tools/oscsend.c)
+	target_link_libraries(oscsend PRIVATE liblo)
+	target_include_directories(oscsend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo) # Ensure tools can find lo.h
+
+	add_executable(oscdump src/tools/oscdump.c)
+	target_link_libraries(oscdump PRIVATE liblo)
+	target_include_directories(oscdump PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+
+	add_executable(oscsendfile src/tools/oscsendfile.c)
+	target_link_libraries(oscsendfile PRIVATE liblo)
+	target_include_directories(oscsendfile PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+
+	install(TARGETS oscsend oscdump oscsendfile RUNTIME DESTINATION bin)
+endif()
+
+# --- Optional: Build Examples ---
+option(BUILD_LO_EXAMPLES "Build liblo examples" OFF)
+
+if(BUILD_LO_EXAMPLES)
+	# Add example targets similarly to tools if desired
+	# Example:
+	# add_executable(example_client src/examples/example_client.c)
+	# target_link_libraries(example_client PRIVATE liblo)
+	# target_include_directories(example_client PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+	# ... add other examples ...
+endif()
+
+# --- Optional: Doxygen Documentation ---
+find_package(Doxygen)
+
+if(DOXYGEN_FOUND)
+	option(BUILD_DOCUMENTATION "Build Doxygen documentation" OFF)
+
+	if(BUILD_DOCUMENTATION)
+		set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/reference.doxygen)
+		set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/doc/html)
+
+		add_custom_target(doc ALL
+			COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_IN}
+			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+			COMMENT "Generating API documentation with Doxygen"
+			VERBATIM)
+
+		# Note: This is a basic integration. More robust Doxygen setup might be needed.
+	endif()
+endif()
+
 # Install targets
 install(TARGETS AudioEngine AudioEngineApp
 	RUNTIME DESTINATION bin
