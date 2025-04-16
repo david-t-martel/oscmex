@@ -1,9 +1,10 @@
 #pragma once
 
 #include "AudioNode.h"
+#include <string>
+#include <mutex>
 #include <thread>
 #include <queue>
-#include <mutex>
 #include <condition_variable>
 #include <atomic>
 
@@ -18,7 +19,7 @@ namespace AudioEngine
 {
 
 	/**
-	 * @brief Node for reading and decoding audio files
+	 * @brief Node for reading audio from a file
 	 */
 	class FileSourceNode : public AudioNode
 	{
@@ -54,7 +55,7 @@ namespace AudioEngine
 		int getOutputPadCount() const override { return 1; } // One output
 
 		/**
-		 * @brief Seek to a position in the file
+		 * @brief Seek to a specific position in the file
 		 *
 		 * @param position Position in seconds
 		 * @return true if seek was successful
@@ -62,53 +63,72 @@ namespace AudioEngine
 		bool seekTo(double position);
 
 		/**
-		 * @brief Get the current position in the file
+		 * @brief Get the current playback position
 		 *
-		 * @return Position in seconds
+		 * @return Current position in seconds
 		 */
 		double getCurrentPosition() const;
 
 		/**
-		 * @brief Get the duration of the file
+		 * @brief Get the file duration
 		 *
 		 * @return Duration in seconds
 		 */
 		double getDuration() const;
 
-	private:
-		// File path
-		std::string m_filePath;
+		/**
+		 * @brief Get the file path
+		 *
+		 * @return File path
+		 */
+		std::string getFilePath() const { return m_filePath; }
 
-		// FFmpeg structures for file reading
-		AVFormatContext *m_formatCtx;
-		AVCodecContext *m_codecCtx;
-		SwrContext *m_swrCtx;
+	private:
+		// File information
+		std::string m_filePath;
+		double m_duration;
+
+		// FFmpeg objects
+		AVFormatContext *m_formatContext;
+		AVCodecContext *m_codecContext;
+		SwrContext *m_swrContext;
 		int m_audioStreamIndex;
 
-		// Thread for file reading
-		std::thread m_readerThread;
-		void readerThreadFunc();
+		// Decoder state
+		AVPacket *m_packet;
+		AVFrame *m_decodedFrame;
+		AVFrame *m_convertedFrame;
 
-		// Queue of output buffers
+		// Reader thread
+		std::thread m_readerThread;
+		std::atomic<bool> m_stopThread;
+
+		// Output buffer queue
 		std::queue<std::shared_ptr<AudioBuffer>> m_outputQueue;
 		std::mutex m_queueMutex;
 		std::condition_variable m_queueCondVar;
 
-		// Thread control
-		std::atomic<bool> m_stopRequested;
-
-		// Buffer management
-		std::shared_ptr<AudioBuffer> m_currentOutputBuffer;
-		int m_outputQueueMaxSize;
-
-		// File information
-		double m_duration;
+		// Current position tracking
 		std::atomic<double> m_currentPosition;
 
-		// Methods for file handling
+		// Maximum buffer queue size
+		const int MAX_QUEUE_SIZE = 4;
+
+		// Helper methods
+		void readerThreadFunc();
 		bool openFile();
 		void closeFile();
-		bool readNextFrame(AVFrame *frame);
+		bool readNextFrame();
+		bool decodePacket();
+		bool resampleFrame();
+		std::shared_ptr<AudioBuffer> createBufferFromFrame();
+
+		// Tracks when we're at the end of file but still have buffers queued
+		bool m_endOfFile;
+
+		// Timing information
+		AVRational m_timeBase;
+		double m_startTime;
 	};
 
 } // namespace AudioEngine

@@ -2,20 +2,24 @@
 
 #include <string>
 #include <map>
+#include <memory>
+#include <mutex>
 
 extern "C"
 {
 #include <libavfilter/avfilter.h>
-#include <libavutil/frame.h>
+#include <libavutil/samplefmt.h>
+#include <libavutil/channel_layout.h>
 }
 
 namespace AudioEngine
 {
 
 	/**
-	 * @brief Wrapper for AVFilter graph handling
+	 * @brief Wrapper class for managing FFmpeg filter graphs
 	 *
-	 * Manages an FFmpeg filter graph for audio processing
+	 * This class handles creating, connecting, and executing
+	 * FFmpeg audio filter graphs for real-time processing.
 	 */
 	class FfmpegFilter
 	{
@@ -26,29 +30,31 @@ namespace AudioEngine
 		FfmpegFilter();
 
 		/**
-		 * @brief Destroy the FFmpeg filter
+		 * @brief Destroy the filter graph
 		 */
 		~FfmpegFilter();
 
 		/**
 		 * @brief Initialize the filter graph
 		 *
-		 * @param filterDescription FFmpeg filter description string
+		 * @param filterDescription FFmpeg filter graph description string
 		 * @param sampleRate Sample rate in Hz
 		 * @param format Sample format
 		 * @param layout Channel layout
+		 * @param bufferSize Buffer size in frames
 		 * @return true if initialization was successful
 		 */
 		bool initGraph(const std::string &filterDescription,
 					   double sampleRate,
 					   AVSampleFormat format,
-					   const AVChannelLayout &layout);
+					   const AVChannelLayout &layout,
+					   long bufferSize);
 
 		/**
 		 * @brief Process audio through the filter graph
 		 *
-		 * @param inputFrame Input audio frame
-		 * @param outputFrame Output audio frame (will be filled)
+		 * @param inputFrame Input AVFrame
+		 * @param outputFrame Output AVFrame
 		 * @return true if processing was successful
 		 */
 		bool process(AVFrame *inputFrame, AVFrame *outputFrame);
@@ -56,9 +62,9 @@ namespace AudioEngine
 		/**
 		 * @brief Update a filter parameter
 		 *
-		 * @param filterName Name of the filter
-		 * @param paramName Parameter name
-		 * @param value New parameter value
+		 * @param filterName Name of the filter to update
+		 * @param paramName Name of the parameter to update
+		 * @param value New value for the parameter
 		 * @return true if update was successful
 		 */
 		bool updateParameter(const std::string &filterName,
@@ -66,22 +72,44 @@ namespace AudioEngine
 							 const std::string &value);
 
 		/**
-		 * @brief Clean up resources
+		 * @brief Check if filter graph is valid
+		 *
+		 * @return true if valid
 		 */
-		void cleanup();
+		bool isValid() const { return m_valid; }
+
+		/**
+		 * @brief Reset filter graph state
+		 *
+		 * @return true if reset was successful
+		 */
+		bool reset();
 
 	private:
-		AVFilterGraph *m_graph;			// Filter graph
-		AVFilterContext *m_srcContext;	// Source filter context
-		AVFilterContext *m_sinkContext; // Sink filter context
+		// FFmpeg filter graph
+		AVFilterGraph *m_graph;
 
-		// Map of named filters in the graph for easier parameter updates
+		// Filter contexts
+		AVFilterContext *m_srcContext;	// Source (abuffer)
+		AVFilterContext *m_sinkContext; // Sink (abuffersink)
+
+		// Named filters for parameter control
 		std::map<std::string, AVFilterContext *> m_namedFilters;
 
-		double m_sampleRate;			 // Current sample rate
-		AVSampleFormat m_format;		 // Current sample format
-		AVChannelLayout m_channelLayout; // Current channel layout
-		bool m_initialized;				 // Initialization state
+		// Filter configuration
+		std::string m_filterDescription;
+		double m_sampleRate;
+		AVSampleFormat m_format;
+		AVChannelLayout m_channelLayout;
+		long m_bufferSize;
+
+		// State
+		bool m_valid;
+		std::mutex m_mutex;
+
+		// Helper methods
+		void cleanup();
+		AVFilterContext *findFilterByName(const std::string &name) const;
 	};
 
 } // namespace AudioEngine

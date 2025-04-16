@@ -1,9 +1,10 @@
 #pragma once
 
 #include "AudioNode.h"
+#include <string>
+#include <mutex>
 #include <thread>
 #include <queue>
-#include <mutex>
 #include <condition_variable>
 #include <atomic>
 
@@ -18,7 +19,7 @@ namespace AudioEngine
 {
 
 	/**
-	 * @brief Node for encoding and writing audio to files
+	 * @brief Node for writing audio to a file
 	 */
 	class FileSinkNode : public AudioNode
 	{
@@ -54,48 +55,85 @@ namespace AudioEngine
 		int getOutputPadCount() const override { return 0; } // No outputs
 
 		/**
-		 * @brief Flush any remaining audio data to file
-		 *
-		 * @return true if flush was successful
+		 * @brief Flush any remaining audio data to the file and finalize
 		 */
 		bool flush();
 
-	private:
-		// File path
-		std::string m_filePath;
+		/**
+		 * @brief Get the file path
+		 *
+		 * @return File path
+		 */
+		std::string getFilePath() const { return m_filePath; }
 
-		// Encoder settings
-		std::string m_encoderName;
+		/**
+		 * @brief Get the current file size in bytes
+		 *
+		 * @return File size in bytes
+		 */
+		int64_t getFileSize() const;
+
+		/**
+		 * @brief Get the current write duration
+		 *
+		 * @return Duration in seconds
+		 */
+		double getDuration() const;
+
+	private:
+		// File information
+		std::string m_filePath;
 		std::string m_format;
+		std::string m_codec;
 		int m_bitrate;
 
-		// FFmpeg structures for file writing
-		AVFormatContext *m_formatCtx;
-		AVCodecContext *m_codecCtx;
-		SwrContext *m_swrCtx;
-		AVStream *m_audioStream;
+		// FFmpeg objects
+		AVFormatContext *m_formatContext;
+		AVCodecContext *m_codecContext;
+		SwrContext *m_swrContext;
+		AVStream *m_stream;
 
-		// Thread for file writing
+		// Encoder state
+		AVFrame *m_frame;
+		AVPacket *m_packet;
+
+		// Writer thread
 		std::thread m_writerThread;
-		void writerThreadFunc();
+		std::atomic<bool> m_stopThread;
 
-		// Queue of input buffers
+		// Input buffer queue
 		std::queue<std::shared_ptr<AudioBuffer>> m_inputQueue;
 		std::mutex m_queueMutex;
 		std::condition_variable m_queueCondVar;
 
-		// Thread control
-		std::atomic<bool> m_stopRequested;
+		// Duration tracking
+		std::atomic<int64_t> m_frameCount;
+		double m_duration;
+		int64_t m_startPts;
+		int64_t m_lastPts;
 
-		// Methods for file handling
+		// Maximum buffer queue size
+		const int MAX_QUEUE_SIZE = 4;
+
+		// Helper methods
+		void writerThreadFunc();
 		bool openFile();
 		void closeFile();
-		bool writeFrame(AVFrame *frame);
-		bool finalizeFile();
+		bool processBuffer(std::shared_ptr<AudioBuffer> buffer);
+		bool encodeFrame(AVFrame *frame);
 
-		// Buffer management
-		int m_inputQueueMaxSize;
-		int64_t m_nextPts;
+		// Initialize encoding frame
+		bool initFrame();
+
+		// Copy buffer to frame
+		bool copyBufferToFrame(std::shared_ptr<AudioBuffer> buffer);
+
+		// Write any delayed packets (after flushing encoder)
+		bool writeDelayedPackets();
+
+		// Encoding options
+		int m_quality;
+		bool m_useCompression;
 	};
 
 } // namespace AudioEngine

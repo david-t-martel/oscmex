@@ -1,19 +1,22 @@
 #pragma once
 
 #include "AudioNode.h"
-#include "FfmpegFilter.h"
 #include <mutex>
+#include <string>
 
 extern "C"
 {
-#include <libavutil/frame.h>
+#include <libavfilter/avfilter.h>
 }
 
 namespace AudioEngine
 {
 
+	// Forward declaration
+	class FfmpegFilter;
+
 	/**
-	 * @brief Node for processing audio through FFmpeg filters
+	 * @brief Node for processing audio using FFmpeg filter chains
 	 */
 	class FfmpegProcessorNode : public AudioNode
 	{
@@ -51,34 +54,43 @@ namespace AudioEngine
 		/**
 		 * @brief Update a filter parameter
 		 *
-		 * @param filterName Name of the filter
-		 * @param paramName Parameter name
-		 * @param value New parameter value
+		 * Dynamically update a parameter of a filter in the chain
+		 *
+		 * @param filterName Name of the filter to update
+		 * @param paramName Name of the parameter to update
+		 * @param value New value for the parameter
 		 * @return true if update was successful
 		 */
-		bool updateParameter(const std::string &filterName,
-							 const std::string &paramName,
-							 const std::string &value);
+		bool updateParameter(const std::string &filterName, const std::string &paramName, const std::string &value);
+
+		/**
+		 * @brief Get the filter description
+		 *
+		 * @return FFmpeg filter description string
+		 */
+		std::string getFilterDescription() const { return m_filterDescription; }
 
 	private:
 		// FFmpeg filter
-		FfmpegFilter m_ffmpegFilter;
+		std::unique_ptr<FfmpegFilter> m_ffmpegFilter;
+
+		// Filter configuration
 		std::string m_filterDescription;
 
-		// Input/output frames and buffers
+		// FFmpeg frame objects
 		AVFrame *m_inputFrame;
 		AVFrame *m_outputFrame;
+
+		// Input/output buffers
 		std::shared_ptr<AudioBuffer> m_inputBuffer;
 		std::shared_ptr<AudioBuffer> m_outputBuffer;
 
-		// Thread synchronization
+		// Thread safety
 		std::mutex m_processMutex;
 
-		// Methods for frame handling
-		bool initFrames();
-		void freeFrames();
-		bool copyBufferToFrame(std::shared_ptr<AudioBuffer> buffer, AVFrame *frame);
-		bool copyFrameToBuffer(AVFrame *frame, std::shared_ptr<AudioBuffer> buffer);
+		// Helper methods
+		bool initializeFrames();
+		void cleanupFrames();
 	};
 
 } // namespace AudioEngine

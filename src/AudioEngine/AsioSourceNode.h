@@ -50,6 +50,8 @@ namespace AudioEngine
 		/**
 		 * @brief Receive data from ASIO callbacks
 		 *
+		 * Called by AsioManager during bufferSwitch callback
+		 *
 		 * @param doubleBufferIndex ASIO double buffer index
 		 * @param asioBuffers ASIO buffer pointers
 		 * @return true if data was received successfully
@@ -78,6 +80,11 @@ namespace AudioEngine
 		bool m_doubleBufferSwitch;
 		std::shared_ptr<AudioBuffer> m_outputBufferA;
 		std::shared_ptr<AudioBuffer> m_outputBufferB;
+
+		// Helper methods
+		bool createBuffers();
+		void convertAsioToAudioBuffer(void *asioBuffer, uint8_t *destBuffer, long frames,
+									  int asioType, AVSampleFormat format);
 	};
 
 } // namespace AudioEngine

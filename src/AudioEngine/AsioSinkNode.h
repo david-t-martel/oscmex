@@ -50,6 +50,8 @@ namespace AudioEngine
 		/**
 		 * @brief Provide data for ASIO callbacks
 		 *
+		 * Called by AsioManager during bufferSwitch callback
+		 *
 		 * @param doubleBufferIndex ASIO double buffer index
 		 * @param asioBuffers ASIO buffer pointers
 		 * @return true if data was provided successfully
@@ -81,6 +83,11 @@ namespace AudioEngine
 
 		// Buffer for silence when no input is available
 		std::shared_ptr<AudioBuffer> m_silenceBuffer;
+
+		// Helper methods
+		bool createBuffers();
+		void convertAudioBufferToAsio(uint8_t *sourceBuffer, void *asioBuffer, long frames,
+									  AVSampleFormat format, int asioType);
 	};
 
 } // namespace AudioEngine
