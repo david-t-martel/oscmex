@@ -16,7 +16,7 @@
         "C:/Program Files (x86)/Intel/oneAPI/ipp/latest/include",
         "C:/Program Files (x86)/Intel/oneAPI/ippcp/latest/include",
         "C:/Program Files (x86)/Intel/oneAPI/dal/latest/include",
-        "C:/Program Files (x86)/Intel/oneAPI/dpl/latest/include",
+        "C:/Program Files (x86)/Intel/oneAPI/dpl/latest/include"
       ],
       "defines": [
         "_DEBUG",
