@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			".fantomasignore": "ignore",
+			"*.rmd": "markdown",
+			"socket.h": "c",
+			"stdbool.h": "c",
+			"*.cpp": "cpp",
+			"*.h": "cpp",
+			"*.hpp": "cpp",
+			"*.c": "c"
+		},
+		"terminal.integrated.defaultProfile.windows": "Command Prompt"
+	}
+}
