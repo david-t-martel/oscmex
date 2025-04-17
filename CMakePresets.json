@@ -1,0 +1,94 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Config (Release)",
+      "description": "Default configuration using system compiler, Release build.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_LO_TOOLS": "OFF",
+        "BUILD_LO_EXAMPLES": "OFF",
+        "BUILD_DOCUMENTATION": "OFF"
+      }
+    },
+    {
+      "name": "intel-release",
+      "displayName": "Intel Compilers (Release)",
+      "description": "Uses Intel oneAPI C/C++ compilers (icx/icpx), Release build.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/intel-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "icx",
+        "CMAKE_CXX_COMPILER": "icpx",
+        "BUILD_LO_TOOLS": "OFF",
+        "BUILD_LO_EXAMPLES": "OFF",
+        "BUILD_DOCUMENTATION": "OFF"
+      },
+      "environment": {
+        "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
+      }
+    },
+    {
+      "name": "intel-debug",
+      "displayName": "Intel Compilers (Debug)",
+      "description": "Uses Intel oneAPI C/C++ compilers (icx/icpx), Debug build.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/intel-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "icx",
+        "CMAKE_CXX_COMPILER": "icpx",
+        "BUILD_LO_TOOLS": "OFF",
+        "BUILD_LO_EXAMPLES": "OFF",
+        "BUILD_DOCUMENTATION": "OFF"
+      },
+      "environment": {
+        "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
+      }
+    },
+    {
+      "name": "intel-release-all",
+      "displayName": "Intel Compilers (Release, All Options)",
+      "description": "Uses Intel compilers, Release build, enables Tools, Examples, and Docs.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/intel-release-all",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "icx",
+        "CMAKE_CXX_COMPILER": "icpx",
+        "BUILD_LO_TOOLS": "ON",
+        "BUILD_LO_EXAMPLES": "ON",
+        "BUILD_DOCUMENTATION": "ON"
+      },
+      "environment": {
+        "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default-build",
+      "configurePreset": "default",
+      "displayName": "Build Default Config"
+    },
+    {
+      "name": "intel-release-build",
+      "configurePreset": "intel-release",
+      "displayName": "Build Intel Release"
+    },
+    {
+      "name": "intel-debug-build",
+      "configurePreset": "intel-debug",
+      "displayName": "Build Intel Debug"
+    },
+    {
+      "name": "intel-release-all-build",
+      "configurePreset": "intel-release-all",
+      "displayName": "Build Intel Release (All Options)"
+    }
+  ]
+}
