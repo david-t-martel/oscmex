@@ -16,7 +16,8 @@ int main()
      * handlers will run on the background thread!
      */
     lo::ServerThread st(9000);
-    if (!st.is_valid()) {
+    if (!st.is_valid())
+    {
         std::cout << "Nope." << std::endl;
         return 1;
     }
@@ -24,8 +25,10 @@ int main()
     /* Set some lambdas to be called when the thread starts and
      * ends. Here we demonstrate capturing a reference to the server
      * thread. */
-    st.set_callbacks([&st](){printf("Thread init: %p.\n",&st);},
-                     [](){printf("Thread cleanup.\n");});
+    st.set_callbacks([&st]()
+                     { printf("Thread init: %p.\n", &st); },
+                     []()
+                     { printf("Thread cleanup.\n"); });
 
     std::cout << "URL: " << st.url() << std::endl;
 
@@ -51,8 +54,8 @@ int main()
      */
     st.add_method("example", "i",
                   [&received](lo_arg **argv, int)
-                  {std::cout << "example (" << (++received) << "): "
-                             << argv[0]->i << std::endl;});
+                  { std::cout << "example (" << (++received) << "): "
+                              << argv[0]->i << std::endl; });
 
     /*
      * Start the server.
@@ -89,15 +92,17 @@ int main()
      * Wait for messages to be received and processed.
      */
     int tries = 200;
-    while (received < 4 && --tries > 0) {
+    while (received < 4 && --tries > 0)
+    {
 #ifdef WIN32
         Sleep(10);
 #else
-        usleep(10*1000);
+        usleep(10 * 1000);
 #endif
     }
 
-    if (tries <= 0) {
+    if (tries <= 0)
+    {
         std::cout << "Error, waited too long for messages." << std::endl;
         return 1;
     }
