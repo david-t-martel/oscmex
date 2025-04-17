@@ -25,6 +25,7 @@
 #include <pthread.h>
 #endif
 #include <sys/types.h>
+#include <errno.h>
 
 #if defined(WIN32) || defined(_MSC_VER)
 #include <winsock2.h>
@@ -129,6 +130,7 @@ void lo_server_thread_free(lo_server_thread st)
             lo_server_thread_stop(st);
         }
         lo_server_free(st->s);
+        st->s = NULL;
     }
     free(st);
 }
@@ -278,7 +280,7 @@ static void *thread_func(void *data)
             pthread_exit(NULL);
 #else
 #ifdef HAVE_WIN32_THREADS
-            _endthread();
+            _endthreadex(0);
 #else
 #error "No threading implementation selected."
 #endif
@@ -302,7 +304,7 @@ static void *thread_func(void *data)
     pthread_exit(NULL);
 #else
 #ifdef HAVE_WIN32_THREADS
-    _endthread();
+    _endthreadex(0);
 #else
 #error "No threading implementation selected."
 #endif
