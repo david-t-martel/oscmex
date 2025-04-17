@@ -1,4 +1,73 @@
-# This file is used to ignore files and directories in a Git repository.
-/VST_SDK
-/vst3sdk
+# VST SDK and archives
 *.zip
+
+# Build directories
+/build/
+/out/
+/install/
+/bin/
+/lib/
+/Debug/
+/Release/
+cmake-build-*/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+*.cmake
+!CMakeLists.txt
+!CMakePresets.json
+
+# Compiled output
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# Generated logs and build reports
+/build/build_log_*.txt
+
+# IDE-specific files
+
+.idea/
+*.swp
+*.swo
+*.user
+*.suo
+*.ncb
+*.sdf
+*.opensdf
+*.vcxproj.user
+*.vcproj.*.user
+*.vcxproj.filters
+
+# Intel oneAPI specific
+*_genx_*
+*.spv
+*.d3d12.*
+
+# Dependency files
+*.d
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Profiling/testing outputs
+*.gcda
+*.gcno
+*.prof
