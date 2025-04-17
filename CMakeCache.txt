@@ -278,11 +278,56 @@ DOXYGEN_DOT_EXECUTABLE:FILEPATH=DOXYGEN_DOT_EXECUTABLE-NOTFOUND
 //Doxygen documentation generation tool (https://www.doxygen.nl)
 DOXYGEN_EXECUTABLE:FILEPATH=DOXYGEN_EXECUTABLE-NOTFOUND
 
+//Enables cluster BLAS library
+ENABLE_BLACS:BOOL=OFF
+
+//Enables BLAS Fortran95 API
+ENABLE_BLAS95:BOOL=OFF
+
+//Enables cluster DFT library
+ENABLE_CDFT:BOOL=OFF
+
+//Enables LAPACK Fortran95 API
+ENABLE_LAPACK95:BOOL=OFF
+
+//Enables OpenMP Offload functionality
+ENABLE_OMP_OFFLOAD:BOOL=OFF
+
+//Enables cluster LAPACK library
+ENABLE_SCALAPACK:BOOL=OFF
+
+//Enables compiling a oneMKL DPC++ test program
+ENABLE_TRY_SYCL_COMPILE:BOOL=OFF
+
 //The directory containing a CMake configuration file for IPP.
 IPP_DIR:PATH=C:/Program Files (x86)/Intel/oneAPI/ipp/2022.0/lib/cmake/ipp
 
 //Build liblo with threading support
 LIBLO_ENABLE_THREADS:BOOL=ON
+
+//The directory containing a CMake configuration file for MKL.
+MKL_DIR:PATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/lib/cmake/mkl
+
+//Path to a file.
+MKL_INCLUDE:PATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/include
+
+//Choose MKL_INTERFACE_FULL options are: intel_ilp64;intel_lp64
+MKL_INTERFACE_FULL:STRING=intel_ilp64
+
+//Choose MKL_LINK options are: static;dynamic;sdl
+MKL_LINK:STRING=dynamic
+
+//Choose MKL_MPI options are: intelmpi;mshpc;msmpi
+MKL_MPI:STRING=intelmpi
+
+//Choose MKL_THREADING options are: sequential;intel_thread;tbb_thread;gnu_thread
+MKL_THREADING:STRING=intel_thread
+
+//Path to a file.
+OMP_DLL_DIR:PATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/../../compiler/latest/bin
+
+//Path to a library.
+OMP_LIBRARY:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/compiler/latest/lib/libiomp5md.lib
 
 //The directory containing a CMake configuration file for TBB.
 TBB_DIR:PATH=C:/Program Files (x86)/Intel/oneAPI/tbb/2022.0/lib/cmake/tbb
@@ -298,6 +343,24 @@ _tbb_release_dll:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/tbb/2022.0/bin/tbb
 
 //Path to a library.
 _tbb_release_lib:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/tbb/2022.0/lib/tbbmalloc_proxy.lib
+
+//Path to a library.
+mkl_blacs_ilp64_file:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/lib/mkl_blacs_ilp64_dll.lib
+
+//Path to a library.
+mkl_cdft_core_file:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/lib/mkl_cdft_core_dll.lib
+
+//Path to a library.
+mkl_core_file:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/lib/mkl_core_dll.lib
+
+//Path to a library.
+mkl_intel_ilp64_file:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/lib/mkl_intel_ilp64_dll.lib
+
+//Path to a library.
+mkl_intel_thread_file:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/lib/mkl_intel_thread_dll.lib
+
+//Path to a library.
+mkl_scalapack_ilp64_file:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/lib/mkl_scalapack_ilp64_dll.lib
 
 
 ########################

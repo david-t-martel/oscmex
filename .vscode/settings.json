@@ -31,7 +31,7 @@
 
     // If using CMake Tools extension, point to the source directory containing the main CMakeLists.txt
     // Adjust the path if your main CMakeLists.txt for the AudioEngine is deeper
-    "cmake.sourceDirectory": "${workspaceFolder}/src/AudioEngine", // Or potentially "${workspaceFolder}/src" if CMake covers more
+    "cmake.sourceDirectory": "C:/codedev/auricleinc/oscmex", // Or potentially "${workspaceFolder}/src" if CMake covers more
 
     // Default terminal for build tasks (optional, PowerShell is default on Windows)
     "terminal.integrated.defaultProfile.windows": "Command Prompt" // Or "PowerShell" or specific VS Dev Prompt
