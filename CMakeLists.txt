@@ -14,9 +14,7 @@ include(TestBigEndian)
 # Find Intel oneAPI components
 find_package(TBB REQUIRED)
 find_package(IPP REQUIRED)
-
-# For MKL later when needed
-# find_package(MKL REQUIRED)
+find_package(MKL REQUIRED) # Add this line if using MKL
 
 # Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -92,7 +90,9 @@ if(WIN32)
 		_CRT_SECURE_NO_WARNINGS
 		_CRT_SECURE_NO_DEPRECATE
 		_CRT_NONSTDC_NO_DEPRECATE
-		_WINSOCK_DEPRECATED_NO_WARNINGS)
+		_WINSOCK_DEPRECATED_NO_WARNINGS
+		HAVE_WIN32_THREADS
+	)
 else()
 	list(APPEND LIBLO_LINK_LIBS m)
 endif()
@@ -126,24 +126,30 @@ target_link_libraries(AudioEngine PRIVATE
 	TBB::tbb
 	IPP::ipp
 	liblo
-
-	# MKL::mkl_core MKL::mkl_intel_thread MKL::mkl_intel_ilp64  # When needed
+	MKL::mkl_intel_lp64 # Or appropriate MKL interface library
+	MKL::mkl_sequential # Or MKL::mkl_tbb_thread
+	MKL::mkl_core
 )
 
-# Compiler-specific optimizations
+# Apply optimizations globally if using Intel compiler
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-	target_compile_options(AudioEngine PRIVATE
-		-xHost # Optimize for current architecture
-		-O3 # High optimization
-		-qopenmp # Enable OpenMP
-		-ipo # Interprocedural optimization
-		-fp-model fast=2 # Fast floating-point math
+	add_compile_options(
+		-xHost # Optimize for the build machine's architecture
+		-O3 # High optimization level
+
+		# -qopenmp      # Enable OpenMP only if you use #pragma omp
+		-ipo # Interprocedural optimization (can increase link time)
+		-fp-model fast=2 # Faster, potentially less precise FP math
 	)
+
+	# For C code as well
+	add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wall>) # Example C flag
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-	target_compile_options(AudioEngine PRIVATE
+	add_compile_options(
 		-O3
 		-march=native
-		-fopenmp
+
+		# -fopenmp      # Enable OpenMP only if you use #pragma omp
 	)
 endif()
 
