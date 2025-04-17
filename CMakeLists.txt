@@ -5,21 +5,21 @@ project(AudioEngine VERSION 1.0.0 LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Output directories - moved out of root directory
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
 # Enable Intel compiler detection
 include(CheckCXXCompiler)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
 include(TestBigEndian)
 
-# Find Intel oneAPI components
-find_package(TBB REQUIRED)
-find_package(IPP REQUIRED)
-find_package(MKL REQUIRED) # Add this line if using MKL
-
-# Output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+# Find Intel oneAPI components if available
+find_package(TBB QUIET)
+find_package(IPP QUIET)
+find_package(MKL QUIET)
 
 # --- liblo Configuration ---
 option(LIBLO_ENABLE_THREADS "Build liblo with threading support" ON)
@@ -162,46 +162,54 @@ target_link_libraries(AudioEngineApp PRIVATE AudioEngine)
 
 # --- Optional: Build Tools ---
 if(BUILD_LO_TOOLS)
-	# add_executable(oscsend src/tools/oscsend.c)
-	# target_link_libraries(oscsend PRIVATE liblo)
-	# target_include_directories(oscsend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
-	# ... (oscdump, oscsendfile) ...
-	# install(TARGETS oscsend oscdump oscsendfile RUNTIME DESTINATION bin)
+	# Check if tools directory exists
+	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/tools")
+		file(GLOB TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/tools/*.c")
+
+		foreach(TOOL_SRC ${TOOLS_SOURCES})
+			get_filename_component(TOOL_NAME ${TOOL_SRC} NAME_WE)
+			add_executable(${TOOL_NAME} ${TOOL_SRC})
+			target_link_libraries(${TOOL_NAME} PRIVATE liblo)
+			target_include_directories(${TOOL_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+		endforeach()
+
+		# Install tools
+		install(TARGETS ${TOOL_TARGETS} RUNTIME DESTINATION bin)
+	else()
+		message(STATUS "Tools directory not found, skipping build of command-line tools")
+		set(BUILD_LO_TOOLS OFF CACHE BOOL "Build liblo command-line tools (oscsend, oscdump)" FORCE)
+	endif()
 endif()
 
 # --- Optional: Build Examples ---
 if(BUILD_LO_EXAMPLES)
-	# C++ Example
-	add_executable(cpp_example src/examples/cpp_example.cpp)
-	target_link_libraries(cpp_example PRIVATE liblo)
-	target_include_directories(cpp_example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+	# Check if examples directory exists
+	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/examples")
+		# C++ Example
+		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/examples/cpp_example.cpp")
+			add_executable(cpp_example src/examples/cpp_example.cpp)
+			target_link_libraries(cpp_example PRIVATE liblo)
+			target_include_directories(cpp_example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+			list(APPEND EXAMPLE_TARGETS cpp_example)
+		endif()
 
-	# C Examples
-	add_executable(example_client src/examples/example_client.c)
-	target_link_libraries(example_client PRIVATE liblo)
-	target_include_directories(example_client PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+		# C Examples
+		file(GLOB C_EXAMPLES "${CMAKE_CURRENT_SOURCE_DIR}/src/examples/*.c")
 
-	add_executable(example_server src/examples/example_server.c)
-	target_link_libraries(example_server PRIVATE liblo)
-	target_include_directories(example_server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+		foreach(EXAMPLE_SRC ${C_EXAMPLES})
+			get_filename_component(EXAMPLE_NAME ${EXAMPLE_SRC} NAME_WE)
+			add_executable(${EXAMPLE_NAME} ${EXAMPLE_SRC})
+			target_link_libraries(${EXAMPLE_NAME} PRIVATE liblo)
+			target_include_directories(${EXAMPLE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
+			list(APPEND EXAMPLE_TARGETS ${EXAMPLE_NAME})
+		endforeach()
 
-	add_executable(example_tcp_echo_server src/examples/example_tcp_echo_server.c)
-	target_link_libraries(example_tcp_echo_server PRIVATE liblo)
-	target_include_directories(example_tcp_echo_server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
-
-	add_executable(nonblocking_server_example src/examples/nonblocking_server_example.c)
-	target_link_libraries(nonblocking_server_example PRIVATE liblo)
-	target_include_directories(nonblocking_server_example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lo)
-
-	# Optionally install examples
-	install(TARGETS
-		cpp_example
-		example_client
-		example_server
-		example_tcp_echo_server
-		nonblocking_server_example
-		RUNTIME DESTINATION bin/examples
-	)
+		# Optionally install examples
+		install(TARGETS ${EXAMPLE_TARGETS} RUNTIME DESTINATION bin/examples)
+	else()
+		message(STATUS "Examples directory not found, skipping build of examples")
+		set(BUILD_LO_EXAMPLES OFF CACHE BOOL "Build liblo examples" FORCE)
+	endif()
 endif()
 
 # --- Optional: Doxygen Documentation ---
@@ -209,10 +217,30 @@ find_package(Doxygen)
 
 if(DOXYGEN_FOUND)
 	if(BUILD_DOCUMENTATION)
-		# set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/reference.doxygen)
-		# set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/doc/html)
-		# add_custom_target(doc ALL ...)
+		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/doc/reference.doxygen")
+			set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/reference.doxygen)
+			set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/doc)
+
+			# Create doc directory if it doesn't exist
+			file(MAKE_DIRECTORY ${DOXYGEN_OUT})
+
+			# Configure Doxygen file
+			configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT}/Doxyfile @ONLY)
+
+			# Add custom target
+			add_custom_target(doc
+				COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}/Doxyfile
+				WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+				COMMENT "Generating API documentation with Doxygen"
+				VERBATIM)
+		else()
+			message(STATUS "Doxygen configuration file not found, skipping documentation build")
+			set(BUILD_DOCUMENTATION OFF CACHE BOOL "Build Doxygen documentation" FORCE)
+		endif()
 	endif()
+else()
+	message(STATUS "Doxygen not found, documentation will not be built")
+	set(BUILD_DOCUMENTATION OFF CACHE BOOL "Build Doxygen documentation" FORCE)
 endif()
 
 # Install targets
@@ -225,5 +253,11 @@ install(TARGETS AudioEngine AudioEngineApp
 # Install headers
 install(DIRECTORY src/AudioEngine/
 	DESTINATION include/AudioEngine
+	FILES_MATCHING PATTERN "*.h"
+)
+
+# Install liblo headers
+install(DIRECTORY src/lo/
+	DESTINATION include/lo
 	FILES_MATCHING PATTERN "*.h"
 )

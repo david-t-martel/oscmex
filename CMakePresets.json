@@ -9,9 +9,9 @@
       "binaryDir": "${sourceDir}/build/default",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_LO_TOOLS": "OFF",
-        "BUILD_LO_EXAMPLES": "OFF",
-        "BUILD_DOCUMENTATION": "OFF"
+        "BUILD_LO_TOOLS": "ON",
+        "BUILD_LO_EXAMPLES": "ON",
+        "BUILD_DOCUMENTATION": "ON"
       }
     },
     {
@@ -24,9 +24,9 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx",
-        "BUILD_LO_TOOLS": "OFF",
-        "BUILD_LO_EXAMPLES": "OFF",
-        "BUILD_DOCUMENTATION": "OFF"
+        "BUILD_LO_TOOLS": "ON",
+        "BUILD_LO_EXAMPLES": "ON",
+        "BUILD_DOCUMENTATION": "ON"
       },
       "environment": {
         "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
@@ -42,9 +42,9 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx",
-        "BUILD_LO_TOOLS": "OFF",
-        "BUILD_LO_EXAMPLES": "OFF",
-        "BUILD_DOCUMENTATION": "OFF"
+        "BUILD_LO_TOOLS": "ON",
+        "BUILD_LO_EXAMPLES": "ON",
+        "BUILD_DOCUMENTATION": "ON"
       },
       "environment": {
         "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
@@ -66,6 +66,20 @@
       },
       "environment": {
         "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
+      }
+    },
+    {
+      "name": "vs2022-desktop",
+      "displayName": "Visual Studio 2022 (Desktop)",
+      "description": "Uses Visual Studio 2022 generators for desktop development",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/vs2022",
+      "architecture": "x64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_LO_TOOLS": "ON",
+        "BUILD_LO_EXAMPLES": "ON",
+        "BUILD_DOCUMENTATION": "ON"
       }
     }
   ],
@@ -89,6 +103,12 @@
       "name": "intel-release-all-build",
       "configurePreset": "intel-release-all",
       "displayName": "Build Intel Release (All Options)"
+    },
+    {
+      "name": "vs2022-desktop-build",
+      "configurePreset": "vs2022-desktop",
+      "displayName": "Build with Visual Studio 2022",
+      "configuration": "Release"
     }
   ]
 }

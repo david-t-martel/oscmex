@@ -6,6 +6,7 @@ setlocal enabledelayedexpansion
 :: --- Default Settings ---
 set CLEAN_BUILD=0
 set RUN_INSTALL=0
+set BUILD_PRESET=intel-debug
 
 :: --- Parse Arguments ---
 :arg_loop
@@ -21,24 +22,46 @@ if /i "%~1" == "/install" (
     shift
     goto arg_loop
 )
+if /i "%~1" == "/preset" (
+    if not "%~2" == "" (
+        set BUILD_PRESET=%~2
+        echo Build preset set to: %BUILD_PRESET%
+        shift
+        shift
+        goto arg_loop
+    ) else (
+        echo ERROR: /preset requires an argument.
+        goto :usage
+    )
+)
+if /i "%~1" == "/help" (
+    goto :usage
+)
 if not "%~1" == "" (
     echo Unrecognized argument: %~1
-    shift
-    goto arg_loop
+    goto :usage
 )
 
 :: --- Configuration ---
 set ONEAPI_ROOT=C:\Program Files (x86)\Intel\oneAPI
 set SETVARS_BAT="%ONEAPI_ROOT%\setvars.bat"
 set SOURCE_DIR=%~dp0..
-set BUILD_SUBDIR=intel-debug-all
-set BUILD_DIR=%SOURCE_DIR%\build\%BUILD_SUBDIR%
-set CMAKE_GENERATOR=Ninja
+set BUILD_DIR=%SOURCE_DIR%\build\%BUILD_PRESET%
 
 :: --- Generate Timestamped Log Filename ---
 for /f "tokens=2 delims==" %%I in ('wmic os get LocalDateTime /value') do set datetime=%%I
 set TIMESTAMP=%datetime:~0,8%_%datetime:~8,6%
-set LOG_FILE=%SOURCE_DIR%\build\build_log_%BUILD_SUBDIR%_%TIMESTAMP%.txt
+set LOG_FILE=%SOURCE_DIR%\build\build_log_%BUILD_PRESET%_%TIMESTAMP%.txt
+
+:: --- Print Build Info ---
+echo Build Configuration:
+echo   Source directory: %SOURCE_DIR%
+echo   Build directory: %BUILD_DIR%
+echo   Build preset: %BUILD_PRESET%
+echo   Clean build: %CLEAN_BUILD%
+echo   Run install: %RUN_INSTALL%
+echo   Log file: %LOG_FILE%
+echo.
 
 :: --- Clean Log File (Create New) ---
 echo Build started on %DATE% at %TIME% > "%LOG_FILE%"
@@ -46,8 +69,7 @@ echo Timestamp: %TIMESTAMP% >> "%LOG_FILE%"
 echo Configuration: >> "%LOG_FILE%"
 echo   Source Dir: %SOURCE_DIR% >> "%LOG_FILE%"
 echo   Build Dir: %BUILD_DIR% >> "%LOG_FILE%"
-echo   Generator: %CMAKE_GENERATOR% >> "%LOG_FILE%"
-echo   oneAPI Root: %ONEAPI_ROOT% >> "%LOG_FILE%"
+echo   Build Preset: %BUILD_PRESET% >> "%LOG_FILE%"
 echo   Clean Build: %CLEAN_BUILD% >> "%LOG_FILE%"
 echo   Run Install: %RUN_INSTALL% >> "%LOG_FILE%"
 echo. >> "%LOG_FILE%"
@@ -66,7 +88,7 @@ if %CLEAN_BUILD% == 1 (
 )
 
 :: --- Setup oneAPI Environment ---
-echo Setting up Intel oneAPI environment...
+echo Setting up Intel oneAPI environment... | tee -a "%LOG_FILE%"
 if not exist %SETVARS_BAT% (
     echo ERROR: setvars.bat not found at %SETVARS_BAT% | tee -a "%LOG_FILE%"
     goto :error
@@ -88,17 +110,10 @@ if not exist "%BUILD_DIR%" (
     )
 )
 
-:: --- Run CMake Configuration ---
-echo Configuring project using CMake... | tee -a "%LOG_FILE%"
-cd /D "%BUILD_DIR%"
-cmake "%SOURCE_DIR%" ^
-    -G "%CMAKE_GENERATOR%" ^
-    -DCMAKE_BUILD_TYPE=Debug ^
-    -DCMAKE_C_COMPILER=icx ^
-    -DCMAKE_CXX_COMPILER=icpx ^
-    -DBUILD_LO_TOOLS=ON ^
-    -DBUILD_LO_EXAMPLES=ON ^
-    -DBUILD_DOCUMENTATION=ON >> "%LOG_FILE%" 2>&1
+:: --- Run CMake Configure using Preset ---
+echo Configuring project using CMake preset: %BUILD_PRESET% | tee -a "%LOG_FILE%"
+cd /D "%SOURCE_DIR%"
+cmake --preset %BUILD_PRESET% >> "%LOG_FILE%" 2>&1
 
 if %errorlevel% neq 0 (
     echo ERROR: CMake configuration failed. See %LOG_FILE% for details. | tee -a "%LOG_FILE%"
@@ -107,8 +122,8 @@ if %errorlevel% neq 0 (
 echo CMake configuration successful. | tee -a "%LOG_FILE%"
 
 :: --- Build Project ---
-echo Building project (Debug)... | tee -a "%LOG_FILE%"
-cmake --build . --config Debug --verbose >> "%LOG_FILE%" 2>&1
+echo Building project using preset: %BUILD_PRESET% | tee -a "%LOG_FILE%"
+cmake --build --preset %BUILD_PRESET%-build --verbose >> "%LOG_FILE%" 2>&1
 
 if %errorlevel% neq 0 (
     echo ERROR: Build failed. See %LOG_FILE% for details. | tee -a "%LOG_FILE%"
@@ -119,7 +134,7 @@ echo Build successful! | tee -a "%LOG_FILE%"
 :: --- Optional Install Step ---
 if %RUN_INSTALL% == 1 (
     echo Running install step... | tee -a "%LOG_FILE%"
-    cmake --install . --config Debug --prefix "%SOURCE_DIR%\install\%BUILD_SUBDIR%" >> "%LOG_FILE%" 2>&1
+    cmake --install "%BUILD_DIR%" --prefix "%SOURCE_DIR%\install\%BUILD_PRESET%" >> "%LOG_FILE%" 2>&1
     if %errorlevel% neq 0 (
         echo ERROR: Install step failed. See %LOG_FILE% for details. | tee -a "%LOG_FILE%"
         goto :error
@@ -129,6 +144,25 @@ if %RUN_INSTALL% == 1 (
 
 echo Build finished on %DATE% at %TIME% >> "%LOG_FILE%"
 goto :success
+
+:usage
+echo.
+echo AudioEngine Build Script
+echo Usage: %~nx0 [options]
+echo.
+echo Options:
+echo   /clean         - Clean build directory before building
+echo   /install       - Run install step after successful build
+echo   /preset NAME   - Use specified CMake preset (default: intel-debug)
+echo   /help          - Show this help
+echo.
+echo Available presets:
+echo   default        - Uses system compiler, Release build
+echo   intel-release  - Uses Intel compilers, Release build
+echo   intel-debug    - Uses Intel compilers, Debug build
+echo   vs2022-desktop - Uses Visual Studio 2022, Release build
+echo.
+exit /b 1
 
 :error
 echo Build process failed.
