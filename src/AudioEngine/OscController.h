@@ -334,6 +334,30 @@ namespace AudioEngine
 		 */
 		void cleanup();
 
+		/**
+		 * @brief Get the target IP address
+		 *
+		 * @return The IP address that this controller is sending to
+		 */
+		std::string getTargetIp() const { return m_targetIp; }
+
+		/**
+		 * @brief Get the target port
+		 *
+		 * @return The port that this controller is sending to
+		 */
+		int getTargetPort() const { return m_targetPort; }
+
+		/**
+		 * @brief Apply a configuration to the RME device
+		 *
+		 * This method sends all the OSC commands in the configuration to the device
+		 *
+		 * @param config The configuration to apply
+		 * @return true if all commands were sent successfully
+		 */
+		bool applyConfiguration(const Configuration &config);
+
 	private:
 		/**
 		 * @brief Handle an incoming OSC message (liblo callback)

@@ -848,4 +848,64 @@ namespace AudioEngine
 		return result; // This only indicates successful send, not actual connection status
 	}
 
+	bool OscController::applyConfiguration(const Configuration &config)
+	{
+		if (!m_configured || !m_oscAddress)
+		{
+			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
+			return false;
+		}
+
+		// We'll send the commands as a bundle for better performance
+		if (config.rmeCommands.empty())
+		{
+			std::cerr << "OscController: No commands in configuration to apply" << std::endl;
+			return true; // Not an error, just nothing to do
+		}
+
+		// Send the RME commands in batches
+		const size_t MAX_BATCH_SIZE = 50; // Avoid overflowing message buffers
+
+		// Calculate number of batches needed
+		size_t totalCommands = config.rmeCommands.size();
+		size_t batchCount = (totalCommands + MAX_BATCH_SIZE - 1) / MAX_BATCH_SIZE;
+
+		bool success = true;
+		for (size_t batchIndex = 0; batchIndex < batchCount; batchIndex++)
+		{
+			// Calculate start and end indices for this batch
+			size_t startIdx = batchIndex * MAX_BATCH_SIZE;
+			size_t endIdx = std::min(startIdx + MAX_BATCH_SIZE, totalCommands);
+
+			// Create a vector containing just this batch of commands
+			std::vector<RmeOscCommandConfig> batch(
+				config.rmeCommands.begin() + startIdx,
+				config.rmeCommands.begin() + endIdx);
+
+			// Send the batch
+			if (!sendBatch(batch))
+			{
+				std::cerr << "OscController: Failed to send command batch "
+						  << (batchIndex + 1) << " of " << batchCount << std::endl;
+				success = false;
+			}
+
+			// Small delay between batches to avoid overwhelming the device
+			std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		}
+
+		return success;
+	}
+
+	// Add methods to get target IP and port for DeviceStateManager
+	std::string OscController::getTargetIp() const
+	{
+		return m_targetIp;
+	}
+
+	int OscController::getTargetPort() const
+	{
+		return m_targetPort;
+	}
+
 } // namespace AudioEngine
