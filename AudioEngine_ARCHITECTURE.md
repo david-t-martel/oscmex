@@ -21,8 +21,8 @@ This design facilitates flexible routing between hardware I/O (via ASIO), file I
         * Owns and manages the `AsioManager` instance.
         * Instantiates and configures all required `AudioNode` objects based on the configuration.
         * Manages connections between `AudioNode` pads based on the configuration.
-        * Owns and manages the `RmeOscController`.
-        * Sends initial OSC commands to configure the RME TotalMix FX matrix via `RmeOscController`.
+        * Owns and manages the `OscController`.
+        * Sends initial OSC commands to configure the RME TotalMix FX matrix via `OscController`.
         * Drives the audio processing loop:
             * If using ASIO, it gets triggered by the `AsioManager` callback.
             * If purely file-based, it runs its own loop.
@@ -37,11 +37,12 @@ This design facilitates flexible routing between hardware I/O (via ASIO), file I
     * Activates *only* the specific ASIO channels requested by the created `AsioSourceNode` and `AsioSinkNode` instances.
     * Provides the core `bufferSwitch` callback, which notifies the `AudioEngine` to run its processing cycle.
 
-5. **`RmeOscController`**:
-    * Uses a C++ OSC library (e.g., `oscpack`).
+5. **`OscController`**:
+    * Uses a C++ OSC library (e.g., `oscpack`, `liblo`).
     * Provides a method like `sendMatrixCommand(oscAddress, args)` or higher-level functions like `setMatrixCrosspointGain(inputChannel, outputChannel, gainDb)`.
-    * Takes target RME IP address and port (from configuration).
-    * Formats and sends OSC messages via UDP to control TotalMix FX. Primarily used during initialization by the `AudioEngine` based on the configuration file's routing requirements.
+    * Takes target OSC device IP address and port (from configuration).
+    * Formats and sends OSC messages via UDP to control the target device (e.g., TotalMix FX). Primarily used during initialization by the `AudioEngine` based on the configuration file's routing requirements.
+    * Can also listen for incoming OSC messages and dispatch them (e.g., level meters, status updates).
 
 6. **`Configuration`**:
     * A data structure holding the parsed configuration.
@@ -56,10 +57,10 @@ This design facilitates flexible routing between hardware I/O (via ASIO), file I
 ## Workflow Example (ASIO In -> FFmpeg -> ASIO Out)
 
 1. **Startup**:
-    * `main` creates `AudioEngine`, `ConfigurationParser`, `RmeOscController`.
+    * `main` creates `AudioEngine`, `ConfigurationParser`, `OscController`.
     * `ConfigurationParser` reads config (defining `asio_in`, `ffmpeg_proc`, `asio_out` nodes, connections, and RME routing).
     * `AudioEngine` parses config struct.
-    * `AudioEngine` tells `RmeOscController` to send OSC commands to TotalMix FX (e.g., route physical input X to the ASIO channel used by `asio_in`, route the ASIO channel used by `asio_out` to physical output Y).
+    * `AudioEngine` tells `OscController` to send OSC commands to TotalMix FX (e.g., route physical input X to the ASIO channel used by `asio_in`, route the ASIO channel used by `asio_out` to physical output Y).
     * `AudioEngine` initializes `AsioManager` for the required ASIO channels.
     * `AudioEngine` creates `AsioSourceNode` (using ASIO input channels), `FfmpegProcessorNode` (with filter chain), `AsioSinkNode` (using ASIO output channels).
     * `AudioEngine` establishes internal connections: `asio_in` output -> `ffmpeg_proc` input, `ffmpeg_proc` output -> `asio_out` input.

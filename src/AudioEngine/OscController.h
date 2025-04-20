@@ -7,34 +7,30 @@
 #include <functional>
 #include <atomic>
 #include <map>
+#include <thread> // Added for std::thread
 
 // Include Configuration.h for RmeOscCommandConfig structure
 #include "Configuration.h"
 
-// Forward declaration of liblo types
-struct _lo_address;
-typedef struct _lo_address *lo_address;
-struct _lo_server_thread;
-typedef struct _lo_server_thread *lo_server_thread;
-struct _lo_message;
-typedef struct _lo_message *lo_message;
-struct _lo_bundle;
-typedef struct _lo_bundle *lo_bundle;
+// Include liblo headers directly
+extern "C"
+{
+#include "lo/lo_cpp.h"
+}
 
 namespace AudioEngine
 {
 	/**
-	 * @brief Controller for RME TotalMix FX via OSC
+	 * @brief Generic OSC Controller
 	 *
-	 * Uses liblo to send OSC messages to an RME interface
-	 * for controlling routing, gain, and other parameters.
-	 * Also provides capability to receive OSC messages from RME.
+	 * Uses liblo to send and receive OSC messages.
+	 * Can be configured for specific devices like RME TotalMix FX.
 	 */
-	class RmeOscController
+	class OscController // Renamed from RmeOscController
 	{
 	public:
 		/**
-		 * @brief RME Device Channel Types
+		 * @brief Device-specific Channel Types (Example: RME)
 		 */
 		enum class ChannelType
 		{
@@ -44,7 +40,7 @@ namespace AudioEngine
 		};
 
 		/**
-		 * @brief Common parameter types for RME devices
+		 * @brief Common parameter types (Example: RME)
 		 */
 		enum class ParamType
 		{
@@ -104,14 +100,14 @@ namespace AudioEngine
 		using LevelMeterCallback = std::function<void(ChannelType, int, const LevelMeterData &)>;
 
 		/**
-		 * @brief Construct a new RmeOscController
+		 * @brief Construct a new OscController
 		 */
-		RmeOscController();
+		OscController(); // Renamed from RmeOscController
 
 		/**
-		 * @brief Destroy the RmeOscController and cleanup resources
+		 * @brief Destroy the OscController and cleanup resources
 		 */
-		~RmeOscController();
+		~OscController(); // Renamed from RmeOscController
 
 		/**
 		 * @brief Configure the controller with target IP and port
@@ -155,7 +151,7 @@ namespace AudioEngine
 		bool setLevelMeterCallback(LevelMeterCallback callback);
 
 		/**
-		 * @brief Send an OSC command to the RME device
+		 * @brief Send an OSC command to the target device
 		 *
 		 * @param address OSC address (e.g., "/1/matrix/1/1/gain")
 		 * @param args Command arguments (float, int, string)
@@ -185,7 +181,7 @@ namespace AudioEngine
 		bool querySingleValue(const std::string &address, float &outValue, int timeoutMs = 500);
 
 		/**
-		 * @brief Helper to set matrix crosspoint gain
+		 * @brief Helper to set matrix crosspoint gain (Example: RME)
 		 *
 		 * @param hw_input Hardware input channel (1-based)
 		 * @param hw_output Hardware output channel (1-based)
@@ -196,7 +192,7 @@ namespace AudioEngine
 		bool setMatrixCrosspointGain(int hw_input, int hw_output, float gain_db);
 
 		/**
-		 * @brief Set channel strip mute state
+		 * @brief Set channel strip mute state (Example: RME)
 		 *
 		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
@@ -207,7 +203,7 @@ namespace AudioEngine
 		bool setChannelMute(ChannelType type, int channel, bool mute);
 
 		/**
-		 * @brief Set channel strip stereo link state
+		 * @brief Set channel strip stereo link state (Example: RME)
 		 *
 		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
@@ -218,7 +214,7 @@ namespace AudioEngine
 		bool setChannelStereo(ChannelType type, int channel, bool stereo);
 
 		/**
-		 * @brief Set channel strip volume
+		 * @brief Set channel strip volume (Example: RME)
 		 *
 		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
@@ -238,7 +234,7 @@ namespace AudioEngine
 		}
 
 		/**
-		 * @brief Set channel phantom power (48V)
+		 * @brief Set channel phantom power (48V) (Example: RME)
 		 *
 		 * @param channel Input channel number (1-based)
 		 * @param enabled Phantom power state
@@ -248,7 +244,7 @@ namespace AudioEngine
 		bool setInputPhantomPower(int channel, bool enabled);
 
 		/**
-		 * @brief Set input channel Hi-Z mode
+		 * @brief Set input channel Hi-Z mode (Example: RME)
 		 *
 		 * @param channel Input channel number (1-based)
 		 * @param enabled Hi-Z state
@@ -258,7 +254,7 @@ namespace AudioEngine
 		bool setInputHiZ(int channel, bool enabled);
 
 		/**
-		 * @brief Set channel EQ state
+		 * @brief Set channel EQ state (Example: RME)
 		 *
 		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
@@ -269,7 +265,7 @@ namespace AudioEngine
 		bool setChannelEQ(ChannelType type, int channel, bool enabled);
 
 		/**
-		 * @brief Set channel EQ band parameters
+		 * @brief Set channel EQ band parameters (Example: RME)
 		 *
 		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
@@ -283,7 +279,7 @@ namespace AudioEngine
 		bool setChannelEQBand(ChannelType type, int channel, int band, float freq, float gain, float q);
 
 		/**
-		 * @brief Query channel volume from the device
+		 * @brief Query channel volume from the device (Example: RME)
 		 *
 		 * @param type Channel type (input, playback, output)
 		 * @param channel Channel number (1-based)
@@ -303,7 +299,7 @@ namespace AudioEngine
 		}
 
 		/**
-		 * @brief Enable or disable level meter updates
+		 * @brief Enable or disable level meter updates (Example: RME)
 		 *
 		 * @param enable Whether to enable level meter updates
 		 * @return true if the setting was changed successfully
@@ -311,14 +307,14 @@ namespace AudioEngine
 		bool enableLevelMeters(bool enable);
 
 		/**
-		 * @brief Get current DSP status
+		 * @brief Get current DSP status (Example: RME)
 		 *
 		 * @return DspStatus Current DSP status
 		 */
 		DspStatus getDspStatus() const;
 
 		/**
-		 * @brief Send a TotalMix refresh command
+		 * @brief Send a TotalMix refresh command (Example: RME)
 		 * This requests the device to send all current parameter values
 		 *
 		 * @return true if the command was sent successfully
@@ -340,20 +336,27 @@ namespace AudioEngine
 
 	private:
 		/**
-		 * @brief Handle an incoming OSC message
+		 * @brief Handle an incoming OSC message (liblo callback)
 		 *
 		 * @param path OSC address path
 		 * @param types Type tag string
 		 * @param argv Argument values
 		 * @param argc Argument count
 		 * @param msg Original message
+		 * @param user_data Pointer to the OscController instance
 		 * @return int Return value to indicate message handling status
 		 */
-		int handleOscMessage(const char *path, const char *types,
-							 lo_arg **argv, int argc, _lo_message *msg);
+		static int handleOscMessageStatic(const char *path, const char *types,
+										  lo_arg **argv, int argc, lo_message msg, void *user_data);
 
 		/**
-		 * @brief Process a level meter message from the device
+		 * @brief Instance method to handle OSC message processing
+		 */
+		int handleOscMessage(const char *path, const char *types,
+							 lo_arg **argv, int argc, lo_message msg);
+
+		/**
+		 * @brief Process a level meter message from the device (Example: RME)
 		 *
 		 * @param type Channel type
 		 * @param channel Channel number (1-based)
@@ -369,7 +372,7 @@ namespace AudioEngine
 							   bool clipping);
 
 		/**
-		 * @brief Build an OSC address string for a channel parameter
+		 * @brief Build an OSC address string for a channel parameter (Example: RME)
 		 *
 		 * @param type Channel type
 		 * @param channel Channel number (1-based)
@@ -402,19 +405,19 @@ namespace AudioEngine
 		lo_bundle createBundle();
 
 		// Member variables
-		std::string m_rmeIp;										 // Target IP address
-		int m_rmePort = 0;											 // Target port
-		bool m_configured = false;									 // Configuration state
-		lo_address m_oscAddress;									 // liblo OSC address for sending
-		lo_server_thread m_oscServer = nullptr;						 // liblo OSC server for receiving
-		std::thread *m_oscThread = nullptr;							 // OSC thread for receiving
+		std::string m_targetIp;					// Target IP address
+		int m_targetPort = 0;					// Target port
+		bool m_configured = false;				// Configuration state
+		lo_address m_oscAddress = nullptr;		// liblo OSC address for sending
+		lo_server_thread m_oscServer = nullptr; // liblo OSC server for receiving
+		// std::thread *m_oscThread = nullptr;						 // No longer needed, liblo manages its thread
 		OscMessageCallback m_messageCallback;						 // Callback for OSC messages
 		LevelMeterCallback m_levelCallback;							 // Callback for level meter updates
 		bool m_levelMetersEnabled = false;							 // Whether level meters are enabled
 		DspStatus m_dspStatus;										 // Current DSP status
 		std::map<std::string, std::atomic<bool>> m_pendingResponses; // For handling query responses
 
-		// Clamp helpers for parameter bounds (from rme_osc_commands.md)
+		// Clamp helpers for parameter bounds (Example: RME)
 		float clampVolumeDb(float db) const { return std::max(-65.0f, std::min(6.0f, db)); }
 		int clampPan(int pan) const { return std::max(-100, std::min(100, pan)); }
 		float clampGain(float gain, bool mic) const { return std::max(0.0f, std::min(mic ? 75.0f : 24.0f, gain)); }
@@ -423,4 +426,4 @@ namespace AudioEngine
 		float clampEQQ(float q) const { return std::max(0.4f, std::min(9.9f, q)); }
 	};
 
-}
+} // namespace AudioEngine

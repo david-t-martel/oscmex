@@ -6,7 +6,7 @@
 classDiagram
     %% Main Engine Coordinator
     AudioEngine *-- "1" AsioManager : manages
-    AudioEngine *-- "1" RmeOscController : manages
+    AudioEngine *-- "1" OscController : manages
     AudioEngine *-- "many" AudioNode : owns
     AudioEngine *-- "many" Connection : contains
     AudioEngine --> Configuration : configured by
@@ -30,7 +30,7 @@ classDiagram
     AsioSourceNode --> AsioManager : receives data from
     AsioSinkNode --> AsioManager : sends data to
     FfmpegProcessorNode --> FfmpegFilter : uses
-    RmeOscController --> "liblo" : uses
+    OscController --> "liblo" : uses
     FileSourceNode --> "libavformat/libavcodec" : reads from
     FileSinkNode --> "libavformat/libavcodec" : writes to
 
@@ -47,7 +47,7 @@ classDiagram
     class AudioEngine {
         -Configuration m_config
         -AsioManager* m_asioManager
-        -RmeOscController* m_rmeController
+        -OscController* m_oscController
         -vector~AudioNode*~ m_nodes
         -vector~Connection~ m_connections
         -map~string, AudioNode*~ m_nodeMap
@@ -57,7 +57,7 @@ classDiagram
         +stop()
         +processAsioBlock(long, bool)
         +getNodeByName(string)
-        +getRmeController()
+        +getOscController()
     }
 
     class AudioNode {
@@ -105,17 +105,13 @@ classDiagram
         +setCallback(callback)
     }
 
-    class RmeOscController {
-        -string m_rmeIp
-        -int m_rmePort
-        -lo_address m_oscAddress
+    class OscController {
+        -string m_targetIp
+        -int m_targetPort
         -lo_server_thread m_oscServer
-        +configure(ip, port)
         +sendCommand(address, args)
         +startReceiver(port)
-        +stopReceiver()
-        +setMessageCallback(callback)
-        +setMatrixCrosspointGain(input, output, gain)
+        +setMatrixCrosspointGain(input, output, gain) // Example RME-specific method
     }
 
     class AsioSourceNode {

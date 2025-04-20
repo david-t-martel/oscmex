@@ -2,7 +2,7 @@
 
 This document outlines the steps required to implement the modular C++ audio engine architecture, as detailed in the `audio_engine_diagram_v3` diagram.
 
-**Important Context:** This plan describes the creation of a **new C++ application**. While it incorporates OSC concepts potentially shared with your MATLAB/MEX `oscmex` project, it does not directly modify the `oscmex` codebase. This C++ engine could potentially be controlled by or interact with MATLAB via MEX wrappers later, but the core engine itself is a separate C++ entity.
+**Important Context:** This plan describes the creation of a **new C++ application**. While it incorporates OSC concepts potentially shared with your MATLAB/MEX `oscmex` project ([`osc_rme.cpp`](c:\codedev\auricleinc\oscmex\src\tools\matlab\osc_rme.cpp), [`oscmex_test.m`](c:\codedev\auricleinc\oscmex\src\tools\matlab\oscmex_test.m)), it does not directly modify the `oscmex` codebase. The existing [`OscController`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h) class implements some of the OSC functionalities described below. This C++ engine could potentially be controlled by or interact with MATLAB via MEX wrappers later, but the core engine itself is a separate C++ entity.
 
 ## I. Project Setup & Dependencies
 
@@ -11,8 +11,8 @@ This document outlines the steps required to implement the modular C++ audio eng
   - Organize source files (.h/.cpp) logically (e.g., `src/core`, `src/nodes`, `src/managers`, `src/utils`).
 - [ ] **Integrate Dependencies:**
   - **ASIO SDK:** Ensure headers are accessible to the compiler and link against any necessary libraries (if applicable). Add placeholders/wrappers if SDK cannot be directly included in a public repo.
-  - **FFmpeg:** Include headers and link against required FFmpeg development libraries (`libavutil`, `libavformat`, `libavcodec`, `libavfilter`, `libswresample`).
-  - **C++ OSC Library:** Choose and integrate a library (e.g., `oscpack`, `liblo wrapper`). Add necessary headers and linking instructions.
+  - **FFmpeg:** Include headers and link against required FFmpeg development libraries (`libavutil`, `libavformat`, `libavcodec`, `libavfilter`, `libswresample`). (Headers seem present in `c:\Program Files\ffmpeg\include`)
+  - **C++ OSC Library:** Choose and integrate a library (e.g., `oscpack`, `liblo wrapper`). (`liblo` seems to be used in [`OscController.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp)).
   - **C++ Configuration Library (Optional):** Choose and integrate a library for parsing config files (e.g., `nlohmann/json`, `yaml-cpp`, `toml++`) or implement robust command-line parsing.
 
 ## II. Core Component Implementation
@@ -29,25 +29,22 @@ This document outlines the steps required to implement the modular C++ audio eng
   - Implement `setCallback` to store the `AudioEngine`'s callback function pointer/lambda.
   - Implement `getBufferPointers` for `AudioEngine` to retrieve buffers during the callback.
   - Ensure robust error handling for all ASIO calls.
-- [ ] **Implement `RmeOscClient` Class:**
-  - Implement `configure` method to set RME target IP/Port.
-  - Implement `sendCommand` using the chosen C++ OSC library to format and send UDP packets.
-  - Implement helper methods (e.g., `setMatrixCrosspointGain`) based on RME TotalMix FX OSC documentation, translating logical actions into specific OSC messages.
-- [ ] **Implement `OscServer` Class:**
-  - Implement `configure` method to set listening port.
-  - Implement listener thread (`OscListenThread`).
-  - Use the chosen C++ OSC library to bind a UDP socket and listen for packets in the thread.
-  - Implement message parsing logic within the listener thread.
-  - Implement a dispatch mechanism (e.g., callback map, message queue to `AudioEngine`) to handle recognized OSC address patterns.
-  - Implement `startListening`, `stopListening`, `cleanup` methods.
-- [ ] **Implement `AudioEngine` Class:**
+- [X] **Implement `OscController` Class:** (Partially implemented as [`OscController`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h))
+  - [X] Implement `configure` method to set target IP/Port for sending and listening port. (See [`OscController::configure`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=52-71) for sending, [`OscController::startReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=73-110) for receiving)
+  - [X] Implement `sendCommand` using the chosen C++ OSC library (`liblo`) to format and send UDP packets. (See [`OscController::sendCommand`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=308-356), [`OscController::sendBatch`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=365-439))
+  - [X] Implement listener thread (`OscListenThread`). (Handled by `lo_server_thread` within [`OscController::startReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=97-109))
+  - [X] Use the chosen C++ OSC library (`liblo`) to bind a UDP socket and listen for packets in the thread. (Handled by `lo_server_thread_new` in [`OscController::startReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=81-95))
+  - [X] Implement message parsing logic within the listener thread. (See [`OscController::handleOscMessage`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=128-239))
+  - [X] Implement a dispatch mechanism (e.g., callback map, message queue to `AudioEngine`) to handle recognized OSC address patterns. (Uses `m_messageCallback` and `m_levelCallback` in [`OscController`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h?range=397-398))
+  - [X] Implement `startListening`, `stopListening`, `cleanup` methods. (See [`OscController::startReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=73-110), [`OscController::stopReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=111-120), [`OscController::cleanup`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=36-44))
+  - [X] Implement RME-specific helper methods (e.g., `setMatrixCrosspointGain`) based on RME TotalMix FX OSC documentation, translating logical actions into specific OSC messages. (See [`OscController::setMatrixCrosspointGain`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h?range=186-191), [`OscController::setChannelMute`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h?range=199-209), etc.)
+- [ ] **Implement `AudioEngine` Class:** (Basic structure/demonstration in [`main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\main.cpp) and [`audioEngine_main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\audioEngine_main.cpp))
   - Implement constructor/destructor, `initialize`, `run`, `stop`, `cleanup`.
   - Implement configuration parsing logic within `initialize` (using `ConfigurationParser`).
   - Implement node creation and storage (`m_nodes`, `m_nodeMap`).
   - Implement connection setup (`m_connections`, determine `m_processingOrder`).
   - Implement interaction with `AsioManager` (initialization, starting, stopping, setting callback).
-  - Implement interaction with `RmeOscClient` (sending setup commands).
-  - Implement interaction with `OscServer` (starting/stopping listener, potentially receiving dispatched commands).
+  - [X] Implement interaction with `OscController` (sending setup commands, starting/stopping listener, potentially receiving dispatched commands). (See [`audioEngine_main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\audioEngine_main.cpp?range=854-865) for sending, [`main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\main.cpp?range=68-80) for receiving)
   - Implement `processAsioBlock` method (called by `AsioManager` callback).
   - Implement `runFileProcessingLoop` method (for non-ASIO mode).
   - **Crucially:** Implement the core logic within `processAsioBlock` / `runFileProcessingLoop` to manage data flow between connected nodes based on `m_connections` and `m_processingOrder`. This involves getting/setting buffers on nodes.
@@ -122,7 +119,7 @@ This document outlines the steps required to implement the modular C++ audio eng
 
 - [ ] **Unit Testing:** Write tests for individual components where possible (e.g., `FfmpegFilter` parameter updates, configuration parsing).
 - [ ] **Integration Testing:** Test common configurations (ASIO I/O, File I/O, combinations) with actual hardware and files.
-- [ ] **OSC Testing:** Test sending commands to RME and receiving commands via the `OscServer`.
+- [ ] **OSC Testing:** Test sending commands (e.g., to RME) and receiving commands via the `OscController`.
 - [ ] **Performance Profiling:** Profile real-time paths (`processAsioBlock`) and optimize critical sections. Check for audio dropouts under load.
 - [ ] **Memory Checking:** Use tools (like Valgrind on Linux/macOS, Dr. Memory/AddressSanitizer on Windows) to check for memory leaks or errors.
 - [ ] **Documentation:** Add Doxygen-style comments or other documentation for classes and methods.

@@ -268,29 +268,9 @@ private:
 #include "ffmpeg_filter.h" // Assuming it's in a separate file now
 
 // =========================================================================
-// RmeOscController Class
+// OscController Class
 // =========================================================================
-class RmeOscController
-{
-public:
-	RmeOscController() = default;
-	~RmeOscController(); // Close socket etc.
-
-	bool configure(const std::string &ip, int port);
-	bool sendCommand(const std::string &address, const std::vector<std::any> &args);
-	bool setMatrixCrosspointGain(int hw_input, int hw_output, float gain_db); // Example helper
-
-private:
-	// Format arguments for OSC library (implementation specific)
-	void formatAndSend(const std::string &address, const std::vector<std::any> &args);
-
-	std::string m_rmeIp;
-	int m_rmePort = 0;
-	bool m_configured = false;
-
-	// --- Using liblo for OSC communication ---
-	lo_address m_oscAddress = nullptr;
-};
+#include "OscController.h" // Include the renamed header
 
 // =========================================================================
 // AudioNode Base & Derived Classes (More detailed stubs)
@@ -505,7 +485,7 @@ public:
 
 	// Getters
 	AsioManager *getAsioManager() { return m_asioManager.get(); }
-	RmeOscController *getRmeController() { return m_rmeController.get(); }
+	OscController *getRmeController() { return m_rmeController.get(); } // Update return type
 	double getSampleRate() const { return m_sampleRate; }
 	long getBufferSize() const { return m_bufferSize; }
 	const AVChannelLayout &getInternalLayout() const { return m_internalLayout; }
@@ -520,7 +500,7 @@ private:
 
 	Configuration m_config;
 	std::unique_ptr<AsioManager> m_asioManager;
-	std::unique_ptr<RmeOscController> m_rmeController;
+	std::unique_ptr<OscController> m_rmeController; // Update type
 
 	std::vector<std::shared_ptr<AudioNode>> m_nodes;
 	std::map<std::string, std::shared_ptr<AudioNode>> m_nodeMap;
@@ -655,51 +635,8 @@ int main(int argc, char *argv[])
 // dynamic channel activation in createBuffers and callback routing to AudioEngine)
 // ... Full AsioManager implementation needed ...
 
-// --- RmeOscController Implementation ---
-RmeOscController::~RmeOscController() { /* Close socket */ }
-bool RmeOscController::configure(const std::string &ip, int port)
-{
-	m_rmeIp = ip;
-	m_rmePort = port;
-	// --- Using liblo for OSC communication ---
-	m_oscAddress = lo_address_new(ip.c_str(), std::to_string(port).c_str());
-	if (!m_oscAddress)
-	{ /* Handle error */
-		return false;
-	}
-	m_configured = true;
-	std::cout << "RME OSC Controller configured for " << ip << ":" << port << "\n";
-	return true;
-}
-bool RmeOscController::sendCommand(const std::string &address, const std::vector<std::any> &args)
-{
-	if (!m_configured || !m_oscAddress)
-		return false;
-	std::cout << "OSC SEND -> " << m_rmeIp << ":" << m_rmePort << " " << address; // Debug
-	// --- Using liblo for OSC communication ---
-	lo_message msg = lo_message_new();
-	for (const auto &arg : args)
-	{
-		if (arg.type() == typeid(float))
-			lo_message_add_float(msg, std::any_cast<float>(arg));
-		else if (arg.type() == typeid(int))
-			lo_message_add_int32(msg, std::any_cast<int>(arg));
-		// Add other types (string, bool, etc.)
-	}
-	lo_send_message(m_oscAddress, address.c_str(), msg);
-	lo_message_free(msg);
-	// --- End liblo communication ---
-	std::cout << " (Sent)\n";
-	return true; // Placeholder
-}
-bool RmeOscController::setMatrixCrosspointGain(int hw_input, int hw_output, float gain_db)
-{
-	// IMPORTANT: Check RME docs for exact address format and gain scale (dB vs linear 0-1)
-	std::string address = "/1/matrix/" + std::to_string(hw_input) + "/" + std::to_string(hw_output) + "/gain";
-	float gain_float = powf(10.0f, gain_db / 20.0f);		 // Example: Convert dB to linear gain (0-1 range?)
-	gain_float = std::max(0.0f, std::min(1.0f, gain_float)); // Clamp to 0-1
-	return sendCommand(address, {std::any(gain_float)});
-}
+// --- OscController Implementation ---
+// (Implementation is now in OscController.cpp)
 
 // --- AudioNode Derived Class Implementations (Stubs) ---
 // ... Need full implementations for configure, start, process, stop, cleanup, get/set buffer ...
@@ -718,7 +655,7 @@ bool AudioEngine::initialize(Configuration config)
 	m_internalFormat = AV_SAMPLE_FMT_FLTP; // Default internal format
 	// TODO: Get internal layout/format from config?
 
-	m_rmeController = std::make_unique<RmeOscController>();
+	m_rmeController = std::make_unique<OscController>(); // Update type
 	if (!m_rmeController->configure(m_config.rmeOscIp, m_config.rmeOscPort))
 	{
 		std::cerr << "Failed to configure RME OSC Controller.\n";
@@ -1017,7 +954,7 @@ void AudioEngine::runFileProcessingLoop()
 // --- TODO: Implement remaining class methods and helper functions ---
 // - ConfigurationParser::parse
 // - AsioManager full implementation (using SDK)
-// - RmeOscController full implementation (using OSC lib)
+// - OscController full implementation (using OSC lib)
 // - AudioNode derived classes full implementation (configure, start, process, stop, cleanup, buffer handling)
 // - AudioEngine::processAsioBlock / runFileProcessingLoop connection/buffer logic
 // - Robust error handling
