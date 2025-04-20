@@ -1,0 +1,49 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake Configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-B", "${workspaceFolder}/build",
+                "-S", "${workspaceFolder}",
+                "-DCMAKE_BUILD_TYPE=Release"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Build",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build", "${workspaceFolder}/build",
+                "--config", "Release",
+                "--parallel"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": "CMake Configure",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Intel OneAPI Configure",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/build_script_oneapi.bat",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Clean Build Directory",
+            "type": "shell",
+            "command": "if exist ${workspaceFolder}\\build\\CMakeCache.txt del ${workspaceFolder}\\build\\CMakeCache.txt",
+            "windows": {
+                "command": "if exist ${workspaceFolder}\\build\\CMakeCache.txt del ${workspaceFolder}\\build\\CMakeCache.txt"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

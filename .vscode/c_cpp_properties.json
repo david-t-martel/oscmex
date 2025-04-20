@@ -1,39 +1,87 @@
 {
   "configurations": [
     {
-      "name": "Win64-Intel",
+      "name": "Win32",
       "includePath": [
         "${workspaceFolder}/**",
         "${workspaceFolder}/src/**",
-        // --- Project Dependencies ---
-        "${workspaceFolder}/src/asio/common",
-        "${workspaceFolder}/src/asio/host",
-        "${workspaceFolder}/src/lo",
-        "${workspaceFolder}/src/gtk",
-        "${workspaceFolder}/src/ffmpeg-master/**",
-        "${workspaceFolder}/src/ffmpeg-master/libavutil",
+        "${workspaceFolder}/include/**",
+        "${workspaceFolder}/src/ffmpeg-master",
         "${workspaceFolder}/src/ffmpeg-master/libavformat",
         "${workspaceFolder}/src/ffmpeg-master/libavcodec",
-        // --- oneAPI Component Includes (Based on standard paths) ---
-        "C:/Program Files (x86)/Intel/oneAPI/tbb/latest/include",
-        "C:/Program Files (x86)/Intel/oneAPI/mkl/latest/include",
-        "C:/Program Files (x86)/Intel/oneAPI/ipp/latest/include",
-        "C:/Program Files (x86)/Intel/oneAPI/ippcp/latest/include",
-        "C:/Program Files (x86)/Intel/oneAPI/dal/latest/include",
-        "C:/Program Files (x86)/Intel/oneAPI/dpl/latest/include"
+        "${workspaceFolder}/src/ffmpeg-master/libavutil",
+        "${workspaceFolder}/src/ffmpeg-master/libavfilter",
+        "${workspaceFolder}/src/ffmpeg-master/libswresample",
+        "${workspaceFolder}/src/ffmpeg-master/libswscale",
+        "${workspaceFolder}/src/asio/AsioSDK/common",
+        "${workspaceFolder}/src/asio/AsioSDK/host",
+        "${workspaceFolder}/src/asio/AsioSDK/host/pc",
+        "${workspaceFolder}/src/AudioEngine/**",
+        "${workspaceFolder}/src/lo/**",
+        "${workspaceFolder}/src/oscmix/**"
       ],
       "defines": [
         "_DEBUG",
         "UNICODE",
-        "_UNICODE"
+        "_UNICODE",
+        "WIN32",
+        "_WINDOWS",
+        "ASIO_SDK_VERSION=233",
+        "HAVE_FFMPEG",
+        "FF_API_OLD_CHANNEL_LAYOUT=0",
+        "HAVE_AV_CONFIG_H"
       ],
-      // Compiler path relies on PATH set by setvars.bat
-      "compilerPath": "icx.exe",
-      "windowsSdkVersion": "10.0.26100.0", // Updated to match environment
+      "windowsSdkVersion": "10.0.19041.0",
+      "compilerPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.34.31933/bin/Hostx64/x64/cl.exe",
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-msvc-x64",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+    },
+    {
+      "name": "Intel-OneAPI",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/src/**",
+        "${workspaceFolder}/include/**",
+        "${workspaceFolder}/src/ffmpeg-master",
+        "${workspaceFolder}/src/ffmpeg-master/libavformat",
+        "${workspaceFolder}/src/ffmpeg-master/libavcodec",
+        "${workspaceFolder}/src/ffmpeg-master/libavutil",
+        "${workspaceFolder}/src/ffmpeg-master/libavfilter",
+        "${workspaceFolder}/src/ffmpeg-master/libswresample",
+        "${workspaceFolder}/src/ffmpeg-master/libswscale",
+        "${workspaceFolder}/src/asio/AsioSDK/common",
+        "${workspaceFolder}/src/asio/AsioSDK/host",
+        "${workspaceFolder}/src/asio/AsioSDK/host/pc",
+        "${workspaceFolder}/src/AudioEngine/**",
+        "${workspaceFolder}/src/lo/**",
+        "${workspaceFolder}/src/oscmix/**",
+        "C:/Program Files (x86)/Intel/oneAPI/tbb/latest/include",
+        "C:/Program Files (x86)/Intel/oneAPI/mkl/latest/include",
+        "C:/Program Files (x86)/Intel/oneAPI/ipp/latest/include"
+      ],
+      "defines": [
+        "UNICODE",
+        "_UNICODE",
+        "WIN32",
+        "_WINDOWS",
+        "ASIO_SDK_VERSION=233",
+        "HAVE_FFMPEG",
+        "FF_API_OLD_CHANNEL_LAYOUT=0",
+        "HAVE_AV_CONFIG_H",
+        "HAVE_TBB",
+        "HAVE_IPP",
+        "HAVE_MKL"
+      ],
+      "windowsSdkVersion": "10.0.19041.0",
+      "compilerPath": "C:/Program Files (x86)/Intel/oneAPI/compiler/latest/windows/bin/icx.exe",
       "cStandard": "c17",
       "cppStandard": "c++17",
       "intelliSenseMode": "windows-clang-x64",
-      "compilerArgs": []
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "compileCommands": "${workspaceFolder}/build/intel-release-all/compile_commands.json"
     }
   ],
   "version": 4

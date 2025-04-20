@@ -10,16 +10,119 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# Enable Intel compiler detection
+# Enable Intel compiler detection - improved detection
 include(CheckCXXCompiler)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
 include(TestBigEndian)
 
-# Find Intel oneAPI components if available
+# Detect Intel oneAPI compilers
+if(CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM" OR
+	CMAKE_CXX_COMPILER_ID MATCHES "Intel" OR
+	CMAKE_CXX_COMPILER MATCHES "icx" OR
+	CMAKE_CXX_COMPILER MATCHES "icpc" OR
+	CMAKE_CXX_COMPILER MATCHES "dpcpp")
+	set(USING_INTEL_COMPILER TRUE)
+	message(STATUS "Intel compiler detected: ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+# Find Intel oneAPI components
+set(CMAKE_PREFIX_PATH "$ENV{ONEAPI_ROOT}/tbb;$ENV{ONEAPI_ROOT}/ipp;$ENV{ONEAPI_ROOT}/mkl;${CMAKE_PREFIX_PATH}")
+
 find_package(TBB QUIET)
+
+if(TBB_FOUND)
+	message(STATUS "Intel TBB found: ${TBB_VERSION}")
+else()
+	message(STATUS "Intel TBB not found, some optimizations will be disabled")
+endif()
+
 find_package(IPP QUIET)
+
+if(IPP_FOUND)
+	message(STATUS "Intel IPP found: ${IPP_VERSION}")
+else()
+	message(STATUS "Intel IPP not found, some optimizations will be disabled")
+endif()
+
 find_package(MKL QUIET)
+
+if(MKL_FOUND)
+	message(STATUS "Intel MKL found: ${MKL_VERSION}")
+else()
+	message(STATUS "Intel MKL not found, will fallback to standard math libraries")
+endif()
+
+# oneAPI configuration options
+option(USE_INTEL_COMPILER "Prefer Intel oneAPI compiler if available" ON)
+option(USE_INTEL_TBB "Use Intel Threading Building Blocks" ON)
+option(USE_INTEL_IPP "Use Intel Integrated Performance Primitives" ON)
+option(USE_INTEL_MKL "Use Intel Math Kernel Library" ON)
+option(USE_INTEL_DPCPP "Use Intel Data Parallel C++" OFF)
+
+# --- FFmpeg Configuration ---
+# Use local FFmpeg source code instead of system installation
+set(FFMPEG_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/ffmpeg-master")
+
+# Set required FFmpeg components
+set(FFMPEG_COMPONENTS
+	avutil
+	avformat
+	avcodec
+	avfilter
+	swresample
+	swscale
+)
+
+# Print status message
+message(STATUS "Using local FFmpeg source from: ${FFMPEG_SOURCE_DIR}")
+
+# Create FFmpeg include paths
+set(FFMPEG_INCLUDE_DIRS
+	"${FFMPEG_SOURCE_DIR}"
+)
+
+# Add each component's include directory
+foreach(component ${FFMPEG_COMPONENTS})
+	list(APPEND FFMPEG_INCLUDE_DIRS "${FFMPEG_SOURCE_DIR}/lib${component}")
+endforeach()
+
+# Build FFmpeg libraries from source
+set(FFMPEG_LIBRARIES)
+
+# Define sources for each FFmpeg component
+foreach(component ${FFMPEG_COMPONENTS})
+	file(GLOB_RECURSE FFMPEG_${component}_SOURCES
+		"${FFMPEG_SOURCE_DIR}/lib${component}/*.c"
+	)
+
+	# Create library target
+	add_library(ffmpeg_${component} STATIC ${FFMPEG_${component}_SOURCES})
+
+	# Add component-specific include paths and definitions
+	target_include_directories(ffmpeg_${component} PRIVATE
+		${FFMPEG_INCLUDE_DIRS}
+	)
+
+	# Add component to libraries list
+	list(APPEND FFMPEG_LIBRARIES ffmpeg_${component})
+
+	# Common compile definitions for all FFmpeg components
+	target_compile_definitions(ffmpeg_${component} PRIVATE
+		HAVE_AV_CONFIG_H
+		_CRT_SECURE_NO_WARNINGS
+		_CRT_NONSTDC_NO_DEPRECATE
+		_WINSOCK_DEPRECATED_NO_WARNINGS
+		FF_API_OLD_CHANNEL_LAYOUT=0
+	)
+
+	# Disable specific warnings for FFmpeg code
+	if(MSVC)
+		target_compile_options(ffmpeg_${component} PRIVATE
+			/wd4244 /wd4267 /wd4018 /wd4996
+		)
+	endif()
+endforeach()
 
 # --- liblo Configuration ---
 option(LIBLO_ENABLE_THREADS "Build liblo with threading support" ON)
@@ -113,6 +216,7 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/src
 	${CMAKE_CURRENT_SOURCE_DIR}/src/AudioEngine
 	${CMAKE_CURRENT_SOURCE_DIR}/include
+	${FFMPEG_INCLUDE_DIRS}
 )
 
 # Source files for AudioEngine
@@ -125,36 +229,107 @@ file(GLOB AUDIO_ENGINE_SOURCES
 add_library(AudioEngine SHARED ${AUDIO_ENGINE_SOURCES})
 
 # Link with oneAPI components and liblo
-target_link_libraries(AudioEngine PRIVATE
-	TBB::tbb
-	IPP::ipp
-	liblo
-	MKL::mkl_intel_lp64 # Or appropriate MKL interface library
-	MKL::mkl_sequential # Or MKL::mkl_tbb_thread
-	MKL::mkl_core
-)
+target_link_libraries(AudioEngine PRIVATE liblo)
+
+# Conditionally link with available oneAPI components
+if(TBB_FOUND)
+	target_link_libraries(AudioEngine PRIVATE TBB::tbb)
+	target_compile_definitions(AudioEngine PRIVATE HAVE_TBB)
+endif()
+
+if(IPP_FOUND)
+	target_link_libraries(AudioEngine PRIVATE IPP::ipp)
+	target_compile_definitions(AudioEngine PRIVATE HAVE_IPP)
+endif()
+
+if(MKL_FOUND)
+	target_link_libraries(AudioEngine PRIVATE
+		MKL::mkl_intel_lp64
+		MKL::mkl_sequential # Or MKL::mkl_tbb_thread if using TBB threading
+		MKL::mkl_core)
+	target_compile_definitions(AudioEngine PRIVATE HAVE_MKL)
+endif()
 
 # Apply optimizations globally if using Intel compiler
-if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+if(USING_INTEL_COMPILER)
+	# Common flags for both classic Intel compiler and Intel LLVM-based compiler
 	add_compile_options(
-		-xHost # Optimize for the build machine's architecture
 		-O3 # High optimization level
-
-		# -qopenmp      # Enable OpenMP only if you use #pragma omp
-		-ipo # Interprocedural optimization (can increase link time)
-		-fp-model fast=2 # Faster, potentially less precise FP math
+		-xHost # Optimize for the build machine's architecture
+		$<$<COMPILE_LANGUAGE:CXX>:-fp-model=fast=2> # Faster FP math for C++
+		$<$<COMPILE_LANGUAGE:C>:-fp-model=fast=2> # Faster FP math for C
 	)
 
-	# For C code as well
-	add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wall>) # Example C flag
+	# LLVM-based Intel compiler (icx/icpx) specific flags
+	if(CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
+		add_compile_options(
+			-fiopenmp # Intel optimized OpenMP (for icx)
+			-ffast-math # Fast math operations
+			-finline-functions # Inline function expansion
+			-flto # Link-time optimization
+		)
+		message(STATUS "Applied Intel LLVM compiler optimizations")
+
+	# Classic Intel compiler (icc/icpc) specific flags
+	elseif(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+		add_compile_options(
+			-qopenmp # Intel OpenMP support (for icc)
+			-ipo # Interprocedural optimization
+			-inline-forceinline # Force inlining for performance
+			-no-prec-div # Faster but less precise division
+			-qopt-mem-layout-trans=3 # Memory layout transformations
+		)
+		message(STATUS "Applied Classic Intel compiler optimizations")
+	endif()
+
+	# Add vectorization report for debugging performance
+	option(VECTORIZATION_REPORT "Generate vectorization report" OFF)
+
+	if(VECTORIZATION_REPORT)
+		if(CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
+			add_compile_options(-qopt-report=5 -qopt-report-phase=vec)
+		else()
+			add_compile_options(-qopt-report=5 -qopt-report-phase=vec)
+		endif()
+	endif()
+
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 	add_compile_options(
 		-O3
 		-march=native
-
-		# -fopenmp      # Enable OpenMP only if you use #pragma omp
+		-ftree-vectorize
+		$<$<COMPILE_LANGUAGE:CXX>:-ffast-math>
 	)
 endif()
+
+# Define FFmpeg-related compilation definitions
+target_compile_definitions(AudioEngine PRIVATE
+	HAVE_FFMPEG
+	FF_API_OLD_CHANNEL_LAYOUT=0 # Use newer FFmpeg channel layout API
+)
+
+# Add FFmpeg compile-time definitions for Windows
+if(WIN32)
+	target_compile_definitions(AudioEngine PRIVATE
+		_CRT_SECURE_NO_WARNINGS
+		_CRT_NONSTDC_NO_DEPRECATE
+		_WINSOCK_DEPRECATED_NO_WARNINGS
+		HAVE_AV_CONFIG_H
+	)
+endif()
+
+# Add custom compile flags for FFmpeg files if needed
+if(MSVC)
+	# Disable specific warnings from FFmpeg code
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4244 /wd4267 /wd4018")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4244 /wd4267 /wd4018")
+endif()
+
+# Include the FFmpeg headers in the AudioEngine target
+target_include_directories(AudioEngine PRIVATE ${FFMPEG_INCLUDE_DIRS})
+
+# Add FFmpeg dependencies to AudioEngine
+target_link_libraries(AudioEngine PRIVATE ${FFMPEG_LIBRARIES})
 
 # Define main executable
 add_executable(AudioEngineApp src/main.cpp)
