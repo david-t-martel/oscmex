@@ -16,7 +16,7 @@ namespace AudioEngine
 
 	// Forward declarations
 	class AsioManager;
-	class RmeOscController;
+	class OscController; // Changed from RmeOscController
 
 	/**
 	 * @brief Core audio engine class
@@ -71,11 +71,11 @@ namespace AudioEngine
 		bool processAsioBlock(long doubleBufferIndex, bool directProcess);
 
 		/**
-		 * @brief Get the RME OSC controller
+		 * @brief Get the OSC controller
 		 *
-		 * @return Pointer to RME OSC controller
+		 * @return Pointer to OSC controller
 		 */
-		RmeOscController *getRmeController() { return m_rmeController.get(); }
+		OscController *getOscController() { return m_oscController.get(); } // Changed from getRmeController and updated return type
 
 		/**
 		 * @brief Get a node by name
@@ -106,7 +106,7 @@ namespace AudioEngine
 
 		// Managers
 		std::unique_ptr<AsioManager> m_asioManager;
-		std::unique_ptr<RmeOscController> m_rmeController;
+		std::unique_ptr<OscController> m_oscController; // Changed from m_rmeController
 
 		// Nodes and connections
 		std::vector<std::unique_ptr<AudioNode>> m_nodes;
@@ -125,7 +125,7 @@ namespace AudioEngine
 		// Helper methods
 		bool createAndConfigureNodes();
 		bool setupConnections();
-		bool sendRmeCommands();
+		bool sendOscCommands(); // Changed from sendRmeCommands
 		void reportStatus(const std::string &category, const std::string &message);
 
 		// Process graph traversal

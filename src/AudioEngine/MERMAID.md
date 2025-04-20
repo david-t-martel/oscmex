@@ -221,7 +221,7 @@ flowchart LR
 
     subgraph AudioEngine
         ASIO_MGR[AsioManager]
-        RME_OSC[RmeOscController]
+        RME_OSC[OscController]
 
         subgraph NodeBuffers
             BUFFER_POOL[AudioBuffer Pool]
@@ -295,7 +295,7 @@ sequenceDiagram
     participant Engine as AudioEngine
     participant Config as ConfigurationParser
     participant ASIO as AsioManager
-    participant RME as RmeOscController
+    participant RME as OscController
     participant Nodes as AudioNodes
 
     Main->>Config: parse(argc, argv)

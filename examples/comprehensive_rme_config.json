@@ -1,0 +1,347 @@
+{
+  "asioDeviceName": "RME Fireface UCX II",
+  "rmeOscIp": "127.0.0.1",
+  "rmeOscPort": 8000,
+  "sampleRate": 48000.0,
+  "bufferSize": 512,
+
+  "nodes": [
+    {
+      "name": "asio_input",
+      "type": "ASIO_SOURCE",
+      "params": {
+        "channels": "0,1",
+        "device": "RME Fireface UCX II"
+      }
+    },
+    {
+      "name": "fir_processor",
+      "type": "FFMPEG_PROCESSOR",
+      "params": {
+        "filter_description": "afir=dry=1:wet=1:gtype=1:taps=256:minp=1:hpgain=1:maxp=1:wfunc=hann",
+        "taps": "256",
+        "min_phase": "true",
+        "window_function": "hann"
+      }
+    },
+    {
+      "name": "eq_processor",
+      "type": "FFMPEG_PROCESSOR",
+      "params": {
+        "filter_description": "equalizer=f=1000:width_type=q:width=1:g=0,equalizer=f=4000:width_type=q:width=1:g=0,equalizer=f=8000:width_type=h:width=0.7:g=0",
+        "eq_band1_freq": "1000",
+        "eq_band1_q": "1.0",
+        "eq_band1_gain": "0.0",
+        "eq_band2_freq": "4000",
+        "eq_band2_q": "1.0",
+        "eq_band2_gain": "0.0",
+        "eq_band3_freq": "8000",
+        "eq_band3_type": "h",
+        "eq_band3_q": "0.7",
+        "eq_band3_gain": "0.0"
+      }
+    },
+    {
+      "name": "dynamics_processor",
+      "type": "FFMPEG_PROCESSOR",
+      "params": {
+        "filter_description": "acompressor=threshold=-20:ratio=4:attack=20:release=100",
+        "threshold": "-20",
+        "ratio": "4",
+        "attack": "20",
+        "release": "100"
+      }
+    },
+    {
+      "name": "asio_output",
+      "type": "ASIO_SINK",
+      "params": {
+        "channels": "0,1",
+        "device": "RME Fireface UCX II"
+      }
+    }
+  ],
+
+  "connections": [
+    {
+      "sourceName": "asio_input",
+      "sourcePad": 0,
+      "sinkName": "fir_processor",
+      "sinkPad": 0
+    },
+    {
+      "sourceName": "fir_processor",
+      "sourcePad": 0,
+      "sinkName": "eq_processor",
+      "sinkPad": 0
+    },
+    {
+      "sourceName": "eq_processor",
+      "sourcePad": 0,
+      "sinkName": "dynamics_processor",
+      "sinkPad": 0
+    },
+    {
+      "sourceName": "dynamics_processor",
+      "sourcePad": 0,
+      "sinkName": "asio_output",
+      "sinkPad": 0
+    }
+  ],
+
+  "rmeCommands": [
+    // Channel setup commands
+    {
+      "address": "/1/channel/1/name",
+      "args": ["Input 1"]
+    },
+    {
+      "address": "/1/channel/2/name",
+      "args": ["Input 2"]
+    },
+    {
+      "address": "/1/channel/1/volume",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/channel/2/volume",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/channel/1/mute",
+      "args": [false]
+    },
+    {
+      "address": "/1/channel/2/mute",
+      "args": [false]
+    },
+    {
+      "address": "/1/channel/1/phase",
+      "args": [false]
+    },
+    {
+      "address": "/1/channel/2/phase",
+      "args": [false]
+    },
+
+    // Input processing commands
+    {
+      "address": "/1/input/1/gain",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/input/2/gain",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/input/1/48v",
+      "args": [false]
+    },
+    {
+      "address": "/1/input/2/48v",
+      "args": [false]
+    },
+    {
+      "address": "/1/input/1/hiz",
+      "args": [false]
+    },
+    {
+      "address": "/1/input/2/hiz",
+      "args": [false]
+    },
+
+    // EQ commands
+    {
+      "address": "/1/input/1/eq/enable",
+      "args": [true]
+    },
+    {
+      "address": "/1/input/2/eq/enable",
+      "args": [true]
+    },
+    {
+      "address": "/1/input/1/eq/band1/type",
+      "args": [0]
+    },
+    {
+      "address": "/1/input/1/eq/band1/gain",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/input/1/eq/band1/freq",
+      "args": [1000]
+    },
+    {
+      "address": "/1/input/1/eq/band1/q",
+      "args": [1.0]
+    },
+    {
+      "address": "/1/input/1/eq/band2/gain",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/input/1/eq/band2/freq",
+      "args": [4000]
+    },
+    {
+      "address": "/1/input/1/eq/band2/q",
+      "args": [1.0]
+    },
+    {
+      "address": "/1/input/1/eq/band3/type",
+      "args": [1]
+    },
+    {
+      "address": "/1/input/1/eq/band3/gain",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/input/1/eq/band3/freq",
+      "args": [8000]
+    },
+    {
+      "address": "/1/input/1/eq/band3/q",
+      "args": [0.7]
+    },
+
+    // Dynamics processing
+    {
+      "address": "/1/input/1/dynamics/enable",
+      "args": [true]
+    },
+    {
+      "address": "/1/input/2/dynamics/enable",
+      "args": [true]
+    },
+    {
+      "address": "/1/input/1/dynamics/gain",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/input/1/dynamics/attack",
+      "args": [20]
+    },
+    {
+      "address": "/1/input/1/dynamics/release",
+      "args": [100]
+    },
+    {
+      "address": "/1/input/1/dynamics/threshold",
+      "args": [-20.0]
+    },
+    {
+      "address": "/1/input/1/dynamics/ratio",
+      "args": [4.0]
+    },
+
+    // Low-cut filter
+    {
+      "address": "/1/input/1/lowcut/enable",
+      "args": [true]
+    },
+    {
+      "address": "/1/input/2/lowcut/enable",
+      "args": [true]
+    },
+    {
+      "address": "/1/input/1/lowcut/freq",
+      "args": [80]
+    },
+    {
+      "address": "/1/input/2/lowcut/freq",
+      "args": [80]
+    },
+    {
+      "address": "/1/input/1/lowcut/slope",
+      "args": [2]
+    },
+    {
+      "address": "/1/input/2/lowcut/slope",
+      "args": [2]
+    },
+
+    // Matrix routing
+    {
+      "address": "/1/matrix/1/1/gain",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/matrix/2/2/gain",
+      "args": [0.0]
+    },
+
+    // Global settings
+    {
+      "address": "/1/global/main_out",
+      "args": [0]
+    },
+    {
+      "address": "/1/global/main_mono",
+      "args": [false]
+    },
+    {
+      "address": "/1/global/dim",
+      "args": [false]
+    },
+    {
+      "address": "/1/global/clock_source",
+      "args": [0]
+    },
+
+    // Reverb settings
+    {
+      "address": "/1/fx/reverb/enable",
+      "args": [false]
+    },
+    {
+      "address": "/1/fx/reverb/type",
+      "args": [1]
+    },
+    {
+      "address": "/1/fx/reverb/predelay",
+      "args": [0]
+    },
+    {
+      "address": "/1/fx/reverb/lowcut",
+      "args": [100]
+    },
+    {
+      "address": "/1/fx/reverb/room_scale",
+      "args": [0.5]
+    },
+    {
+      "address": "/1/fx/reverb/time",
+      "args": [1.0]
+    },
+    {
+      "address": "/1/fx/reverb/highcut",
+      "args": [8000]
+    },
+    {
+      "address": "/1/fx/reverb/volume",
+      "args": [0.0]
+    },
+
+    // Echo settings
+    {
+      "address": "/1/fx/echo/enable",
+      "args": [false]
+    },
+    {
+      "address": "/1/fx/echo/type",
+      "args": [0]
+    },
+    {
+      "address": "/1/fx/echo/delay",
+      "args": [250]
+    },
+    {
+      "address": "/1/fx/echo/feedback",
+      "args": [50]
+    },
+    {
+      "address": "/1/fx/echo/volume",
+      "args": [0.0]
+    }
+  ]
+}

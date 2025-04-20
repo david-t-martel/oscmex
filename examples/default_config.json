@@ -1,0 +1,78 @@
+{
+  "asioDeviceName": "ASIO4ALL v2",
+  "rmeOscIp": "127.0.0.1",
+  "rmeOscPort": 8000,
+  "sampleRate": 48000.0,
+  "bufferSize": 512,
+
+  "nodes": [
+    {
+      "name": "asio_input",
+      "type": "ASIO_SOURCE",
+      "params": {
+        "channels": "0,1",
+        "device": "ASIO4ALL v2"
+      }
+    },
+    {
+      "name": "fir_processor",
+      "type": "FFMPEG_PROCESSOR",
+      "params": {
+        "filter_description": "afir=dry=1:wet=1:gtype=1:taps=256:minp=1:hpgain=1:maxp=1:wfunc=hann",
+        "taps": "256",
+        "min_phase": "true",
+        "window_function": "hann"
+      }
+    },
+    {
+      "name": "asio_output",
+      "type": "ASIO_SINK",
+      "params": {
+        "channels": "0,1",
+        "device": "ASIO4ALL v2"
+      }
+    }
+  ],
+
+  "connections": [
+    {
+      "sourceName": "asio_input",
+      "sourcePad": 0,
+      "sinkName": "fir_processor",
+      "sinkPad": 0
+    },
+    {
+      "sourceName": "fir_processor",
+      "sourcePad": 0,
+      "sinkName": "asio_output",
+      "sinkPad": 0
+    }
+  ],
+
+  "rmeCommands": [
+    {
+      "address": "/1/channel/1/name",
+      "args": ["Input 1"]
+    },
+    {
+      "address": "/1/channel/2/name",
+      "args": ["Input 2"]
+    },
+    {
+      "address": "/1/channel/1/volume",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/channel/2/volume",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/matrix/1/1/gain",
+      "args": [0.0]
+    },
+    {
+      "address": "/1/matrix/2/2/gain",
+      "args": [0.0]
+    }
+  ]
+}

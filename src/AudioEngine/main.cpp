@@ -52,18 +52,18 @@ void oscMessageHandler(const std::string &path, const std::vector<std::any> &arg
 }
 
 /**
- * @brief Separate function to showcase RmeOscController independent of AudioEngine
+ * @brief Separate function to showcase OscController independent of AudioEngine
  */
-void demonstrateRmeOscControl()
+void demonstrateOscControl() // Renamed from demonstrateRmeOscControl
 {
-	std::cout << "Demonstrating RME OSC Control Module...\n";
+	std::cout << "Demonstrating OSC Control Module...\n"; // Updated text
 
-	// Create and configure RME OSC controller
-	AudioEngine::RmeOscController controller;
+	// Create and configure OSC controller
+	AudioEngine::OscController controller; // Updated class name
 
 	if (!controller.configure("127.0.0.1", 7001))
 	{
-		std::cerr << "Failed to configure RME OSC controller\n";
+		std::cerr << "Failed to configure OSC controller\n"; // Updated text
 		return;
 	}
 
@@ -81,16 +81,16 @@ void demonstrateRmeOscControl()
 	}
 
 	// Example commands to send
-	std::cout << "Sending test RME OSC commands...\n";
+	std::cout << "Sending test OSC commands...\n"; // Updated text
 
 	// Set channel 1 volume to -10dB
 	controller.setChannelVolume(1, -10.0f);
 
 	// Send a batch of commands
-	std::vector<AudioEngine::RmeOscCommandConfig> commands = {
-		{"/1/channel/2/mute", {std::any(true)}},
-		{"/1/channel/3/volume", {std::any(0.8f)}},
-		{"/1/matrix/1/2/gain", {std::any(0.5f)}}};
+	std::vector<AudioEngine::OscCommandConfig> commands = {// Updated type name
+														   {"/1/channel/2/mute", {std::any(true)}},
+														   {"/1/channel/3/volume", {std::any(0.8f)}},
+														   {"/1/matrix/1/2/gain", {std::any(0.5f)}}};
 
 	controller.sendBatch(commands);
 
@@ -118,7 +118,7 @@ void demonstrateRmeOscControl()
 
 	// Clean up
 	controller.cleanup();
-	std::cout << "RME OSC demonstration complete\n";
+	std::cout << "OSC demonstration complete\n"; // Updated text
 }
 
 /**
@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 
 	if (demonstrationMode)
 	{
-		demonstrateRmeOscControl();
+		demonstrateOscControl();
 		return 0;
 	}
 
@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
 				int input = std::stoi(args[0]);
 				int output = std::stoi(args[1]);
 				float gain = std::stof(args[2]);
-				if (engine.getRmeController()->setMatrixCrosspointGain(input, output, gain))
+				if (engine.getOscController()->setMatrixCrosspointGain(input, output, gain)) // Updated to getOscController
 				{
 					std::cout << "Matrix " << input << "," << output << " gain set to " << gain << " dB\n";
 				}
@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
 			{
 				int channel = std::stoi(args[0]);
 				float volume = std::stof(args[1]);
-				if (engine.getRmeController()->setChannelVolume(channel, volume))
+				if (engine.getOscController()->setChannelVolume(channel, volume)) // Updated to getOscController
 				{
 					std::cout << "Channel " << channel << " volume set to " << volume << " dB\n";
 				}
@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
 			{
 				int channel = std::stoi(args[0]);
 				bool mute = std::stoi(args[1]) != 0;
-				if (engine.getRmeController()->setChannelMute(channel, mute))
+				if (engine.getOscController()->setChannelMute(channel, mute)) // Updated to getOscController
 				{
 					std::cout << "Channel " << channel << (mute ? " muted" : " unmuted") << std::endl;
 				}
@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
 			{
 				int channel = std::stoi(args[0]);
 				float volume;
-				if (engine.getRmeController()->queryChannelVolume(channel, volume))
+				if (engine.getOscController()->queryChannelVolume(channel, volume)) // Updated to getOscController
 				{
 					std::cout << "Channel " << channel << " volume: " << volume << " dB\n";
 				}
