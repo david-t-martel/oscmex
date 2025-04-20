@@ -8,9 +8,12 @@
         // --- Project Dependencies ---
         "${workspaceFolder}/src/asio/common",
         "${workspaceFolder}/src/asio/host",
-        "C:/Program Files/ffmpeg/include", // VERIFY THIS
         "${workspaceFolder}/src/lo",
         "${workspaceFolder}/src/gtk",
+        "${workspaceFolder}/src/ffmpeg-master/**",
+        "${workspaceFolder}/src/ffmpeg-master/libavutil",
+        "${workspaceFolder}/src/ffmpeg-master/libavformat",
+        "${workspaceFolder}/src/ffmpeg-master/libavcodec",
         // --- oneAPI Component Includes (Based on standard paths) ---
         "C:/Program Files (x86)/Intel/oneAPI/tbb/latest/include",
         "C:/Program Files (x86)/Intel/oneAPI/mkl/latest/include",
