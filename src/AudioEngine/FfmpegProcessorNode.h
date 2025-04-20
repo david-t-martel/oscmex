@@ -56,9 +56,21 @@ namespace AudioEngine
 		int getOutputPadCount() const override { return 1; } // One output
 
 		/**
+		 * @brief Update a node parameter
+		 *
+		 * This implementation routes parameter update requests to the
+		 * base class updateParameter method.
+		 *
+		 * @param paramName Name of the parameter to update
+		 * @param paramValue New value for the parameter
+		 * @return true if update was successful
+		 */
+		bool updateParameter(const std::string &paramName, const std::string &paramValue) override;
+
+		/**
 		 * @brief Update a filter parameter
 		 *
-		 * Dynamically update a parameter of a filter in the chain
+		 * Dynamically update a parameter of a specific filter in the chain
 		 *
 		 * @param filterName Name of the filter to update
 		 * @param paramName Name of the parameter to update

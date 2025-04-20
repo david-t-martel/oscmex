@@ -275,19 +275,10 @@ namespace AudioEngine
 			return false;
 		}
 
-		if (!buffer || !buffer->isValid())
+		// Use the new buffer format compatibility checker from AudioNode base class
+		if (!isBufferFormatCompatible(buffer))
 		{
-			logMessage("Invalid input buffer", true);
-			return false;
-		}
-
-		// Validate buffer format matches configuration
-		if (buffer->getFrames() != m_bufferSize ||
-			buffer->getFormat() != m_format ||
-			buffer->getChannelCount() != m_channelLayout.nb_channels)
-		{
-
-			logMessage("Input buffer format mismatch", true);
+			logMessage("Input buffer format incompatible", true);
 			return false;
 		}
 
@@ -319,4 +310,25 @@ namespace AudioEngine
 		return true;
 	}
 
-} // namespace AudioEngine
+	bool FfmpegProcessorNode::updateParameter(const std::string &paramName, const std::string &paramValue)
+	{
+		// For this processor node, simple parameter updates are not supported
+		// We need filter-specific parameter updates using the three-parameter version
+		// However, we could parse parameter names in format "filtername.parametername"
+
+		// Check if the parameter name has a filter prefix (contains a dot)
+		size_t dotPos = paramName.find('.');
+		if (dotPos != std::string::npos && dotPos > 0 && dotPos < paramName.length() - 1)
+		{
+			// Extract filter name and actual parameter name
+			std::string filterName = paramName.substr(0, dotPos);
+			std::string actualParamName = paramName.substr(dotPos + 1);
+
+			// Forward to the three-parameter version
+			return updateParameter(filterName, actualParamName, paramValue);
+		}
+
+		// If no dot separator, call the base class implementation
+		return AudioNode::updateParameter(paramName, paramValue);
+	}
+}
