@@ -1,6 +1,6 @@
 #include "AudioEngine.h"
 #include "Configuration.h"
-#include "RmeOscController.h"
+#include "OscController.h"
 #include <iostream>
 #include <csignal>
 #include <thread>
