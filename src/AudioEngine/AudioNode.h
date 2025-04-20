@@ -124,6 +124,46 @@ namespace AudioEngine
 		 */
 		virtual int getOutputPadCount() const = 0;
 
+		/**
+		 * @brief Update a node parameter
+		 *
+		 * Dynamic parameter updates after node has been configured
+		 *
+		 * @param paramName Parameter name
+		 * @param paramValue Parameter value
+		 * @return true if parameter was updated successfully
+		 */
+		virtual bool updateParameter(const std::string &paramName, const std::string &paramValue);
+
+		/**
+		 * @brief Check if the node is configured
+		 *
+		 * @return true if node is configured
+		 */
+		bool isConfigured() const { return m_configured; }
+
+		/**
+		 * @brief Check if the node is running
+		 *
+		 * @return true if node is running
+		 */
+		bool isRunning() const { return m_running; }
+
+		/**
+		 * @brief Check if a buffer format is compatible with this node
+		 *
+		 * @param buffer Buffer to check compatibility with
+		 * @return true if buffer is compatible
+		 */
+		bool isBufferFormatCompatible(const std::shared_ptr<AudioBuffer> &buffer) const;
+
+		/**
+		 * @brief Get the last error message
+		 *
+		 * @return Last error message
+		 */
+		std::string getLastError() const { return m_lastError; }
+
 	protected:
 		std::string m_name;	   // Node name
 		NodeType m_type;	   // Node type
@@ -136,6 +176,16 @@ namespace AudioEngine
 
 		bool m_configured; // Configuration state
 		bool m_running;	   // Running state
+
+		// Helper methods
+		bool checkConfigure(double sampleRate, long bufferSize,
+							AVSampleFormat format, const AVChannelLayout &layout);
+
+		void logMessage(const std::string &message, bool isError);
+		static std::string nodeTypeToString(NodeType type);
+
+		// Error reporting
+		std::string m_lastError;
 	};
 
 } // namespace AudioEngine

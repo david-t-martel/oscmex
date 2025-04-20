@@ -6,9 +6,12 @@
 
 extern "C"
 {
+// Updated with additional headers from local FFmpeg source
 #include <libavutil/frame.h>
 #include <libavutil/opt.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/avutil.h>
+#include <libavutil/error.h>
 }
 
 namespace AudioEngine

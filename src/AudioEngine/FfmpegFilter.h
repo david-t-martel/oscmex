@@ -5,11 +5,17 @@
 #include <memory>
 #include <mutex>
 
+// Use local FFmpeg source headers with all required components
 extern "C"
 {
 #include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
+#include <libavutil/opt.h>
 #include <libavutil/samplefmt.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/error.h>
+#include <libavutil/frame.h>
 }
 
 namespace AudioEngine

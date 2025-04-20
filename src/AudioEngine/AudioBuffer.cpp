@@ -5,10 +5,13 @@
 #include <tbb/blocked_range.h>
 #include <ipp.h>
 
+// Update to use local FFmpeg source headers
 extern "C"
 {
 #include <libavutil/frame.h>
 #include <libavutil/mem.h>
+#include <libavutil/samplefmt.h>
+#include <libavutil/error.h>
 }
 
 namespace AudioEngine

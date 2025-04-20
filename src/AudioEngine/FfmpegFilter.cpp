@@ -9,6 +9,8 @@ extern "C"
 #include <libavfilter/buffersrc.h>
 #include <libavutil/opt.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/dict.h>
+#include <libavutil/log.h>
 }
 
 namespace AudioEngine

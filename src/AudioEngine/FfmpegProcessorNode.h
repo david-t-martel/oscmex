@@ -6,7 +6,11 @@
 
 extern "C"
 {
+// Use the local FFmpeg source headers
 #include <libavfilter/avfilter.h>
+#include <libavutil/frame.h>
+#include <libavutil/samplefmt.h>
+#include <libavutil/channel_layout.h>
 }
 
 namespace AudioEngine
