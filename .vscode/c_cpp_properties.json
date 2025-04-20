@@ -4,6 +4,9 @@
       "name": "Win32",
       "includePath": [
         "${workspaceFolder}/**",
+        "${workspaceFolder}/json/**",
+        "${workspaceFolder}/json/include",
+        "${workspaceFolder}/json/include",
         "${workspaceFolder}/src/**",
         "${workspaceFolder}/include/**",
         "${workspaceFolder}/src/ffmpeg-master",
@@ -18,7 +21,8 @@
         "${workspaceFolder}/src/asio/AsioSDK/host/pc",
         "${workspaceFolder}/src/AudioEngine/**",
         "${workspaceFolder}/src/lo/**",
-        "${workspaceFolder}/src/oscmix/**"
+        "${workspaceFolder}/src/oscmix/**",
+        "${workspaceFolder}/include/nlohmann"
       ],
       "defines": [
         "_DEBUG",
@@ -58,6 +62,7 @@
         "${workspaceFolder}/src/AudioEngine/**",
         "${workspaceFolder}/src/lo/**",
         "${workspaceFolder}/src/oscmix/**",
+        "${workspaceFolder}/include/nlohmann",
         "C:/Program Files (x86)/Intel/oneAPI/tbb/latest/include",
         "C:/Program Files (x86)/Intel/oneAPI/mkl/latest/include",
         "C:/Program Files (x86)/Intel/oneAPI/ipp/latest/include"

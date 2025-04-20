@@ -331,6 +331,21 @@ target_include_directories(AudioEngine PRIVATE ${FFMPEG_INCLUDE_DIRS})
 # Add FFmpeg dependencies to AudioEngine
 target_link_libraries(AudioEngine PRIVATE ${FFMPEG_LIBRARIES})
 
+# Add nlohmann/json library
+include(FetchContent)
+FetchContent_Declare(
+	json
+	GIT_REPOSITORY https://github.com/nlohmann/json.git
+	GIT_TAG v3.11.2 # Use the latest stable version
+	GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(json)
+
+# Note: nlohmann_json is the target created by the FetchContent_MakeAvailable call
+
+# Link the JSON library to AudioEngine
+target_link_libraries(AudioEngine PRIVATE nlohmann_json)
+
 # Define main executable
 add_executable(AudioEngineApp src/main.cpp)
 target_link_libraries(AudioEngineApp PRIVATE AudioEngine)

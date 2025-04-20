@@ -31,11 +31,13 @@ classDiagram
     AsioSinkNode --> AsioManager : sends data to
     FfmpegProcessorNode --> FfmpegFilter : uses
     OscController --> "liblo" : uses
-    FileSourceNode --> "libavformat/libavcodec" : reads from
-    FileSinkNode --> "libavformat/libavcodec" : writes to
+    FileSourceNode --> "FFmpegSource" : reads from
+    FileSinkNode --> "FFmpegSource" : writes to
 
     %% Configuration
     ConfigurationParser --> Configuration : creates
+    DeviceStateManager --> Configuration : generates
+    DeviceStateManager --> OscController : queries
 
     %% Connection Between Nodes
     Connection --> AudioNode : connects
@@ -69,6 +71,9 @@ classDiagram
         #long m_bufferSize
         #AVSampleFormat m_format
         #AVChannelLayout m_channelLayout
+        #bool m_configured
+        #bool m_running
+        #string m_lastError
         +configure(params, sampleRate, bufferSize, format, layout)
         +start()
         +process()
@@ -77,6 +82,11 @@ classDiagram
         +setInputBuffer(buffer, padIndex)
         +getInputPadCount()
         +getOutputPadCount()
+        +updateParameter(paramName, paramValue)
+        +isConfigured()
+        +isRunning()
+        +isBufferFormatCompatible(buffer)
+        +getLastError()
     }
 
     class AudioBuffer {
@@ -91,6 +101,7 @@ classDiagram
         +copyFrom(buffer)
         +getPlaneData(plane)
         +createReference()
+        +isValid()
     }
 
     class AsioManager {
@@ -111,7 +122,13 @@ classDiagram
         -lo_server_thread m_oscServer
         +sendCommand(address, args)
         +startReceiver(port)
-        +setMatrixCrosspointGain(input, output, gain) // Example RME-specific method
+        +setMatrixCrosspointGain(input, output, gain)
+        +setChannelVolume(channelType, channel, volumeDb)
+        +setChannelMute(channelType, channel, mute)
+        +queryChannelVolume(channelType, channel, volumeDb)
+        +applyConfiguration(config)
+        +getTargetIp()
+        +getTargetPort()
     }
 
     class AsioSourceNode {
@@ -171,6 +188,7 @@ classDiagram
         -shared_ptr~AudioBuffer~ m_outputBuffer
         -mutex m_processMutex
         +process()
+        +updateParameter(paramName, paramValue)
         +updateParameter(filterName, paramName, value)
     }
 
@@ -192,12 +210,26 @@ classDiagram
         +long bufferSize
         +vector~NodeConfig~ nodes
         +vector~ConnectionConfig~ connections
-        +vector~RmeOscCommandConfig~ rmeCommands
+        +vector~OscCommandConfig~ rmeCommands
+        +loadFromFile(filePath)
+        +saveToFile(filePath)
+        +toJsonString()
+        +setConnectionParams(ip, port, receivePort)
+        +getTargetIp()
+        +getTargetPort()
+        +getReceivePort()
+        +setMatrixCrosspointGain(input, output, gainDb)
+        +setChannelMute(channelType, channel, mute)
+        +setChannelVolume(channelType, channel, volumeDb)
+        +getCommands()
+        +addCommand(address, args)
+        +clearCommands()
     }
 
     class ConfigurationParser {
         +parse(argc, argv, config)
         +parseFromFile(filePath, config)
+        +parseJson(content, config)
     }
 
     class Connection {
@@ -207,6 +239,13 @@ classDiagram
         +int sinkPad
         +transfer()
         +toString()
+    }
+
+    class DeviceStateManager {
+        +DeviceStateManager(OscController*)
+        +queryDeviceState(callback, channelCount)
+        +queryParameter(address, callback)
+        +queryParameters(addresses, callback)
     }
 ```
 
@@ -221,7 +260,8 @@ flowchart LR
 
     subgraph AudioEngine
         ASIO_MGR[AsioManager]
-        RME_OSC[OscController]
+        OSC_CTRL[OscController]
+        DEV_STATE[DeviceStateManager]
 
         subgraph NodeBuffers
             BUFFER_POOL[AudioBuffer Pool]
@@ -242,17 +282,19 @@ flowchart LR
 
     subgraph Storage
         FILES[Audio Files]
+        JSON_CONFIG[JSON Configuration]
     end
 
     subgraph Libraries
-        LIBAV[FFmpeg Libraries]
+        FF_SOURCE[Integrated FFmpeg Source]
         LIBLO[LibLO OSC]
+        ONEAPI[Intel oneAPI Libraries]
     end
 
     %% Hardware connections
     ASIO_HW <--> ASIO_MGR
-    RME_HW <-- OSC --> RME_OSC
-    RME_OSC <--> LIBLO
+    RME_HW <-- OSC --> OSC_CTRL
+    OSC_CTRL <--> LIBLO
 
     %% ASIO data flow
     ASIO_MGR --> ASIO_SRC
@@ -261,16 +303,16 @@ flowchart LR
     ASIO_SINK --> ASIO_MGR
 
     %% File data flow
-    FILES <--> LIBAV
-    LIBAV <--> FILE_SRC
+    FILES <--> FF_SOURCE
+    FF_SOURCE <--> FILE_SRC
     FILE_SRC --> BUFFER_POOL
     BUFFER_POOL --> FILE_SINK
-    FILE_SINK <--> LIBAV
-    LIBAV --> FILES
+    FILE_SINK <--> FF_SOURCE
+    FF_SOURCE --> FILES
 
     %% Processing data flow
     BUFFER_POOL --> PROC
-    PROC <--> LIBAV
+    PROC <--> FF_SOURCE
     PROC --> BUFFER_POOL
 
     %% Buffer reference counting
@@ -284,7 +326,18 @@ flowchart LR
     CONNECTIONS --> FILE_SINK
 
     %% Configuration
+    JSON_CONFIG <--> CONFIG
     CONFIG --> AudioEngine
+
+    %% Device state management
+    DEV_STATE <--> OSC_CTRL
+    DEV_STATE --> CONFIG
+    CONFIG --> JSON_CONFIG
+
+    %% Intel oneAPI integration
+    ONEAPI <--> BUFFER_POOL
+    ONEAPI <--> PROC
+    ONEAPI <--> FF_SOURCE
 ```
 
 ## Initialization Sequence
@@ -295,8 +348,9 @@ sequenceDiagram
     participant Engine as AudioEngine
     participant Config as ConfigurationParser
     participant ASIO as AsioManager
-    participant RME as OscController
+    participant OSC as OscController
     participant Nodes as AudioNodes
+    participant FFmpeg as FFmpeg Libraries
 
     Main->>Config: parse(argc, argv)
     Config-->>Main: Configuration
@@ -304,13 +358,16 @@ sequenceDiagram
     Main->>Engine: initialize(config)
     Engine->>Engine: createAndConfigureNodes()
 
+    Engine->>FFmpeg: Initialize from local source
+    FFmpeg-->>Engine: FFmpeg initialized
+
     loop For each node in config
         Engine->>Engine: Create node of appropriate type
         Engine->>Nodes: configure(params, sampleRate, bufferSize, format, layout)
     end
 
-    Engine->>RME: configure(ip, port)
-    RME-->>Engine: configured
+    Engine->>OSC: configure(ip, port)
+    OSC-->>Engine: configured
 
     Engine->>ASIO: loadDriver(deviceName)
     ASIO-->>Engine: driver loaded
@@ -327,8 +384,9 @@ sequenceDiagram
     Engine->>ASIO: createBuffers(inputChannels, outputChannels)
     ASIO-->>Engine: buffers created
 
-    Engine->>RME: sendCommands(rmeCommands)
-    RME-->>Engine: commands sent
+    Engine->>OSC: applyConfiguration(config)
+    OSC->>OSC: sendBatch(commands)
+    OSC-->>Engine: configuration applied
 
     Engine-->>Main: initialization complete
 
@@ -350,41 +408,90 @@ sequenceDiagram
     end
 ```
 
-## Processing Flow
+## Device State Management Flow
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Initialized
-    Initialized --> Running: run()
-    Running --> Stopped: stop()
-    Stopped --> [*]: cleanup()
+sequenceDiagram
+    participant User
+    participant App as Application
+    participant DSM as DeviceStateManager
+    participant OSC as OscController
+    participant Config as Configuration
+    participant JSON as JSON File
 
-    state Running {
-        [*] --> WaitForCallback
-        WaitForCallback --> ProcessingBlock: ASIO callback
-        ProcessingBlock --> WaitForCallback
+    User->>App: Request read device state
+    App->>DSM: queryDeviceState(callback)
 
-        WaitForCallback --> ProcessFileNodes: File node threads
-        ProcessFileNodes --> WaitForCallback
+    DSM->>DSM: Build parameter address list
 
-        state ProcessingBlock {
-            [*] --> ReceiveAsioInput
-            ReceiveAsioInput --> TransferBuffers: AsioSourceNode gets data
-            TransferBuffers --> ProcessNodes: Transfer via connections
-            ProcessNodes --> SendAsioOutput: Process in topological order
-            SendAsioOutput --> [*]: AsioSinkNode provides data
-        }
-    }
+    DSM->>OSC: queryParameters(addresses, callback)
 
-    state ProcessFileNodes {
-        [*] --> ReadAudioFile: FileSourceNode thread
-        ReadAudioFile --> DecodeFrame
-        DecodeFrame --> QueueBuffer
-        QueueBuffer --> [*]
+    loop For each parameter
+        OSC->>RME: Send query OSC message
+        RME-->>OSC: Parameter value response
+    end
 
-        [*] --> DequeueBuffer: FileSinkNode thread
-        DequeueBuffer --> EncodeFrame
-        EncodeFrame --> WriteFile
-        WriteFile --> [*]
-    }
+    OSC-->>DSM: Parameter values map
+
+    DSM->>Config: Create new Configuration
+    DSM->>Config: Add connection params
+
+    loop For each parameter value
+        DSM->>DSM: Parse parameter address
+        DSM->>Config: Add command based on parameter type
+    end
+
+    DSM-->>App: Callback with populated Configuration
+
+    App->>Config: saveToFile(filePath)
+    Config->>Config: Format JSON with structured sections
+    Config->>JSON: Write formatted JSON
+
+    App-->>User: Device state saved to file
+```
+
+## FFmpeg Integration Architecture
+
+```mermaid
+flowchart TD
+    APP[Application] --> NODES[Audio Nodes]
+    NODES --> FFPROC[FfmpegProcessorNode]
+    FFPROC --> FILTER[FfmpegFilter]
+
+    subgraph FFmpegSource["Integrated FFmpeg Source"]
+        AVUTIL[libavutil]
+        AVFORMAT[libavformat]
+        AVCODEC[libavcodec]
+        AVFILTER[libavfilter]
+        SWRESAMPLE[libswresample]
+        SWSCALE[libswscale]
+
+        AVFORMAT --> AVCODEC
+        AVFORMAT --> AVUTIL
+        AVCODEC --> AVUTIL
+        AVFILTER --> AVUTIL
+        SWRESAMPLE --> AVUTIL
+        SWSCALE --> AVUTIL
+    end
+
+    FILTER --> AVFILTER
+    FILTER --> AVUTIL
+
+    FILE_SRC[FileSourceNode] --> AVFORMAT
+    FILE_SRC --> AVCODEC
+    FILE_SRC --> SWRESAMPLE
+
+    FILE_SINK[FileSinkNode] --> AVFORMAT
+    FILE_SINK --> AVCODEC
+    FILE_SINK --> SWRESAMPLE
+
+    subgraph oneAPI["Intel oneAPI Components"]
+        TBB[Threading Building Blocks]
+        IPP[Integrated Performance Primitives]
+        MKL[Math Kernel Library]
+    end
+
+    FFPROC --> TBB
+    BUFFER[AudioBuffer] --> IPP
+    AVFILTER --> MKL
 ```

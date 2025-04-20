@@ -493,7 +493,6 @@ namespace AudioEngine
     {
         try
         {
-            // Open the file
             std::ifstream file(filepath);
             if (!file.is_open())
             {
@@ -501,134 +500,259 @@ namespace AudioEngine
                 return false;
             }
 
-            // Parse the JSON
             json config;
             file >> config;
             file.close();
 
             // Clear existing commands
-            clearCommands();
+            m_commands.clear();
 
-            // Extract connection parameters
+            // Load connection parameters
             if (config.contains("osc"))
             {
-                auto &osc = config["osc"];
+                const auto &osc = config["osc"];
                 if (osc.contains("ip"))
-                {
                     m_targetIp = osc["ip"].get<std::string>();
-                }
                 if (osc.contains("port"))
-                {
                     m_targetPort = osc["port"].get<int>();
-                }
                 if (osc.contains("receive_port"))
-                {
                     m_receivePort = osc["receive_port"].get<int>();
+            }
+
+            // Process structured configuration sections
+
+            // Process global settings
+            if (config.contains("global"))
+            {
+                const auto &global = config["global"];
+                for (auto it = global.begin(); it != global.end(); ++it)
+                {
+                    std::string paramName = it.key();
+                    std::string address = "/main/" + paramName;
+
+                    if (it.value().is_boolean())
+                    {
+                        bool value = it.value().get<bool>();
+                        addOscCommand(address, value);
+                    }
+                    else if (it.value().is_number())
+                    {
+                        float value = it.value().get<float>();
+                        addOscCommand(address, value);
+                    }
                 }
             }
 
-            // Process matrix crosspoints
+            // Process inputs section
+            if (config.contains("inputs"))
+            {
+                const auto &inputs = config["inputs"];
+                for (auto channelIt = inputs.begin(); channelIt != inputs.end(); ++channelIt)
+                {
+                    int channelNum = std::stoi(channelIt.key());
+                    const auto &channelParams = channelIt.value();
+
+                    for (auto paramIt = channelParams.begin(); paramIt != channelParams.end(); ++paramIt)
+                    {
+                        std::string paramName = paramIt.key();
+                        std::string address = "/" + std::to_string(channelNum) + "/input/" + paramName;
+
+                        if (paramName == "volume")
+                        {
+                            // Convert from dB to normalized value
+                            float valueDb = paramIt.value().get<float>();
+                            float normalized = (valueDb + 65.0f) / 65.0f;
+                            addOscCommand(address, normalized);
+                        }
+                        else if (paramName == "mute" || paramName == "phase" || paramName == "solo")
+                        {
+                            bool value = paramIt.value().get<bool>();
+                            addOscCommand(address, value);
+                        }
+                        else
+                        {
+                            float value = paramIt.value().get<float>();
+                            addOscCommand(address, value);
+                        }
+                    }
+                }
+            }
+
+            // Process playbacks section
+            if (config.contains("playbacks"))
+            {
+                const auto &playbacks = config["playbacks"];
+                for (auto channelIt = playbacks.begin(); channelIt != playbacks.end(); ++channelIt)
+                {
+                    int channelNum = std::stoi(channelIt.key());
+                    const auto &channelParams = channelIt.value();
+
+                    for (auto paramIt = channelParams.begin(); paramIt != channelParams.end(); ++paramIt)
+                    {
+                        std::string paramName = paramIt.key();
+                        std::string address = "/" + std::to_string(channelNum) + "/playback/" + paramName;
+
+                        if (paramName == "volume")
+                        {
+                            // Convert from dB to normalized value
+                            float valueDb = paramIt.value().get<float>();
+                            float normalized = (valueDb + 65.0f) / 65.0f;
+                            addOscCommand(address, normalized);
+                        }
+                        else if (paramName == "mute" || paramName == "phase" || paramName == "solo")
+                        {
+                            bool value = paramIt.value().get<bool>();
+                            addOscCommand(address, value);
+                        }
+                        else
+                        {
+                            float value = paramIt.value().get<float>();
+                            addOscCommand(address, value);
+                        }
+                    }
+                }
+            }
+
+            // Process outputs section
+            if (config.contains("outputs"))
+            {
+                const auto &outputs = config["outputs"];
+                for (auto channelIt = outputs.begin(); channelIt != outputs.end(); ++channelIt)
+                {
+                    int channelNum = std::stoi(channelIt.key());
+                    const auto &channelParams = channelIt.value();
+
+                    for (auto paramIt = channelParams.begin(); paramIt != channelParams.end(); ++paramIt)
+                    {
+                        std::string paramName = paramIt.key();
+                        std::string address = "/" + std::to_string(channelNum) + "/output/" + paramName;
+
+                        if (paramName == "volume")
+                        {
+                            // Convert from dB to normalized value
+                            float valueDb = paramIt.value().get<float>();
+                            float normalized = (valueDb + 65.0f) / 65.0f;
+                            addOscCommand(address, normalized);
+                        }
+                        else if (paramName == "mute" || paramName == "phase")
+                        {
+                            bool value = paramIt.value().get<bool>();
+                            addOscCommand(address, value);
+                        }
+                        else
+                        {
+                            float value = paramIt.value().get<float>();
+                            addOscCommand(address, value);
+                        }
+                    }
+                }
+            }
+
+            // Process matrix section
             if (config.contains("matrix"))
             {
-                auto &matrix = config["matrix"];
-                for (auto &item : matrix.items())
+                const auto &matrix = config["matrix"];
+                for (auto it = matrix.begin(); it != matrix.end(); ++it)
                 {
-                    // Parse key format "input_output" (e.g. "1_2" means input 1 to output 2)
-                    std::string key = item.key();
-                    size_t underscore = key.find('_');
-                    if (underscore != std::string::npos)
+                    std::string key = it.key();
+                    float valueDb = it.value().get<float>();
+
+                    // Parse the input_output key
+                    size_t pos = key.find('_');
+                    if (pos != std::string::npos)
                     {
-                        try
-                        {
-                            int input = std::stoi(key.substr(0, underscore));
-                            int output = std::stoi(key.substr(underscore + 1));
-                            float gain = item.value().get<float>();
-                            setMatrixCrosspointGain(input, output, gain);
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cerr << "Error parsing matrix key '" << key << "': " << e.what() << std::endl;
-                        }
+                        int input = std::stoi(key.substr(0, pos));
+                        int output = std::stoi(key.substr(pos + 1));
+
+                        // Convert from dB to normalized value
+                        float normalized = (valueDb + 65.0f) / 65.0f;
+
+                        std::string address = "/matrix/volA/" + std::to_string(input) + "/" + std::to_string(output);
+                        addOscCommand(address, normalized);
                     }
                 }
             }
 
-            // Process channel settings
-            const std::string channelTypes[] = {"inputs", "playbacks", "outputs"};
-            for (int typeIdx = 0; typeIdx < 3; typeIdx++)
+            // Process raw commands array (for backward compatibility or complex commands)
+            if (config.contains("commands") && config["commands"].is_array())
             {
-                const std::string &typeStr = channelTypes[typeIdx];
-
-                if (config.contains(typeStr))
-                {
-                    auto &channels = config[typeStr];
-                    for (auto &item : channels.items())
-                    {
-                        // Parse key as channel number
-                        try
-                        {
-                            int channel = std::stoi(item.key());
-                            auto &settings = item.value();
-
-                            // Process volume
-                            if (settings.contains("volume"))
-                            {
-                                float volume = settings["volume"].get<float>();
-                                setChannelVolume(typeIdx, channel, volume);
-                            }
-
-                            // Process mute
-                            if (settings.contains("mute"))
-                            {
-                                bool mute = settings["mute"].get<bool>();
-                                setChannelMute(typeIdx, channel, mute);
-                            }
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cerr << "Error parsing channel settings for '" << item.key()
-                                      << "': " << e.what() << std::endl;
-                        }
-                    }
-                }
-            }
-
-            // Process raw OSC commands (if present)
-            if (config.contains("commands"))
-            {
-                auto &commands = config["commands"];
-                for (auto &cmd : commands)
+                const auto &cmds = config["commands"];
+                for (const auto &cmd : cmds)
                 {
                     if (cmd.contains("address") && cmd.contains("args"))
                     {
                         std::string address = cmd["address"].get<std::string>();
-                        std::vector<std::any> args;
+                        const auto &jsonArgs = cmd["args"];
 
-                        for (auto &arg : cmd["args"])
+                        std::vector<std::any> args;
+                        for (const auto &arg : jsonArgs)
                         {
                             if (arg.is_number_float())
-                            {
-                                args.push_back(std::any(arg.get<float>()));
-                            }
+                                args.push_back(arg.get<float>());
                             else if (arg.is_number_integer())
-                            {
-                                args.push_back(std::any(arg.get<int>()));
-                            }
+                                args.push_back(arg.get<int>());
                             else if (arg.is_boolean())
-                            {
-                                args.push_back(std::any(arg.get<bool>()));
-                            }
+                                args.push_back(arg.get<bool>());
                             else if (arg.is_string())
-                            {
-                                args.push_back(std::any(arg.get<std::string>()));
-                            }
+                                args.push_back(arg.get<std::string>());
+                            // Add more types as needed
                         }
 
-                        addCommand(address, args);
+                        m_commands.push_back({address, args});
+                    }
+                }
+            }
+            // For backward compatibility with the old format
+            else if (config.contains("commands") && config["commands"].is_object())
+            {
+                const auto &cmds = config["commands"];
+                for (auto it = cmds.begin(); it != cmds.end(); ++it)
+                {
+                    std::string address = it.key();
+                    const auto &jsonArgs = it.value();
+
+                    if (jsonArgs.is_array())
+                    {
+                        std::vector<std::any> args;
+                        for (const auto &arg : jsonArgs)
+                        {
+                            if (arg.is_number_float())
+                                args.push_back(arg.get<float>());
+                            else if (arg.is_number_integer())
+                                args.push_back(arg.get<int>());
+                            else if (arg.is_boolean())
+                                args.push_back(arg.get<bool>());
+                            else if (arg.is_string())
+                                args.push_back(arg.get<std::string>());
+                            // Add more types as needed
+                        }
+
+                        m_commands.push_back({address, args});
+                    }
+                    else if (jsonArgs.is_number_float())
+                    {
+                        float value = jsonArgs.get<float>();
+                        m_commands.push_back({address, {value}});
+                    }
+                    else if (jsonArgs.is_number_integer())
+                    {
+                        int value = jsonArgs.get<int>();
+                        m_commands.push_back({address, {value}});
+                    }
+                    else if (jsonArgs.is_boolean())
+                    {
+                        bool value = jsonArgs.get<bool>();
+                        m_commands.push_back({address, {value}});
+                    }
+                    else if (jsonArgs.is_string())
+                    {
+                        std::string value = jsonArgs.get<std::string>();
+                        m_commands.push_back({address, {value}});
                     }
                 }
             }
 
+            std::cout << "Configuration loaded from: " << filepath << std::endl;
             return true;
         }
         catch (const std::exception &e)
@@ -642,46 +766,191 @@ namespace AudioEngine
     {
         try
         {
-            // Create the JSON structure
+            // Create the root JSON object
             json config;
 
-            // Add connection parameters
-            config["osc"]["ip"] = m_targetIp;
-            config["osc"]["port"] = m_targetPort;
-            config["osc"]["receive_port"] = m_receivePort;
+            // Add OSC connection parameters
+            config["osc"] = {
+                {"ip", m_targetIp},
+                {"port", m_targetPort},
+                {"receive_port", m_receivePort}};
 
-            // Save commands in raw format for complete representation
+            // Create containers for different sections
+            json inputs = json::object();
+            json playbacks = json::object();
+            json outputs = json::object();
+            json matrix = json::object();
+            json global = json::object();
+            json rawCommands = json::array();
+
+            // Sort commands into appropriate sections
             for (const auto &cmd : m_commands)
             {
-                json jsonCmd;
-                jsonCmd["address"] = cmd.address;
+                const std::string &address = cmd.first;
+                const std::vector<std::any> &args = cmd.second;
 
-                json args = json::array();
-                for (const auto &arg : cmd.args)
+                if (args.empty())
+                    continue;
+
+                // Parse address to determine the section
+                if (address.find("/matrix/volA/") == 0)
                 {
-                    if (arg.type() == typeid(float))
+                    // Matrix routing format: /matrix/volA/[input]/[output]
+                    std::stringstream ss(address.substr(13)); // Skip "/matrix/volA/"
+                    int input, output;
+                    char delimiter;
+                    if (ss >> input >> delimiter >> output)
                     {
-                        args.push_back(std::any_cast<float>(arg));
-                    }
-                    else if (arg.type() == typeid(int))
-                    {
-                        args.push_back(std::any_cast<int>(arg));
-                    }
-                    else if (arg.type() == typeid(bool))
-                    {
-                        args.push_back(std::any_cast<bool>(arg));
-                    }
-                    else if (arg.type() == typeid(std::string))
-                    {
-                        args.push_back(std::any_cast<std::string>(arg));
+                        float value = 0.0f;
+                        if (args[0].type() == typeid(float))
+                            value = std::any_cast<float>(args[0]);
+                        else if (args[0].type() == typeid(int))
+                            value = static_cast<float>(std::any_cast<int>(args[0]));
+
+                        // Convert normalized value to dB
+                        float dB = (value * 65.0f) - 65.0f;
+
+                        // Use format "input_output" as key
+                        std::string key = std::to_string(input) + "_" + std::to_string(output);
+                        matrix[key] = dB;
                     }
                 }
+                else if (address[0] == '/' && std::isdigit(address[1]))
+                {
+                    // Channel specific parameter format: /[channel]/[type]/[param]
+                    std::string addrCopy = address.substr(1); // Remove leading slash
+                    size_t firstSlash = addrCopy.find('/');
+                    if (firstSlash != std::string::npos)
+                    {
+                        std::string channelStr = addrCopy.substr(0, firstSlash);
+                        std::string rest = addrCopy.substr(firstSlash + 1);
 
-                jsonCmd["args"] = args;
-                config["commands"].push_back(jsonCmd);
+                        int channel = std::stoi(channelStr);
+
+                        // Find parameter type (input, playback, output)
+                        size_t secondSlash = rest.find('/');
+                        if (secondSlash != std::string::npos)
+                        {
+                            std::string type = rest.substr(0, secondSlash);
+                            std::string param = rest.substr(secondSlash + 1);
+                            json *targetSection = nullptr;
+
+                            if (type == "input")
+                                targetSection = &inputs;
+                            else if (type == "playback")
+                                targetSection = &playbacks;
+                            else if (type == "output")
+                                targetSection = &outputs;
+
+                            if (targetSection)
+                            {
+                                // Create channel if it doesn't exist
+                                std::string channelKey = channelStr;
+                                if (!targetSection->contains(channelKey))
+                                    (*targetSection)[channelKey] = json::object();
+
+                                // Add parameter value
+                                if (args[0].type() == typeid(float))
+                                {
+                                    float value = std::any_cast<float>(args[0]);
+
+                                    // For volume, convert normalized value to dB
+                                    if (param == "volume")
+                                    {
+                                        float dB = (value * 65.0f) - 65.0f;
+                                        (*targetSection)[channelKey][param] = dB;
+                                    }
+                                    else
+                                    {
+                                        (*targetSection)[channelKey][param] = value;
+                                    }
+                                }
+                                else if (args[0].type() == typeid(bool))
+                                {
+                                    bool value = std::any_cast<bool>(args[0]);
+                                    (*targetSection)[channelKey][param] = value;
+                                }
+                                else if (args[0].type() == typeid(int))
+                                {
+                                    int value = std::any_cast<int>(args[0]);
+                                    (*targetSection)[channelKey][param] = value;
+                                }
+                                else if (args[0].type() == typeid(std::string))
+                                {
+                                    std::string value = std::any_cast<std::string>(args[0]);
+                                    (*targetSection)[channelKey][param] = value;
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (address.find("/main/") == 0)
+                {
+                    // Global parameters format: /main/[param]
+                    std::string param = address.substr(6); // Skip "/main/"
+
+                    // Add parameter value
+                    if (args[0].type() == typeid(float))
+                    {
+                        float value = std::any_cast<float>(args[0]);
+                        global[param] = value;
+                    }
+                    else if (args[0].type() == typeid(bool))
+                    {
+                        bool value = std::any_cast<bool>(args[0]);
+                        global[param] = value;
+                    }
+                    else if (args[0].type() == typeid(int))
+                    {
+                        int value = std::any_cast<int>(args[0]);
+                        global[param] = value;
+                    }
+                    else if (args[0].type() == typeid(std::string))
+                    {
+                        std::string value = std::any_cast<std::string>(args[0]);
+                        global[param] = value;
+                    }
+                }
+                else
+                {
+                    // This is an unsorted command, add to raw commands array
+                    json jsonCmd;
+                    jsonCmd["address"] = address;
+
+                    json jsonArgs = json::array();
+                    for (const auto &arg : args)
+                    {
+                        if (arg.type() == typeid(float))
+                            jsonArgs.push_back(std::any_cast<float>(arg));
+                        else if (arg.type() == typeid(int))
+                            jsonArgs.push_back(std::any_cast<int>(arg));
+                        else if (arg.type() == typeid(bool))
+                            jsonArgs.push_back(std::any_cast<bool>(arg));
+                        else if (arg.type() == typeid(std::string))
+                            jsonArgs.push_back(std::any_cast<std::string>(arg));
+                        // Add more types as needed
+                    }
+
+                    jsonCmd["args"] = jsonArgs;
+                    rawCommands.push_back(jsonCmd);
+                }
             }
 
-            // Write to file
+            // Add non-empty sections to the config
+            if (!inputs.empty())
+                config["inputs"] = inputs;
+            if (!playbacks.empty())
+                config["playbacks"] = playbacks;
+            if (!outputs.empty())
+                config["outputs"] = outputs;
+            if (!matrix.empty())
+                config["matrix"] = matrix;
+            if (!global.empty())
+                config["global"] = global;
+            if (!rawCommands.empty())
+                config["commands"] = rawCommands;
+
+            // Write the configuration to file
             std::ofstream file(filepath);
             if (!file.is_open())
             {
@@ -689,8 +958,10 @@ namespace AudioEngine
                 return false;
             }
 
-            file << config.dump(4); // Pretty-print with 4-space indent
+            file << config.dump(4); // Pretty print with 4-space indentation
             file.close();
+
+            std::cout << "Configuration saved to: " << filepath << std::endl;
             return true;
         }
         catch (const std::exception &e)
@@ -698,6 +969,35 @@ namespace AudioEngine
             std::cerr << "Error saving configuration: " << e.what() << std::endl;
             return false;
         }
+    }
+
+    // Helper method to process command arguments for JSON serialization
+    json Configuration::processCommandArgs(const std::vector<std::any> &args) const
+    {
+        json jsonArgs = json::array();
+
+        for (const auto &arg : args)
+        {
+            if (arg.type() == typeid(float))
+            {
+                jsonArgs.push_back(std::any_cast<float>(arg));
+            }
+            else if (arg.type() == typeid(int))
+            {
+                jsonArgs.push_back(std::any_cast<int>(arg));
+            }
+            else if (arg.type() == typeid(bool))
+            {
+                jsonArgs.push_back(std::any_cast<bool>(arg));
+            }
+            else if (arg.type() == typeid(std::string))
+            {
+                jsonArgs.push_back(std::any_cast<std::string>(arg));
+            }
+            // Add more types as needed
+        }
+
+        return jsonArgs;
     }
 
     void Configuration::setConnectionParams(const std::string &ip, int sendPort, int receivePort)
@@ -826,7 +1126,7 @@ namespace AudioEngine
         // Build a list of parameters to query
         std::vector<std::string> queries;
 
-        // Add channel volumes
+        // Add channel volumes and mutes
         for (int typeIdx = 0; typeIdx < 3; typeIdx++)
         {
             std::string typeStr;
@@ -850,54 +1150,139 @@ namespace AudioEngine
 
                 // Mute query
                 queries.push_back("/" + std::to_string(ch) + "/" + typeStr + "/mute");
+
+                // Phase query (if supported)
+                queries.push_back("/" + std::to_string(ch) + "/" + typeStr + "/phase");
+
+                // Solo query (if supported)
+                queries.push_back("/" + std::to_string(ch) + "/" + typeStr + "/solo");
+
+                // If it's input, also query phantom power
+                if (typeStr == "input")
+                {
+                    queries.push_back("/" + std::to_string(ch) + "/input/phantom");
+                }
+
+                // EQ parameters (if supported)
+                if (typeStr != "playback")
+                {
+                    queries.push_back("/" + std::to_string(ch) + "/" + typeStr + "/eq/on");
+                    for (int band = 1; band <= 4; band++)
+                    {
+                        queries.push_back("/" + std::to_string(ch) + "/" + typeStr + "/eq/" + std::to_string(band) + "/gain");
+                        queries.push_back("/" + std::to_string(ch) + "/" + typeStr + "/eq/" + std::to_string(band) + "/freq");
+                        queries.push_back("/" + std::to_string(ch) + "/" + typeStr + "/eq/" + std::to_string(band) + "/q");
+                    }
+                }
             }
         }
 
+        // Query main/master settings
+        queries.push_back("/main/dim");
+        queries.push_back("/main/volume");
+        queries.push_back("/main/mute");
+        queries.push_back("/main/mono");
+
+        // Add matrix routing entries for all channels
+        // Matrix routing follows the pattern /matrix/volA/output/input
+        for (int output = 1; output <= channelCount; output++)
+        {
+            for (int input = 1; input <= channelCount; input++)
+            {
+                queries.push_back("/matrix/volA/" + std::to_string(output) + "/" + std::to_string(input));
+                queries.push_back("/matrix/muteA/" + std::to_string(output) + "/" + std::to_string(input));
+            }
+        }
+
+        // Display query information
+        std::cout << "Querying " << queries.size() << " parameters from RME device..." << std::endl;
+
         // Query all parameters
-        queryParameters(queries, [callback, config, this](const std::map<std::string, float> &results)
+        queryParameters(queries, [callback, config, this, channelCount](const std::map<std::string, float> &results)
                         {
+            std::cout << "Received " << results.size() << " parameter values from device" << std::endl;
+
             // Process results and populate the configuration
             for (const auto& [address, value] : results) {
-                // Parse the address to determine the parameter type
-                // Format: /channel/type/param
-                std::string addrCopy = address;
-                if (addrCopy[0] == '/') addrCopy = addrCopy.substr(1);
+                // Parse different types of addresses
+                if (address.find("/matrix/volA/") == 0 || address.find("/matrix/muteA/") == 0) {
+                    // Handle matrix routing - extract output and input channels
+                    std::string addrCopy = address;
+                    // Skip the initial "/matrix/volA/" or "/matrix/muteA/"
+                    size_t typeLength = (address.find("/volA/") != std::string::npos) ? 6 : 7;
+                    addrCopy = addrCopy.substr(typeLength);
 
-                size_t pos1 = addrCopy.find('/');
-                if (pos1 == std::string::npos) continue;
+                    size_t slashPos = addrCopy.find('/');
+                    if (slashPos == std::string::npos) continue;
 
-                std::string channelStr = addrCopy.substr(0, pos1);
-                addrCopy = addrCopy.substr(pos1 + 1);
+                    int output = std::stoi(addrCopy.substr(0, slashPos));
+                    int input = std::stoi(addrCopy.substr(slashPos + 1));
 
-                size_t pos2 = addrCopy.find('/');
-                if (pos2 == std::string::npos) continue;
+                    // Add matrix command to config
+                    std::vector<std::any> args = {std::any(output), std::any(input), std::any(value)};
+                    config->addCommand(address, args);
+                }
+                else if (address.find("/main/") == 0) {
+                    // Handle main/global settings - just store as raw commands for now
+                    std::vector<std::any> args = {std::any(value)};
+                    config->addCommand(address, args);
+                }
+                else {
+                    // Handle channel parameters (format: /channel/type/param)
+                    std::string addrCopy = address;
+                    if (addrCopy[0] == '/') addrCopy = addrCopy.substr(1);
 
-                std::string typeStr = addrCopy.substr(0, pos2);
-                std::string paramStr = addrCopy.substr(pos2 + 1);
+                    size_t pos1 = addrCopy.find('/');
+                    if (pos1 == std::string::npos) continue;
 
-                try {
-                    int channel = std::stoi(channelStr);
-                    int typeIdx;
+                    std::string channelStr = addrCopy.substr(0, pos1);
+                    addrCopy = addrCopy.substr(pos1 + 1);
 
-                    if (typeStr == "input") typeIdx = 0;
-                    else if (typeStr == "playback") typeIdx = 1;
-                    else if (typeStr == "output") typeIdx = 2;
-                    else continue;
+                    size_t pos2 = addrCopy.find('/');
+                    if (pos2 == std::string::npos) continue;
 
-                    if (paramStr == "volume") {
-                        // Convert normalized value back to dB
-                        float volumeDb = value * 65.0f - 65.0f;
-                        config->setChannelVolume(typeIdx, channel, volumeDb);
-                    } else if (paramStr == "mute") {
-                        bool mute = value > 0.5f;
-                        config->setChannelMute(typeIdx, channel, mute);
+                    std::string typeStr = addrCopy.substr(0, pos2);
+                    std::string paramStr = addrCopy.substr(pos2 + 1);
+
+                    // Parse channel number
+                    int channel;
+                    try {
+                        channel = std::stoi(channelStr);
                     }
-                } catch (const std::exception& e) {
-                    std::cerr << "Error parsing OSC address: " << address << ": " << e.what() << std::endl;
+                    catch (const std::exception& e) {
+                        continue; // Skip if channel is not a number
+                    }
+
+                    // Create appropriate command based on parameter type
+                    if (paramStr == "volume") {
+                        config->setChannelVolume(channel, typeStr, value);
+                    }
+                    else if (paramStr == "mute") {
+                        config->setChannelMute(channel, typeStr, value > 0.5f);
+                    }
+                    else if (paramStr == "phantom") {
+                        config->setPhantomPower(channel, value > 0.5f);
+                    }
+                    else if (paramStr == "phase") {
+                        config->setChannelPhase(channel, typeStr, value > 0.5f);
+                    }
+                    else if (paramStr == "solo") {
+                        config->setChannelSolo(channel, typeStr, value > 0.5f);
+                    }
+                    else if (paramStr.find("eq/") == 0) {
+                        // Handle EQ parameters
+                        std::vector<std::any> args = {std::any(channel), std::any(value)};
+                        config->addCommand(address, args);
+                    }
+                    else {
+                        // Generic parameter handling for other types
+                        std::vector<std::any> args = {std::any(value)};
+                        config->addCommand(address, args);
+                    }
                 }
             }
 
-            // Call the callback with the populated configuration
+            // Invoke callback with the populated configuration
             callback(*config); });
     }
 
