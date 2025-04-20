@@ -6,120 +6,230 @@ This document outlines the steps required to implement the modular C++ audio eng
 
 ## I. Project Setup & Dependencies
 
-- [ ] **Create C++ Project Structure:**
-  - Set up a new C++ project using a build system like CMake.
-  - Organize source files (.h/.cpp) logically (e.g., `src/core`, `src/nodes`, `src/managers`, `src/utils`).
-- [ ] **Integrate Dependencies:**
-  - **ASIO SDK:** Ensure headers are accessible to the compiler and link against any necessary libraries (if applicable). Add placeholders/wrappers if SDK cannot be directly included in a public repo.
-  - **FFmpeg:** Include headers and link against required FFmpeg development libraries (`libavutil`, `libavformat`, `libavcodec`, `libavfilter`, `libswresample`). (Headers seem present in `c:\Program Files\ffmpeg\include`)
-  - **C++ OSC Library:** Choose and integrate a library (e.g., `oscpack`, `liblo wrapper`). (`liblo` seems to be used in [`OscController.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp)).
-  - **C++ Configuration Library (Optional):** Choose and integrate a library for parsing config files (e.g., `nlohmann/json`, `yaml-cpp`, `toml++`) or implement robust command-line parsing.
+- [X] **Create C++ Project Structure:**
+  - [X] Set up a new C++ project using a build system like CMake.
+  - [X] Organize source files (.h/.cpp) logically (e.g., `src/core`, `src/nodes`, `src/managers`, `src/utils`).
+- [X] **Integrate Dependencies:**
+  - [X] **ASIO SDK:** Ensure headers are accessible to the compiler and link against any necessary libraries (if applicable). Add placeholders/wrappers if SDK cannot be directly included in a public repo.
+  - [X] **FFmpeg:** Include headers and link against required FFmpeg development libraries (`libavutil`, `libavformat`, `libavcodec`, `libavfilter`, `libswresample`). Integrated source code rather than external libraries.
+  - [X] **C++ OSC Library:** Choose and integrate a library (e.g., `oscpack`, `liblo wrapper`). (`liblo` integrated into the project).
+  - [X] **C++ Configuration Library:** Implemented using `nlohmann/json` auto-downloaded during build process.
 
 ## II. Core Component Implementation
 
-- [ ] **Implement `AudioBuffer` Structure/Class:**
-  - Define the `AudioBuffer` struct (as in `audio_engine_impl_v1`) or a more robust class.
-  - Consider adding methods for allocation, copying, and potentially reference counting or integrating with a buffer pool.
-  - Ensure it holds format, layout, sample rate, and frame count alongside data pointers.
-- [ ] **Implement `AsioManager` Class:**
-  - Adapt the detailed C++ implementation (`asio_ffmpeg_eq_code_v2`, `audio_engine_impl_v1`).
-  - Replace ASIO SDK placeholders with actual SDK calls.
-  - Modify `initDevice` to accept preferred sample rate/buffer size from `AudioEngine`.
-  - Modify `createBuffers` to accept specific input/output channel index vectors provided by `AudioEngine`.
-  - Implement `setCallback` to store the `AudioEngine`'s callback function pointer/lambda.
-  - Implement `getBufferPointers` for `AudioEngine` to retrieve buffers during the callback.
-  - Ensure robust error handling for all ASIO calls.
-- [X] **Implement `OscController` Class:** (Partially implemented as [`OscController`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h))
-  - [X] Implement `configure` method to set target IP/Port for sending and listening port. (See [`OscController::configure`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=52-71) for sending, [`OscController::startReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=73-110) for receiving)
-  - [X] Implement `sendCommand` using the chosen C++ OSC library (`liblo`) to format and send UDP packets. (See [`OscController::sendCommand`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=308-356), [`OscController::sendBatch`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=365-439))
-  - [X] Implement listener thread (`OscListenThread`). (Handled by `lo_server_thread` within [`OscController::startReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=97-109))
-  - [X] Use the chosen C++ OSC library (`liblo`) to bind a UDP socket and listen for packets in the thread. (Handled by `lo_server_thread_new` in [`OscController::startReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=81-95))
-  - [X] Implement message parsing logic within the listener thread. (See [`OscController::handleOscMessage`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=128-239))
-  - [X] Implement a dispatch mechanism (e.g., callback map, message queue to `AudioEngine`) to handle recognized OSC address patterns. (Uses `m_messageCallback` and `m_levelCallback` in [`OscController`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h?range=397-398))
-  - [X] Implement `startListening`, `stopListening`, `cleanup` methods. (See [`OscController::startReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=73-110), [`OscController::stopReceiver`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=111-120), [`OscController::cleanup`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.cpp?range=36-44))
-  - [X] Implement RME-specific helper methods (e.g., `setMatrixCrosspointGain`) based on RME TotalMix FX OSC documentation, translating logical actions into specific OSC messages. (See [`OscController::setMatrixCrosspointGain`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h?range=186-191), [`OscController::setChannelMute`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h?range=199-209), etc.)
-- [ ] **Implement `AudioEngine` Class:** (Basic structure/demonstration in [`main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\main.cpp) and [`audioEngine_main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\audioEngine_main.cpp))
-  - Implement constructor/destructor, `initialize`, `run`, `stop`, `cleanup`.
-  - Implement configuration parsing logic within `initialize` (using `ConfigurationParser`).
-  - Implement node creation and storage (`m_nodes`, `m_nodeMap`).
-  - Implement connection setup (`m_connections`, determine `m_processingOrder`).
-  - Implement interaction with `AsioManager` (initialization, starting, stopping, setting callback).
-  - [X] Implement interaction with `OscController` (sending setup commands, starting/stopping listener, potentially receiving dispatched commands). (See [`audioEngine_main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\audioEngine_main.cpp?range=854-865) for sending, [`main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\main.cpp?range=68-80) for receiving)
-  - Implement `processAsioBlock` method (called by `AsioManager` callback).
-  - Implement `runFileProcessingLoop` method (for non-ASIO mode).
-  - **Crucially:** Implement the core logic within `processAsioBlock` / `runFileProcessingLoop` to manage data flow between connected nodes based on `m_connections` and `m_processingOrder`. This involves getting/setting buffers on nodes.
-  - Implement basic buffer management strategy (or placeholder for future pool).
-  - Implement thread management for file nodes.
+- [X] **Implement `AudioBuffer` Structure/Class:**
+  - [X] Define the `AudioBuffer` struct/class with allocation, copying methods.
+  - [X] Implement reference counting for efficient buffer management.
+  - [X] Include format, layout, sample rate, and frame count alongside data pointers.
+- [ ] **Implement `AsioManager` Class:** *(Implementation example in sample_project.cpp)*
+  - [X] Adapt the detailed C++ implementation.
+  - [X] Replace ASIO SDK placeholders with actual SDK calls.
+  - [X] Modify `initDevice` to accept preferred sample rate/buffer size from `AudioEngine`.
+  - [ ] Modify `createBuffers` to accept specific input/output channel index vectors provided by `AudioEngine`.
+  - [ ] Implement `setCallback` to store the `AudioEngine`'s callback function pointer/lambda.
+  - [ ] Implement `getBufferPointers` for `AudioEngine` to retrieve buffers during the callback.
+  - [ ] Enhance error handling for all ASIO calls.
+  - [ ] Add channel discovery and selection capabilities as shown in `sample_project.cpp` using `findChannelIndices`.
+  - [ ] Implement multi-channel ASIO device support with proper buffer handling.
+- [X] **Implement `OscController` Class:** (Fully implemented as [`OscController`](c:\codedev\auricleinc\oscmex\src\AudioEngine\OscController.h))
+  - [X] Implement `configure` method to set target IP/Port for sending and listening port.
+  - [X] Implement `sendCommand` using `liblo` to format and send UDP packets.
+  - [X] Implement listener thread (using `lo_server_thread`).
+  - [X] Use `liblo` to bind a UDP socket and listen for packets in the thread.
+  - [X] Implement message parsing logic within the listener thread.
+  - [X] Implement a dispatch mechanism to handle recognized OSC address patterns.
+  - [X] Implement `startReceiver`, `stopReceiver`, `cleanup` methods.
+  - [X] Implement RME-specific helper methods.
+  - [X] Implement `applyConfiguration` to apply complete Configuration to a device.
+  - [X] Add device state querying capabilities.
+- [ ] **Implement `AudioEngine` Class:** (Basic structure in [`main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\main.cpp), [`audioEngine_main.cpp`](c:\codedev\auricleinc\oscmex\src\AudioEngine\audioEngine_main.cpp), and sample reference in `sample_project.cpp`)
+  - [ ] Implement constructor/destructor, `initialize`, `run`, `stop`, `cleanup`.
+  - [X] Implement configuration parsing logic within `initialize` (using `ConfigurationParser`).
+  - [ ] Implement node creation and storage (`m_nodes`, `m_nodeMap`).
+  - [ ] Implement connection setup (`m_connections`, determine `m_processingOrder`).
+  - [ ] Implement interaction with `AsioManager` (initialization, starting, stopping, setting callback).
+  - [X] Implement interaction with `OscController` (sending setup commands, starting/stopping listener, receiving dispatched commands).
+  - [ ] Implement `processAsioBlock` method (called by `AsioManager` callback) based on the callback implementation in `sample_project.cpp`.
+  - [ ] Implement `runFileProcessingLoop` method (for non-ASIO mode).
+  - [ ] Implement the core data flow logic between connected nodes based on `m_connections` and `m_processingOrder`.
+  - [X] Implement basic buffer management strategy with reference counting.
+  - [ ] Implement thread management for file nodes.
+  - [ ] Add clean shutdown handling with proper resource cleanup and thread joining.
 
 ## III. Audio Node Implementation
 
-- [ ] **Define `AudioNode` Base Class:**
-  - Finalize the pure virtual interface (`configure`, `start`, `process`, `stop`, `cleanup`, `getOutputBuffer`, `setInputBuffer`).
+- [X] **Define `AudioNode` Base Class:**
+  - [X] Finalize the pure virtual interface (`configure`, `start`, `process`, `stop`, `cleanup`, `getOutputBuffer`, `setInputBuffer`).
 - [ ] **Implement `AsioSourceNode`:**
-  - Implement `configure` (parse channel params, store indices).
-  - Implement `receiveAsioData` (called by `AudioEngine`): Get raw buffers from `AsioManager`, convert to `m_internalFormat`/`m_internalLayout` (using `SwrContext` if needed), store in `m_outputBuffer`. Use mutex for thread safety.
-  - Implement `getOutputBuffer`: Return data from `m_outputBuffer` (use mutex).
-  - Implement `cleanup` (free `SwrContext`).
+  - [X] Implement `configure` (parse channel params, store indices).
+  - [ ] Implement `receiveAsioData`: Get raw buffers from `AsioManager`, convert to internal format/layout, store in output buffer.
+  - [X] Implement `getOutputBuffer`: Return data from output buffer.
+  - [X] Implement `cleanup` (free conversion contexts).
+  - [ ] Add support for channel name discovery and selection as demonstrated in `sample_project.cpp`.
 - [ ] **Implement `AsioSinkNode`:**
-  - Implement `configure` (parse channel params, store indices).
-  - Implement `setInputBuffer`: Store incoming `AudioBuffer` in `m_inputBuffer` (use mutex).
-  - Implement `provideAsioData` (called by `AudioEngine`): Convert `m_inputBuffer` data to ASIO format (using `SwrContext` if needed), copy to raw ASIO buffers provided by `AsioManager`. Use mutex.
-  - Implement `cleanup` (free `SwrContext`).
-- [ ] **Implement `FfmpegProcessorNode`:**
-  - Implement `configure` (parse `chain` param, call `m_ffmpegFilter->initGraph`).
-  - Implement `setInputBuffer`: Store input buffer.
-  - Implement `process`: Call `m_ffmpegFilter->process` using stored input/output buffers.
-  - Implement `getOutputBuffer`: Return processed output buffer.
-  - Implement `updateParameter`: Forward call to `m_ffmpegFilter->updateFilterParameter`.
-  - Implement `cleanup`: Call `m_ffmpegFilter->cleanup`.
+  - [X] Implement `configure` (parse channel params, store indices).
+  - [X] Implement `setInputBuffer`: Store incoming `AudioBuffer`.
+  - [ ] Implement `provideAsioData`: Convert input buffer data to ASIO format, copy to raw ASIO buffers.
+  - [X] Implement `cleanup` (free conversion contexts).
+  - [ ] Add support for channel name discovery and selection as demonstrated in `sample_project.cpp`.
+- [X] **Implement `FfmpegProcessorNode`:** *(Implementation example in sample_project.cpp as `FfmpegFilter`)*
+  - [X] Implement `configure` (parse `chain` param, call `m_ffmpegFilter->initGraph`).
+  - [X] Implement `setInputBuffer`: Store input buffer.
+  - [X] Implement `process`: Call `m_ffmpegFilter->process` using stored input/output buffers.
+  - [X] Implement `getOutputBuffer`: Return processed output buffer.
+  - [X] Implement `updateParameter`: Forward call to `m_ffmpegFilter->updateFilterParameter`.
+  - [X] Implement `cleanup`: Call `m_ffmpegFilter->cleanup`.
+  - [ ] Add support for dynamic filter chain configuration with parameter updates via OSC.
+  - [ ] Enhance filter graph error handling and validation.
+  - [ ] Implement proper resource management for FFmpeg contexts.
 - [ ] **Implement `FileSourceNode`:**
-  - Implement `configure` (get path, setup FFmpeg format/codec contexts).
-  - Implement `start`: Launch `readerThreadFunc`.
-  - Implement `readerThreadFunc`: Loop (`while m_running`), read (`av_read_frame`), decode (`avcodec_receive_frame`), resample (`swr_convert`), package into `AudioBuffer`, push to thread-safe output queue. Handle EOF.
-  - Implement `getOutputBuffer`: Pop `AudioBuffer` from thread-safe queue (non-blocking or blocking).
-  - Implement `stop`: Set `m_running` to false, join thread.
-  - Implement `cleanup`: Clean up FFmpeg contexts, close file.
+  - [X] Implement `configure` (get path, setup FFmpeg format/codec contexts).
+  - [ ] Implement `start`: Launch `readerThreadFunc`.
+  - [ ] Implement `readerThreadFunc`: Read frames, decode, resample, package into `AudioBuffer`, push to thread-safe output queue.
+  - [X] Implement `getOutputBuffer`: Pop `AudioBuffer` from thread-safe queue.
+  - [ ] Implement `stop`: Set `m_running` to false, join thread.
+  - [X] Implement `cleanup`: Clean up FFmpeg contexts, close file.
 - [ ] **Implement `FileSinkNode`:**
-  - Implement `configure` (get path, setup FFmpeg format/codec/muxer contexts, open file, write header).
-  - Implement `start`: Launch `writerThreadFunc`.
-  - Implement `setInputBuffer`: Push `AudioBuffer` to thread-safe input queue.
-  - Implement `writerThreadFunc`: Loop (`while m_running or !queue.empty()`), pop `AudioBuffer`, resample (`swr_convert`), encode (`avcodec_send_frame`/`receive_packet`), write (`av_interleaved_write_frame`).
-  - Implement `stop`: Signal thread to finish queue, flush encoder, write trailer (`av_write_trailer`), join thread.
-  - Implement `cleanup`: Clean up FFmpeg contexts, close file.
+  - [X] Implement `configure` (get path, setup FFmpeg format/codec/muxer contexts, open file, write header).
+  - [ ] Implement `start`: Launch `writerThreadFunc`.
+  - [X] Implement `setInputBuffer`: Push `AudioBuffer` to thread-safe input queue.
+  - [ ] Implement `writerThreadFunc`: Process queue, resample, encode, write frames.
+  - [ ] Implement `stop`: Signal thread to finish queue, flush encoder, write trailer, join thread.
+  - [X] Implement `cleanup`: Clean up FFmpeg contexts, close file.
 
 ## IV. Supporting Component Implementation
 
-- [ ] **Implement `ConfigurationParser`:**
-  - Choose config format (JSON recommended for structure).
-  - Implement parsing logic using chosen library or manual parsing for CLI args.
-  - Populate the `Configuration` struct robustly, including validation.
-- [ ] **Implement Buffer Management (Basic -> Pool):**
-  - Start with simple buffer allocation/deallocation within nodes or engine.
-  - Refactor later to use a central `AudioBuffer` pool managed by `AudioEngine` for efficiency, especially in real-time paths.
+- [X] **Implement `Configuration` and `ConfigurationParser`:**
+  - [X] Implement JSON configuration format with nlohmann/json library.
+  - [X] Create robust parsing logic for both files and command-line arguments.
+  - [X] Add validation and structured organization of settings.
+  - [X] Implement device-specific sections (channel settings, matrix routing, etc.)
+  - [X] Add serialization/deserialization for all settings.
+- [X] **Implement `DeviceStateManager`:**
+  - [X] Implement device state querying functionality.
+  - [X] Add support for saving and loading device configurations.
+  - [X] Create asynchronous query interface with callbacks.
+- [X] **Implement Buffer Management:**
+  - [X] Implement reference-counted `AudioBuffer` class.
+  - [X] Add thread-safe access methods.
+  - [X] Add format validation and conversion capabilities.
 
 ## V. Integration & Workflow
 
-- [ ] **Implement `main.cpp`:**
-  - Instantiate core components (`ConfigurationParser`, `AudioEngine`).
-  - Handle command-line arguments / config file loading.
-  - Initialize `AudioEngine`.
-  - Start `AudioEngine` (`run`).
-  - Implement main loop (wait for shutdown signal).
-  - Implement graceful shutdown (`stop`, `cleanup`).
+- [ ] **Implement `main.cpp`:** *(Reference implementation in sample_project.cpp)*
+  - [X] Instantiate core components (`ConfigurationParser`, `AudioEngine`).
+  - [X] Handle command-line arguments / config file loading.
+  - [ ] Initialize `AudioEngine` with complete processing graph.
+  - [ ] Start `AudioEngine` (`run`).
+  - [X] Implement main loop with command processing.
+  - [ ] Implement graceful shutdown (`stop`, `cleanup`).
+  - [ ] Add signal handling for clean shutdown (SIGINT, SIGTERM) similar to `sample_project.cpp`.
+  - [ ] Implement clean resource management with proper shutdown sequence.
 - [ ] **Refine `AudioEngine` Processing Logic:**
-  - Implement the graph traversal/data flow logic in `processAsioBlock` and `runFileProcessingLoop`. Ensure correct buffer handling between nodes.
+  - [ ] Implement process ordering for nodes based on connection graph.
+  - [ ] Ensure efficient buffer transfer between nodes.
+  - [ ] Add validation of buffer formats between connected nodes.
+  - [ ] Create a robust callback system for ASIO processing as shown in `sample_project.cpp`.
 
-## VI. GUI Integration Hooks
+## VI. OSC Integration
 
-- [ ] **Define `EngineAPI`:** Specify the functions and data needed by a GUI (e.g., `getStatus()`, `getNodeParameters(nodeName)`, `updateNodeParameter(...)`, `getLevelMeterData()`, `registerStatusCallback(...)`).
-- [ ] **Implement API Layer:** Add methods to `AudioEngine` corresponding to the API.
-- [ ] **Implement Data Push/Callback:** Add thread-safe queues or callbacks within `AudioEngine` to push status updates and level meter data asynchronously to the GUI layer/API.
+- [X] **Define OSC Communication Infrastructure:**
+  - [X] Implement OSC message handling for filter parameter control as shown in `sample_project.cpp`.
+  - [X] Create a thread-safe messaging system between OSC and audio processing threads.
+  - [X] Add support for dynamic filter parameter updates via OSC messages.
+  - [X] Implement bidirectional OSC communication with RME devices.
+- [ ] **Implement OSC Message Handlers:**
+  - [X] Create handlers for various message types (parameter updates, device control, etc.).
+  - [ ] Add support for OSC address pattern matching and dispatching.
+  - [ ] Implement error handling for malformed messages.
+  - [ ] Create a message queue system for thread-safe communication.
+- [ ] **Implement OSC Listener Thread:**
+  - [ ] Setup UDP socket and binding as outlined in `osc_listener_thread_func` in `sample_project.cpp`.
+  - [ ] Create message parsing and dispatch loop.
+  - [ ] Add proper thread lifecycle management (start/stop/join).
+  - [ ] Implement clean resource handling with socket cleanup on thread exit.
+- [ ] **Enhance RME OSC Communication:**
+  - [X] Implement message formatters for RME-specific commands.
+  - [ ] Add support for sending messages to control RME device parameters.
+  - [ ] Implement bi-directional parameter synchronization.
+  - [ ] Create a periodic ping/monitoring system for RME connection status.
 
 ## VII. Testing & Refinement
 
-- [ ] **Unit Testing:** Write tests for individual components where possible (e.g., `FfmpegFilter` parameter updates, configuration parsing).
-- [ ] **Integration Testing:** Test common configurations (ASIO I/O, File I/O, combinations) with actual hardware and files.
-- [ ] **OSC Testing:** Test sending commands (e.g., to RME) and receiving commands via the `OscController`.
-- [ ] **Performance Profiling:** Profile real-time paths (`processAsioBlock`) and optimize critical sections. Check for audio dropouts under load.
-- [ ] **Memory Checking:** Use tools (like Valgrind on Linux/macOS, Dr. Memory/AddressSanitizer on Windows) to check for memory leaks or errors.
-- [ ] **Documentation:** Add Doxygen-style comments or other documentation for classes and methods.
+- [ ] **Unit Testing:**
+  - [ ] Create tests for individual components (filters, buffer management, configuration).
+  - [ ] Add validation tests for parsing and serialization.
+  - [ ] Test OSC message handling with simulated messages as shown in `sample_project.cpp`.
+- [ ] **Integration Testing:**
+  - [X] Test OSC communication with RME devices.
+  - [ ] Test audio throughput with various node configurations.
+  - [ ] Test file reading/writing with different formats and settings.
+  - [ ] Test dynamic filter updates during audio processing.
+- [ ] **Performance Optimization:**
+  - [X] Implement Intel oneAPI optimizations.
+  - [ ] Profile and optimize critical paths in audio processing chain.
+  - [ ] Test for real-time performance under various loads.
+  - [ ] Optimize buffer management and reduce unnecessary conversions.
+- [X] **Documentation:**
+  - [X] Update architecture documentation with FFmpeg integration.
+  - [X] Create/update MERMAID diagrams for visualization.
+  - [X] Document JSON configuration format and options.
+  - [X] Update README with build instructions and dependencies.
+
+## VIII. Future Enhancements
+
+- [ ] **GUI Development:**
+  - [ ] Design a graphical interface for configuration management.
+  - [ ] Add real-time visualization of signal flow and levels.
+  - [ ] Create configuration editor with parameter validation.
+- [ ] **Additional Processing Nodes:**
+  - [ ] Implement specialized DSP nodes for common tasks.
+  - [ ] Add support for VST/VST3 plugins.
+  - [ ] Create nodes for network audio streaming.
+- [ ] **Enhanced Device Control:**
+  - [ ] Support for additional RME device models/features.
+  - [ ] Add support for other OSC-controllable devices.
+  - [ ] Create device discovery and auto-configuration.
+- [ ] **Web Interface Improvements:**
+  - [ ] Enhance the existing web interface components.
+  - [ ] Add remote configuration and monitoring capabilities.
+  - [ ] Create RESTful API for external control.
+
+## Implementation Notes from Sample Project
+
+### AsioManager Implementation
+
+The `sample_project.cpp` provides a useful reference for the `AsioManager` implementation with:
+
+- Channel discovery via `findChannelIndices`
+- Buffer creation and management for specific channels
+- Callback system for audio processing
+- Error handling and proper cleanup
+
+### FFmpeg Filter Implementation
+
+The `FfmpegFilter` class in `sample_project.cpp` demonstrates:
+
+- Dynamic filter parameter updates via OSC
+- Filter chain configuration using `avfilter_graph_parse_ptr`
+- Proper thread-safe parameter update queuing
+- Format conversion between interleaved and planar formats
+- Error handling and resource management
+
+### OSC Integration
+
+The OSC integration in `sample_project.cpp` provides:
+
+- Thread-safe communication between OSC and audio threads
+- Message handling with proper type checking
+- Dynamic parameter updates to running filters
+- Bidirectional communication with RME devices
+
+### Main Application Structure
+
+The main application loop in `sample_project.cpp` shows:
+
+- Clean signal handling for graceful shutdown
+- Proper thread management and joining
+- Resource cleanup in the correct order
+- Error handling throughout the lifecycle

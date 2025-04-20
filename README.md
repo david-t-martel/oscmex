@@ -2,82 +2,192 @@
 
 ## Overview
 
-This project combines a C++ audio processing library (`AudioEngine`) with the `liblo` C library for Open Sound Control (OSC) communication. The primary goal is to create a flexible audio engine controllable via OSC messages, potentially targeting specific hardware like RME audio interfaces (as suggested by configuration files like `rme_osc_config.md`).
+This project combines a C++ audio processing library (`AudioEngine`) with the `liblo` C library for Open Sound Control (OSC) communication and integrates a local FFmpeg source for audio processing. The primary goal is to create a flexible audio engine controllable via OSC messages, specifically targeting RME audio interfaces through their TotalMix FX OSC API.
 
-The project includes the core `AudioEngine`, the underlying `liblo` library, command-line OSC tools, examples, and potentially a web-based interface.
+The project offers high-performance audio processing capabilities with Intel oneAPI optimizations, comprehensive device configuration via JSON, and a modular architecture for future extensibility.
 
 ## Architecture
 
-*(Note: A detailed architecture document, potentially `src/AudioEngine/AudioEngine_ARCHITECTURE.md`, should be created to elaborate on the internal design of the `AudioEngine` library itself.)*
+The project follows a modular architecture detailed in [`AudioEngine_ARCHITECTURE.md`](AudioEngine_ARCHITECTURE.md) with the following key components:
 
-The project is structured as follows:
+1. **`AudioEngine` (C++ Library - `src/AudioEngine`):** The core component responsible for audio processing tasks. It uses a node-based processing architecture with these key elements:
+   - `AudioNode` base class and specialized node types (ASIO I/O, file I/O, FFmpeg processing)
+   - Connection-based signal routing
+   - Enhanced buffer management with reference counting
+   - Integrated FFmpeg libraries for comprehensive audio processing
+   - Intel oneAPI optimizations for high performance
 
-1. **`AudioEngine` (C++ Library - `src/AudioEngine`):** The core component responsible for audio processing tasks. It leverages Intel oneAPI libraries (TBB for parallelism, IPP for signal processing, MKL for math kernels) for high performance. It is designed to be controlled externally.
-2. **`liblo` (C Library - `src/lo`):** A lightweight, cross-platform implementation of the Open Sound Control protocol. It handles the packing, unpacking, sending, and receiving of OSC messages over network protocols (UDP, TCP) or Unix sockets.
-3. **OSC Control Layer:** `AudioEngine` exposes its functionality via an OSC interface, allowing external applications or controllers (like MATLAB scripts, dedicated control surfaces, or the included web interface) to manage its parameters and state. The specific OSC command set for controlling RME devices via an intermediary like `oscmix` is partially documented in `rme_osc_config.md`.
-4. **Command-Line Tools (`src/tools`):** Utilities like `oscsend` and `oscdump` (built from `liblo` sources) for sending and monitoring OSC messages, useful for testing and debugging.
-5. **Examples (`src/examples`):** Sample code demonstrating how to use the `liblo` library (both C and C++ APIs).
-6. **Web Interface (`src/web`):** (Optional) A web-based frontend using HTML, CSS, and JavaScript (potentially compiled to WebAssembly via Emscripten) to provide a graphical user interface for controlling the `AudioEngine` via OSC over WebSockets or MIDI.
-7. **Build System (CMake):** A unified CMake build system manages the compilation of all components across different platforms.
+2. **`OscController` (C++ Class - `src/AudioEngine/OscController.cpp`):** Manages bidirectional OSC communication with RME devices, supporting:
+   - Comprehensive parameter control (volume, mute, routing, EQ, etc.)
+   - Device state querying
+   - Configuration application from JSON files
+   - Event notifications and callbacks
 
-## Project Components / Directory Structure
+3. **Configuration System (C++ Classes - `src/AudioEngine/Configuration.cpp`):**
+   - JSON-based configuration loading/saving
+   - Structured organization of device settings
+   - Device state management (reading/writing)
+   - Command-line parameter parsing
 
-* `./CMakeLists.txt`: The main CMake build script for the entire project.
-* `./CMakePresets.json`: Predefined configurations for CMake (e.g., Debug/Release, Intel compilers).
-* `./BUILD_INSTRUCTIONS.md`: Detailed steps for configuring and building the project using CMake.
-* `./build/`: Default directory for build output (contains build scripts like `build_script_oneapi.bat`).
-* `./src/`: Contains all source code.
-  * `./src/AudioEngine/`: Source code for the C++ `AudioEngine` library.
-  * `./src/lo/`: Source code for the `liblo` C library.
-  * `./src/tools/`: Source code for command-line OSC tools.
-  * `./src/examples/`: Source code for `liblo` examples.
-  * `./src/web/`: Source code for the web interface (`index.html`, `oscmix.js`, etc.).
-  * `./src/main.cpp`: Example main application entry point using the `AudioEngine` library.
-* `./doc/`: Contains Doxygen configuration for generating API documentation.
-* `./INSTALL`: Basic installation instructions (points to `BUILD_INSTRUCTIONS.md`).
-* `./README.md`: This file.
-* `./rme_osc_config.md`: Documentation on OSC commands for RME interfaces (via `oscmix`).
-* `./LICENSE` or `COPYING`: *(Should contain the project's license - currently missing, likely LGPL based on liblo)*.
-* `./AUTHORS`: *(Should list project authors - currently missing)*.
+4. **FFmpeg Integration:**
+   - Local integration of FFmpeg source code (no external dependencies)
+   - Complete audio codec, format, and filtering functionality
+   - Custom-built for optimized performance
+
+5. **Supporting Components:**
+   - `liblo` (C Library - `src/lo`): Lightweight OSC implementation
+   - Command-line tools and examples
+   - Mermaid-based architecture documentation
+
+## Project Structure
+
+* `./CMakeLists.txt`: Main CMake build script with FFmpeg and nlohmann/json integration
+* `./CMakePresets.json`: Predefined configurations for CMake
+* `./AudioEngine_ARCHITECTURE.md`: Detailed architecture documentation
+* `./build/`: Build output directory
+* `./src/`: Source code
+  * `./src/AudioEngine/`: Core engine components
+    * `AudioBuffer.h/cpp`: Audio data container with reference counting
+    * `AudioNode.h/cpp`: Base class for processing nodes
+    * `AsioManager.h/cpp`: ASIO hardware interface
+    * `OscController.h/cpp`: OSC communication with RME devices
+    * `Configuration.h/cpp`: Configuration management
+    * `Connection.h/cpp`: Audio signal routing
+    * `DeviceStateManager.h/cpp`: Device state querying
+    * Node implementations: ASIO I/O, file I/O, FFmpeg processing
+    * `MERMAID.md`: Architectural diagrams
+  * `./src/ffmpeg-master/`: Integrated FFmpeg source code
+  * `./src/lo/`: liblo OSC implementation
+  * `./src/tools/`: Command-line utilities
+    * `./src/tools/osc/`: OSC tools and scripts
+    * `./src/tools/matlab/`: MATLAB integration tools
+  * `./src/web/`: Web-based interface components
+  * `./src/oscmix/`: Device-specific implementations
+* `./include/`: External library headers
+  * `./include/nlohmann/`: nlohmann/json headers (auto-downloaded)
+* `./examples/`: Example configurations and usage patterns
+* `./TODO.md`: Development task tracking
 
 ## Dependencies
 
-* **CMake:** Version 3.15+ (for building).
-* **C++ Compiler:** C++17 compliant (GCC, Clang, MSVC, Intel icpx).
-* **C Compiler:** For `liblo` (GCC, Clang, MSVC, Intel icx).
-* **Intel oneAPI Base Toolkit:** Recommended for optimal performance. Provides:
-  * Intel Threading Building Blocks (TBB)
-  * Intel Integrated Performance Primitives (IPP)
-  * Intel Math Kernel Library (MKL)
-* **Doxygen (Optional):** Required only to build documentation (`BUILD_DOCUMENTATION=ON`).
-* **Ninja (Recommended):** A fast build system often used with CMake.
+* **CMake:** Version 3.15+ (for building)
+* **C++ Compiler:** C++17 compliant (GCC, Clang, MSVC, Intel icpx)
+* **ASIO SDK:** For hardware audio I/O (included)
+* **FFmpeg:** Integrated source code (no external dependency)
+* **nlohmann/json:** Automatically downloaded during the build process
+* **Intel oneAPI (Optional but Recommended):**
+  * Threading Building Blocks (TBB) for parallelism
+  * Integrated Performance Primitives (IPP) for signal processing
+  * Math Kernel Library (MKL) for optimized math operations
+* **Doxygen (Optional):** For building documentation
 
 ## Building
 
-Please refer to **`BUILD_INSTRUCTIONS.md`** for detailed steps on how to configure and build the project using CMake.
+The project uses CMake with the following key features:
 
-Key CMake options include:
+1. **Automatic FFmpeg Integration:**
+   - FFmpeg source code is built as part of the project
+   - No external FFmpeg installation required
 
-* `CMAKE_BUILD_TYPE`: `Debug` or `Release`.
-* `CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER`: Specify compilers (e.g., `icx`/`icpx`).
-* `BUILD_LO_TOOLS`: Build command-line tools (Default: ON).
-* `BUILD_LO_EXAMPLES`: Build examples (Default: ON).
-* `BUILD_DOCUMENTATION`: Build Doxygen documentation (Default: ON).
+2. **Automatic JSON Library Integration:**
+   - nlohmann/json is automatically downloaded and integrated
+   - No manual installation required
 
-A build script (`build/build_script_oneapi.bat`) is provided as an example for building with Intel oneAPI on Windows.
+3. **Intel oneAPI Detection and Integration:**
+   - Automatically detects and uses Intel compilers if available
+   - TBB, IPP, and MKL are automatically integrated when present
 
-## Usage / Control
+4. **Build Options:**
+   - `USE_INTEL_COMPILER`: Prefer Intel oneAPI compiler (default: ON)
+   - `USE_INTEL_TBB`: Use Threading Building Blocks (default: ON)
+   - `USE_INTEL_IPP`: Use Integrated Performance Primitives (default: ON)
+   - `USE_INTEL_MKL`: Use Math Kernel Library (default: ON)
+   - `BUILD_LO_TOOLS`: Build OSC command-line tools (default: ON)
+   - `BUILD_DOCUMENTATION`: Build Doxygen documentation (default: ON)
 
-The `AudioEngine` is designed to be controlled via OSC messages. Refer to the `AudioEngine`'s specific documentation (once created) and potentially `rme_osc_config.md` for details on the OSC address space and expected arguments.
+### Build Steps
 
-The command-line tools (`oscsend`, `oscdump`) or the web interface (`src/web/index.html`) can be used for interaction.
+```bash
+# Configure with standard compiler
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+# Configure with Intel oneAPI compiler
+cmake -S . -B build-intel -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DCMAKE_BUILD_TYPE=Release
+
+# Build
+cmake --build build --config Release
+
+# Install
+cmake --install build --prefix /path/to/install
+```
+
+Windows users can use the provided `build/build_script_oneapi.bat` script for Intel oneAPI builds.
+
+## Configuration and Usage
+
+### JSON Configuration
+
+The system uses JSON configuration files to define:
+- Audio processing graph (nodes and connections)
+- Device settings (ASIO, sample rate, buffer size)
+- OSC communication parameters
+- RME device-specific settings
+
+Example JSON configuration:
+```json
+{
+  "asioDeviceName": "RME Fireface UCX II",
+  "rmeOscIp": "127.0.0.1",
+  "rmeOscPort": 7001,
+  "sampleRate": 48000,
+  "bufferSize": 512,
+
+  "nodes": [
+    { "name": "asio_input", "type": "ASIO_SOURCE", "params": { "channels": "0,1" } },
+    { "name": "processor", "type": "FFMPEG_PROCESSOR", "params": {
+      "filter_description": "equalizer=f=1000:width_type=q:width=1:g=0"
+    }},
+    { "name": "asio_output", "type": "ASIO_SINK", "params": { "channels": "0,1" } }
+  ],
+
+  "connections": [
+    { "sourceName": "asio_input", "sourcePad": 0, "sinkName": "processor", "sinkPad": 0 },
+    { "sourceName": "processor", "sourcePad": 0, "sinkName": "asio_output", "sinkPad": 0 }
+  ],
+
+  "rmeCommands": [
+    { "address": "/1/channel/1/volume", "args": [0.0] },
+    { "address": "/1/channel/2/volume", "args": [0.0] }
+  ]
+}
+```
+
+### Device State Management
+
+The system can:
+1. Query the current state of connected RME devices
+2. Save device configurations to JSON files
+3. Apply saved configurations to devices
+
+This allows for:
+- Creating device presets
+- Backup and restore of device settings
+- Programmatic control of device parameters
+
+## Future Development
+
+Key areas for future development include:
+- GUI integration for configuration and monitoring
+- Additional processing node types
+- Enhanced device control capabilities
+- Web interface improvements
+
+See [`TODO.md`](TODO.md) for specific development tasks.
 
 ## License
 
-*(The license file `COPYING` or `LICENSE` needs to be added. The core `liblo` library is licensed under the LGPL v2.1 or later. The license for the `AudioEngine` component should be clarified.)*
-
-## Authors & Contributing
-
-*(The `AUTHORS` file needs to be added, listing original `liblo` authors and contributors to the `AudioEngine` project.)*
-
-Contributions are welcome. Please follow standard coding practices and consider adding tests for new functionality.
+This project uses multiple components with different licenses:
+- liblo: LGPL v2.1 or later
+- FFmpeg: LGPL v2.1 or later
+- nlohmann/json: MIT
+- Project-specific code: MIT
