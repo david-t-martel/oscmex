@@ -551,54 +551,97 @@ namespace AudioEngine
 			return false;
 		}
 
-		// TODO: Implement robust query mechanism
-		// This requires associating the response message with the query.
-		// Options:
-		// 1. Use a map with unique IDs or the address itself.
-		// 2. Have the callback store the result in a shared structure protected by a mutex.
-		// 3. Use liblo's request/reply features if available/suitable.
+		// Create a promise/future for the response value
+		std::promise<std::optional<float>> responsePromise;
+		std::future<std::optional<float>> responseFuture = responsePromise.get_future();
 
-		// Placeholder implementation - sends request but doesn't wait/parse response correctly.
-		m_pendingResponses[address].store(false); // Mark as pending
+		// Set up a callback to handle the response
+		{
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			m_parameterCallbacks[address] = [&responsePromise](bool success, const std::vector<std::any> &args)
+			{
+				if (success && !args.empty())
+				{
+					try
+					{
+						// Try to extract a float value from the first argument
+						if (args[0].type() == typeid(float))
+						{
+							responsePromise.set_value(std::any_cast<float>(args[0]));
+						}
+						else if (args[0].type() == typeid(int))
+						{
+							responsePromise.set_value(static_cast<float>(std::any_cast<int>(args[0])));
+						}
+						else if (args[0].type() == typeid(double))
+						{
+							responsePromise.set_value(static_cast<float>(std::any_cast<double>(args[0])));
+						}
+						else
+						{
+							// Unsupported type
+							responsePromise.set_value(std::nullopt);
+						}
+					}
+					catch (const std::exception &e)
+					{
+						std::cerr << "OscController: Error parsing response value: " << e.what() << std::endl;
+						responsePromise.set_value(std::nullopt);
+					}
+				}
+				else
+				{
+					// No data or failure
+					responsePromise.set_value(std::nullopt);
+				}
+			};
+		}
 
-		// Send an empty message to request the value (standard OSC query pattern)
-		int sendResult = sendCommand(address, {});
+		// Mark the address as pending a response
+		m_pendingResponses[address].store(false);
 
+		// Send query command (empty message to request current value)
+		bool sendResult = sendCommand(address, {});
 		if (!sendResult)
 		{
-			std::cerr << "OscController: Failed to send query to " << address << std::endl;
+			// If sending fails, remove the callback and return error
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			m_parameterCallbacks.erase(address);
 			m_pendingResponses.erase(address);
 			return false;
 		}
 
-		// Wait for response with timeout (Basic polling)
-		auto startTime = std::chrono::steady_clock::now();
-		while (!m_pendingResponses[address].load())
-		{
-			// Check if timeout has elapsed
-			auto elapsed = std::chrono::steady_clock::now() - startTime;
-			if (std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() > timeoutMs)
-			{
-				std::cerr << "OscController: Timeout waiting for response to " << address << std::endl;
-				m_pendingResponses.erase(address);
-				return false; // Timeout
-			}
+		// Wait for the response with timeout
+		std::future_status status = responseFuture.wait_for(std::chrono::milliseconds(timeoutMs));
 
-			// Yield or sleep briefly to avoid busy-waiting
-			std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		// Clean up
+		m_pendingResponses.erase(address);
+
+		{
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			m_parameterCallbacks.erase(address);
 		}
 
-		// --- This part is missing the crucial step of retrieving the value ---
-		// The value would have been received by handleOscMessage and needs to be
-		// stored somewhere accessible here (e.g., another map or a shared variable
-		// associated with the pending response).
-		// For now, we just return true if a response flag was set.
-		// outValue = ???; // Retrieve the actual value received by the callback
+		// Check result
+		if (status == std::future_status::ready)
+		{
+			std::optional<float> result = responseFuture.get();
+			if (result.has_value())
+			{
+				outValue = result.value();
+				return true;
+			}
+		}
+		else if (status == std::future_status::timeout)
+		{
+			std::cerr << "OscController: Timeout waiting for response to " << address << std::endl;
+		}
+		else
+		{
+			std::cerr << "OscController: Error waiting for response to " << address << std::endl;
+		}
 
-		m_pendingResponses.erase(address); // Clean up pending flag
-		std::cerr << "OscController: Received response flag for " << address << ", but value retrieval not implemented." << std::endl;
-		// return true; // Return true indicating a response *flag* was received
-		return false; // Return false as value retrieval is not implemented
+		return false;
 	}
 
 	// --- RME Specific Helper Methods ---
@@ -856,23 +899,66 @@ namespace AudioEngine
 
 	bool OscController::refreshConnectionStatus()
 	{
-		// Send a harmless query to check if the device responds
-		// Querying DSP load is a good option
-		std::string address = "/1/busLoad"; // RME path for DSP load
-		// Use querySingleValue or just send and check for timeout error
-		// For now, just send and assume success if no immediate error
-		bool result = sendCommand(address, {});
+		if (!m_configured || !m_oscAddress)
+		{
+			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
+			return false;
+		}
 
-		if (result)
+		// Create a timeout flag
+		std::atomic<bool> receivedResponse(false);
+		std::atomic<bool> timedOut(false);
+
+		// Register a one-time callback to handle the response
+		int callbackId = addEventCallback([&receivedResponse](const std::string &path, const std::vector<std::any> &args)
+										  {
+			if (path == "/1/busLoad") {
+				receivedResponse.store(true);
+			} });
+
+		// Send a request for DSP load (harmless query)
+		bool sendResult = sendCommand("/1/busLoad", {});
+		if (!sendResult)
 		{
-			// std::cout << "OSC connection check sent successfully." << std::endl;
-			// A more robust check would involve waiting for a response or error
+			removeEventCallback(callbackId);
+			return false;
 		}
-		else
+
+		// Start a timeout thread
+		std::thread timeoutThread([&timedOut, &receivedResponse]()
+								  {
+									  // Wait for response or timeout after 500ms
+									  for (int i = 0; i < 50; i++)
+									  {
+										  if (receivedResponse.load())
+										  {
+											  return; // Response received, exit thread
+										  }
+										  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+									  }
+									  timedOut.store(true); // Set timeout flag
+								  });
+
+		// Wait for timeout thread to finish
+		timeoutThread.join();
+
+		// Clean up event callback
+		removeEventCallback(callbackId);
+
+		// If we received a response before timeout, connection is active
+		if (receivedResponse.load())
 		{
-			std::cerr << "OSC connection check failed to send." << std::endl;
+			std::cout << "OSC connection active to " << m_targetIp << ":" << m_targetPort << std::endl;
+			return true;
 		}
-		return result; // This only indicates successful send, not actual connection status
+
+		// If we timed out, connection may be down
+		if (timedOut.load())
+		{
+			std::cerr << "OSC connection timed out to " << m_targetIp << ":" << m_targetPort << std::endl;
+		}
+
+		return false;
 	}
 
 	bool OscController::applyConfiguration(const Configuration &config)
@@ -953,94 +1039,77 @@ namespace AudioEngine
 			return false;
 		}
 
-		// Read file contents
-		std::stringstream buffer;
-		buffer << file.rdbuf();
-		file.close();
-
-		// TODO: Parse JSON configuration
-		// For now, use hardcoded defaults or basic parsing
-		std::string ip = "127.0.0.1";
-		int port = 7001;
-		int receivePort = 9001;
-
-		// Extract IP address (very basic parsing)
-		std::string content = buffer.str();
-		size_t ipPos = content.find("\"ip\"");
-		if (ipPos != std::string::npos)
+		try
 		{
-			size_t colonPos = content.find(":", ipPos);
-			if (colonPos != std::string::npos)
+			// Parse JSON using nlohmann::json
+			nlohmann::json config = nlohmann::json::parse(file);
+			file.close();
+
+			// Extract configuration values with proper error handling
+			std::string ip = "127.0.0.1"; // Default values
+			int port = 7001;
+			int receivePort = 9001;
+
+			// Get IP address
+			if (config.contains("rmeOscIp"))
 			{
-				size_t quoteStart = content.find("\"", colonPos);
-				size_t quoteEnd = content.find("\"", quoteStart + 1);
-				if (quoteStart != std::string::npos && quoteEnd != std::string::npos)
-				{
-					ip = content.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
-				}
+				ip = config["rmeOscIp"].get<std::string>();
 			}
-		}
-
-		// Extract port (very basic parsing)
-		size_t portPos = content.find("\"port\"");
-		if (portPos != std::string::npos)
-		{
-			size_t colonPos = content.find(":", portPos);
-			if (colonPos != std::string::npos)
+			else if (config.contains("oscIp"))
 			{
-				size_t commaPos = content.find(",", colonPos);
-				size_t bracketPos = content.find("}", colonPos);
-				size_t endPos = std::min(commaPos, bracketPos);
-				if (endPos != std::string::npos)
-				{
-					std::string portStr = content.substr(colonPos + 1, endPos - colonPos - 1);
-					try
-					{
-						port = std::stoi(portStr);
-					}
-					catch (const std::exception &)
-					{
-						// Ignore parsing errors and use default
-					}
-				}
+				ip = config["oscIp"].get<std::string>();
 			}
-		}
-
-		// Extract receive port (very basic parsing)
-		size_t receivePortPos = content.find("\"receivePort\"");
-		if (receivePortPos != std::string::npos)
-		{
-			size_t colonPos = content.find(":", receivePortPos);
-			if (colonPos != std::string::npos)
+			else if (config.contains("ip"))
 			{
-				size_t commaPos = content.find(",", colonPos);
-				size_t bracketPos = content.find("}", colonPos);
-				size_t endPos = std::min(commaPos, bracketPos);
-				if (endPos != std::string::npos)
-				{
-					std::string receivePortStr = content.substr(colonPos + 1, endPos - colonPos - 1);
-					try
-					{
-						receivePort = std::stoi(receivePortStr);
-					}
-					catch (const std::exception &)
-					{
-						// Ignore parsing errors and use default
-					}
-				}
+				ip = config["ip"].get<std::string>();
 			}
-		}
 
-		// Configure with extracted parameters
-		if (!configure(ip, port, receivePort))
+			// Get target port
+			if (config.contains("rmeOscPort"))
+			{
+				port = config["rmeOscPort"].get<int>();
+			}
+			else if (config.contains("oscPort"))
+			{
+				port = config["oscPort"].get<int>();
+			}
+			else if (config.contains("port"))
+			{
+				port = config["port"].get<int>();
+			}
+
+			// Get receive port
+			if (config.contains("oscReceivePort"))
+			{
+				receivePort = config["oscReceivePort"].get<int>();
+			}
+			else if (config.contains("receivePort"))
+			{
+				receivePort = config["receivePort"].get<int>();
+			}
+
+			// Configure with extracted parameters
+			if (!configure(ip, port, receivePort))
+			{
+				return false;
+			}
+
+			std::cout << "OscController: Configured from file " << configFile
+					  << " (IP: " << ip << ", Port: " << port
+					  << ", Receive Port: " << receivePort << ")" << std::endl;
+
+			return true;
+		}
+		catch (const nlohmann::json::exception &e)
 		{
+			std::cerr << "OscController: JSON parsing error: " << e.what() << std::endl;
 			return false;
 		}
-
-		std::cout << "OscController: Configured from file " << configFile
-				  << " (IP: " << ip << ", Port: " << port
-				  << ", Receive Port: " << receivePort << ")" << std::endl;
-		return true;
+		catch (const std::exception &e)
+		{
+			std::cerr << "OscController: Error configuring from file: " << e.what() << std::endl;
+			return false;
+		}
 	}
 
 	bool OscController::configure(const std::string &ip, int port, int receivePort)
@@ -1110,39 +1179,108 @@ namespace AudioEngine
 		if (!m_configured || !m_oscAddress)
 		{
 			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
+			callback(false, Configuration());
 			return false;
 		}
 
-		// Request a refresh from the device
-		bool result = requestRefresh();
-
-		if (!result)
+		// Request a refresh from the device to ensure state is current
+		bool refreshResult = requestRefresh();
+		if (!refreshResult)
 		{
 			std::cerr << "OscController: Failed to request device state refresh" << std::endl;
-			// Call the callback with failure
-			Configuration emptyConfig;
-			callback(false, emptyConfig);
-			return false;
 		}
 
-		// In a real implementation, we would store the callback and invoke it
-		// when we have received all the state information. For now, just create
-		// a minimal configuration with device info and invoke the callback.
-		Configuration config;
-		// Add basic device info
-		config.deviceName = "RME Audio Device";
-		config.deviceType = "TotalMix FX";
-		config.targetIp = m_targetIp;
-		config.targetPort = m_targetPort;
-
-		// Use a timer to simulate waiting for device information
-		std::thread([this, callback, config]()
+		// Create a state collection thread that will query device parameters
+		// and construct a Configuration object
+		std::thread([this, callback]()
 					{
-			// Wait a bit to simulate device response time
-			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			// Create configuration object with basic device info
+			Configuration config;
+			config.targetIp = m_targetIp;
+			config.targetPort = m_targetPort;
 
-			// Call the callback with the configuration
-			callback(true, config); })
+			// Populate device information
+			bool success = true;
+
+			// Query DSP status
+			auto dspStatus = getDspStatus();
+			config.dspLoadPercent = dspStatus.loadPercent;
+
+			// Example: Query key channel parameters (extend as needed)
+			std::vector<RmeOscCommandConfig> commands;
+
+			// Query channel parameters for a subset of channels (extend based on needs)
+			const int maxChannelsToQuery = 8; // Limit queries to avoid too much traffic
+
+			// Input channels
+			for (int i = 1; i <= maxChannelsToQuery; i++)
+			{
+				float volumeDb = 0.0f;
+				if (queryChannelVolume(ChannelType::INPUT, i, volumeDb))
+				{
+					RmeOscCommandConfig cmd;
+					cmd.address = buildChannelAddress(ChannelType::INPUT, i, ParamType::VOLUME);
+					cmd.args.push_back(std::any(dbToNormalized(volumeDb)));
+					commands.push_back(cmd);
+				}
+				else
+				{
+					success = false;
+				}
+
+				// Add small delay between queries to avoid overwhelming the device
+				std::this_thread::sleep_for(std::chrono::milliseconds(5));
+			}
+
+			// Playback channels
+			for (int i = 1; i <= maxChannelsToQuery; i++)
+			{
+				float volumeDb = 0.0f;
+				if (queryChannelVolume(ChannelType::PLAYBACK, i, volumeDb))
+				{
+					RmeOscCommandConfig cmd;
+					cmd.address = buildChannelAddress(ChannelType::PLAYBACK, i, ParamType::VOLUME);
+					cmd.args.push_back(std::any(dbToNormalized(volumeDb)));
+					commands.push_back(cmd);
+				}
+				else
+				{
+					success = false;
+				}
+
+				// Add small delay between queries
+				std::this_thread::sleep_for(std::chrono::milliseconds(5));
+			}
+
+			// Output channels
+			for (int i = 1; i <= maxChannelsToQuery; i++)
+			{
+				float volumeDb = 0.0f;
+				if (queryChannelVolume(ChannelType::OUTPUT, i, volumeDb))
+				{
+					RmeOscCommandConfig cmd;
+					cmd.address = buildChannelAddress(ChannelType::OUTPUT, i, ParamType::VOLUME);
+					cmd.args.push_back(std::any(dbToNormalized(volumeDb)));
+					commands.push_back(cmd);
+				}
+				else
+				{
+					success = false;
+				}
+
+				// Add small delay between queries
+				std::this_thread::sleep_for(std::chrono::milliseconds(5));
+			}
+
+			// Store the commands in the configuration
+			config.rmeCommands = commands;
+
+			// Get device name if available (may require specific query)
+			config.deviceName = "RME Audio Device"; // Placeholder - ideally this would be queried
+			config.deviceType = "TotalMix FX";     // Placeholder
+
+			// Call the callback with the result
+			callback(success, config); })
 			.detach();
 
 		return true;

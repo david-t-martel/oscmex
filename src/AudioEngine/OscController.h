@@ -537,4 +537,89 @@ namespace AudioEngine
 		float clampEQQ(float q) const { return std::max(0.4f, std::min(9.9f, q)); }
 	};
 
+	// Periodic monitoring/ping system for RME connection status
+	class ConnectionMonitor
+	{
+	public:
+		ConnectionMonitor(OscController *controller, int pingIntervalMs = 5000)
+			: m_controller(controller), m_pingIntervalMs(pingIntervalMs), m_running(false) {}
+
+		~ConnectionMonitor()
+		{
+			stop();
+		}
+
+		// Start periodic ping monitoring
+		void start()
+		{
+			if (m_running)
+				return;
+
+			m_running = true;
+			m_monitorThread = std::thread([this]()
+										  {
+				while (m_running) {
+					// Check connection status
+					bool connected = m_controller->refreshConnectionStatus();
+
+					// Get DSP status if connected
+					if (connected) {
+						auto status = m_controller->getDspStatus();
+
+						// Notify any registered callbacks
+						std::lock_guard<std::mutex> lock(m_callbackMutex);
+						for (const auto& callback : m_statusCallbacks) {
+							callback(true, status);
+						}
+					} else {
+						// Notify about disconnection
+						std::lock_guard<std::mutex> lock(m_callbackMutex);
+						for (const auto& callback : m_statusCallbacks) {
+							callback(false, OscController::DspStatus());
+						}
+					}
+
+					// Wait for next ping interval
+					std::this_thread::sleep_for(std::chrono::milliseconds(m_pingIntervalMs));
+				} });
+		}
+
+		// Stop monitoring
+		void stop()
+		{
+			m_running = false;
+			if (m_monitorThread.joinable())
+			{
+				m_monitorThread.join();
+			}
+		}
+
+		// Register callback for connection status changes
+		using StatusCallback = std::function<void(bool, const OscController::DspStatus &)>;
+		int addStatusCallback(StatusCallback callback)
+		{
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			int id = m_nextCallbackId++;
+			m_statusCallbacks[id] = callback;
+			return id;
+		}
+
+		// Remove a callback
+		void removeStatusCallback(int id)
+		{
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			m_statusCallbacks.erase(id);
+		}
+
+	private:
+		OscController *m_controller;
+		int m_pingIntervalMs;
+		std::atomic<bool> m_running;
+		std::thread m_monitorThread;
+
+		std::mutex m_callbackMutex;
+		std::map<int, StatusCallback> m_statusCallbacks;
+		int m_nextCallbackId = 0;
+	};
+
 } // namespace AudioEngine
