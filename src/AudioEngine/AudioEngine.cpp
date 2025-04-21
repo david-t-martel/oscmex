@@ -128,7 +128,7 @@ namespace AudioEngine
         m_config.setBufferSize(bufferSize);
         m_config.setSampleRate(sampleRate);
         reportStatus("Info", "Auto-configured ASIO with sample rate: " + std::to_string(sampleRate) +
-                               " Hz, buffer size: " + std::to_string(bufferSize));
+                                 " Hz, buffer size: " + std::to_string(bufferSize));
 
         // Get available channels
         long inputChannelCount = m_asioManager->getInputChannelCount();
@@ -177,19 +177,18 @@ namespace AudioEngine
                 m_config.addConnection(connection);
 
                 reportStatus("Info", "Created default connection between " +
-                            connection.sourceName + " and " + connection.sinkName);
+                                         connection.sourceName + " and " + connection.sinkName);
             }
         }
 
         // Set up the ASIO callback
-        m_asioManager->setCallback([this](long doubleBufferIndex) {
-            processAsioBlock(doubleBufferIndex, true);
-        });
+        m_asioManager->setCallback([this](long doubleBufferIndex)
+                                   { processAsioBlock(doubleBufferIndex, true); });
 
         return true;
     }
 
-    void AudioEngine::createDefaultAsioNodes(const std::vector<long>& inputChannels, const std::vector<long>& outputChannels)
+    void AudioEngine::createDefaultAsioNodes(const std::vector<long> &inputChannels, const std::vector<long> &outputChannels)
     {
         if (!m_asioManager)
             return;
@@ -208,7 +207,8 @@ namespace AudioEngine
             std::string channelIndices;
             for (size_t i = 0; i < inputChannels.size(); i++)
             {
-                if (i > 0) channelIndices += ",";
+                if (i > 0)
+                    channelIndices += ",";
                 channelIndices += std::to_string(inputChannels[i]);
             }
 
@@ -237,7 +237,8 @@ namespace AudioEngine
             std::string channelIndices;
             for (size_t i = 0; i < outputChannels.size(); i++)
             {
-                if (i > 0) channelIndices += ",";
+                if (i > 0)
+                    channelIndices += ",";
                 channelIndices += std::to_string(outputChannels[i]);
             }
 

@@ -104,6 +104,7 @@ The system implements a two-phase device configuration approach:
    * The `AudioEngine::sendOscCommands()` method handles this phase
 
 This approach allows the engine to:
+
 1. First establish a working connection to the hardware with optimal settings
 2. Then apply user or application-specific configurations to the device
 3. Support querying the current state through `DeviceStateManager` for persistence or UI feedback
