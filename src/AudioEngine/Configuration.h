@@ -12,6 +12,7 @@ namespace AudioEngine
 {
 	// Forward declaration for classes that will be referenced
 	class OscController;
+	class DeviceStateManager; // Forward declaration for DeviceStateManager
 
 	/**
 	 * @brief Enum for device types supported by the configuration
@@ -373,68 +374,5 @@ namespace AudioEngine
 		static bool parseFromFile(const std::string &filePath, Configuration &config);
 	};
 
-	/**
-	 * @brief Class for reading and managing device state
-	 */
-	class DeviceStateManager
-	{
-	public:
-		/**
-		 * @brief Device parameter query callback type
-		 *
-		 * Called when a parameter query has completed
-		 */
-		using QueryCallback = std::function<void(bool success, float value)>;
-
-		/**
-		 * @brief Query completion callback
-		 *
-		 * Called when all queries in a batch have completed
-		 */
-		using BatchCompletionCallback = std::function<void(bool allSucceeded)>;
-
-		/**
-		 * @brief Construct a new Device State Manager
-		 *
-		 * @param controller Pointer to the OscController to use
-		 */
-		DeviceStateManager(OscController *controller);
-
-		/**
-		 * @brief Destructor
-		 */
-		~DeviceStateManager();
-
-		/**
-		 * @brief Query the current state of the device and build a configuration
-		 *
-		 * @param callback Callback to call when the query completes
-		 * @param channelCount Number of channels to query (default: 32)
-		 */
-		void queryDeviceState(std::function<void(const Configuration &)> callback, int channelCount = 32);
-
-		/**
-		 * @brief Query a single parameter from the device
-		 *
-		 * @param address OSC address to query
-		 * @param callback Callback to call with the result
-		 */
-		void queryParameter(const std::string &address, QueryCallback callback);
-
-		/**
-		 * @brief Query multiple parameters from the device
-		 *
-		 * @param addresses List of OSC addresses to query
-		 * @param callback Callback to call when all queries complete
-		 */
-		void queryParameters(const std::vector<std::string> &addresses,
-							 std::function<void(const std::map<std::string, float> &)> callback);
-
-	private:
-		OscController *m_controller;					  // Pointer to the OscController
-		std::map<std::string, float> m_queryResults;	  // Results of parameter queries
-		int m_pendingQueries;							  // Count of pending queries
-		std::map<std::string, QueryCallback> m_callbacks; // Callbacks for individual queries
-	};
-
+	// DeviceStateManager has been moved to its own file (DeviceStateManager.h)
 }

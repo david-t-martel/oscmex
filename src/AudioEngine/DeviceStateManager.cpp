@@ -1,7 +1,21 @@
 #include "DeviceStateManager.h"
+#include <iostream>
+#include <fstream>
+#include <thread>
 
 namespace AudioEngine
 {
+    DeviceStateManager::DeviceStateManager(OscController *controller)
+        : m_controller(controller), m_pendingQueries(0)
+    {
+        // Constructor implementation
+    }
+
+    DeviceStateManager::~DeviceStateManager()
+    {
+        // Destructor implementation
+    }
+
     bool DeviceStateManager::queryDeviceState(std::function<void(bool, const Configuration &)> callback)
     {
         if (!m_controller)
@@ -13,6 +27,142 @@ namespace AudioEngine
         }
 
         return m_controller->queryDeviceState(callback);
+    }
+
+    bool DeviceStateManager::queryDeviceStateWithChannels(std::function<void(bool, const Configuration &)> callback, int channelCount)
+    {
+        if (!m_controller)
+        {
+            std::cerr << "DeviceStateManager: No OscController available" << std::endl;
+            Configuration emptyConfig;
+            callback(false, emptyConfig);
+            return false;
+        }
+
+        // Create a list of OSC addresses to query based on channel count
+        std::vector<std::string> addresses;
+
+        // Add input channel parameters
+        for (int i = 1; i <= channelCount; i++)
+        {
+            addresses.push_back("/1/channel/" + std::to_string(i) + "/volume");
+            addresses.push_back("/1/channel/" + std::to_string(i) + "/mute");
+            addresses.push_back("/1/channel/" + std::to_string(i) + "/solo");
+        }
+
+        // Add playback channel parameters
+        for (int i = 1; i <= channelCount; i++)
+        {
+            addresses.push_back("/2/channel/" + std::to_string(i) + "/volume");
+            addresses.push_back("/2/channel/" + std::to_string(i) + "/mute");
+            addresses.push_back("/2/channel/" + std::to_string(i) + "/solo");
+        }
+
+        // Add output channel parameters
+        for (int i = 1; i <= channelCount; i++)
+        {
+            addresses.push_back("/3/channel/" + std::to_string(i) + "/volume");
+            addresses.push_back("/3/channel/" + std::to_string(i) + "/mute");
+        }
+
+        // Query all parameters and construct the configuration
+        return queryParameters(addresses, [callback](bool success, const std::map<std::string, float> &results)
+                               {
+            Configuration config;
+
+            if (success) {
+                // Use results to populate configuration
+                for (const auto& pair : results) {
+                    std::vector<std::any> args = { std::any(pair.second) };
+                    config.addCommand(pair.first, args);
+                }
+            }
+
+            callback(success, config); });
+    }
+
+    bool DeviceStateManager::queryParameter(const std::string &address, QueryCallback callback)
+    {
+        if (!m_controller)
+        {
+            std::cerr << "DeviceStateManager: No OscController available" << std::endl;
+            callback(false, 0.0f);
+            return false;
+        }
+
+        // Store the callback for this specific address
+        m_callbacks[address] = callback;
+        m_pendingQueries++;
+
+        // Ask OscController to query the parameter
+        return m_controller->queryParameter(address, [this, address](bool success, float value)
+                                            {
+            // Find and call the stored callback
+            auto iter = m_callbacks.find(address);
+            if (iter != m_callbacks.end())
+            {
+                iter->second(success, value);
+                m_callbacks.erase(iter);
+            }
+
+            // Store the result for batch queries
+            if (success) {
+                m_queryResults[address] = value;
+            }
+
+            // Decrement pending queries counter
+            m_pendingQueries--; });
+    }
+
+    bool DeviceStateManager::queryParameters(const std::vector<std::string> &addresses,
+                                             std::function<void(bool, const std::map<std::string, float> &)> callback)
+    {
+        if (!m_controller)
+        {
+            std::cerr << "DeviceStateManager: No OscController available" << std::endl;
+            callback(false, std::map<std::string, float>());
+            return false;
+        }
+
+        // Clear results from previous queries
+        m_queryResults.clear();
+        m_pendingQueries = 0;
+
+        // Track if any query fails
+        bool anyFailed = false;
+
+        // Define a shared callback for all parameters
+        auto sharedCallback = [this, addresses, callback, &anyFailed](bool success, float value)
+        {
+            if (!success)
+            {
+                anyFailed = true;
+            }
+
+            // If all queries have completed, call the original callback
+            if (m_pendingQueries == 0)
+            {
+                callback(!anyFailed, m_queryResults);
+            }
+        };
+
+        // Start all queries
+        for (const auto &address : addresses)
+        {
+            if (!queryParameter(address, sharedCallback))
+            {
+                anyFailed = true;
+            }
+        }
+
+        // Handle the case where no queries were started
+        if (m_pendingQueries == 0)
+        {
+            callback(!anyFailed, m_queryResults);
+            return !anyFailed;
+        }
+
+        return true;
     }
 
     bool DeviceStateManager::saveDeviceStateToFile(const std::string &filename, std::function<void(bool)> callback)
@@ -32,16 +182,15 @@ namespace AudioEngine
                 nlohmann::json j;
 
                 // Add basic device info
-                j["deviceName"] = config.deviceName;
-                j["deviceType"] = config.deviceType;
-                j["targetIp"] = config.targetIp;
-                j["targetPort"] = config.targetPort;
-                j["dspLoadPercent"] = config.dspLoadPercent;
+                j["deviceName"] = config.getAsioDeviceName();
+                j["deviceType"] = deviceTypeToString(config.getDeviceType());
+                j["targetIp"] = config.getTargetIp();
+                j["targetPort"] = config.getTargetPort();
 
                 // Add commands for each parameter
                 j["commands"] = nlohmann::json::array();
 
-                for (const auto& cmd : config.rmeCommands) {
+                for (const auto& cmd : config.getCommands()) {
                     nlohmann::json command;
                     command["address"] = cmd.address;
 
@@ -115,27 +264,20 @@ namespace AudioEngine
             // Extract basic device info
             if (j.contains("deviceName"))
             {
-                config.deviceName = j["deviceName"].get<std::string>();
+                config.setAsioDeviceName(j["deviceName"].get<std::string>());
             }
 
             if (j.contains("deviceType"))
             {
-                config.deviceType = j["deviceType"].get<std::string>();
+                config.setDeviceType(stringToDeviceType(j["deviceType"].get<std::string>()));
             }
 
-            if (j.contains("targetIp"))
+            if (j.contains("targetIp") && j.contains("targetPort"))
             {
-                config.targetIp = j["targetIp"].get<std::string>();
-            }
-
-            if (j.contains("targetPort"))
-            {
-                config.targetPort = j["targetPort"].get<int>();
-            }
-
-            if (j.contains("dspLoadPercent"))
-            {
-                config.dspLoadPercent = j["dspLoadPercent"].get<int>();
+                std::string ip = j["targetIp"].get<std::string>();
+                int port = j["targetPort"].get<int>();
+                int receivePort = j.contains("receivePort") ? j["receivePort"].get<int>() : 0;
+                config.setConnectionParams(ip, port, receivePort);
             }
 
             // Extract commands
@@ -148,32 +290,32 @@ namespace AudioEngine
                         continue; // Skip invalid commands
                     }
 
-                    RmeOscCommandConfig cmd;
-                    cmd.address = cmdJson["address"].get<std::string>();
+                    std::string address = cmdJson["address"].get<std::string>();
+                    std::vector<std::any> args;
 
                     // Parse arguments
                     for (const auto &argJson : cmdJson["args"])
                     {
                         if (argJson.is_number_float())
                         {
-                            cmd.args.push_back(std::any(argJson.get<float>()));
+                            args.push_back(std::any(argJson.get<float>()));
                         }
                         else if (argJson.is_number_integer())
                         {
-                            cmd.args.push_back(std::any(argJson.get<int>()));
+                            args.push_back(std::any(argJson.get<int>()));
                         }
                         else if (argJson.is_boolean())
                         {
-                            cmd.args.push_back(std::any(argJson.get<bool>()));
+                            args.push_back(std::any(argJson.get<bool>()));
                         }
                         else if (argJson.is_string())
                         {
-                            cmd.args.push_back(std::any(argJson.get<std::string>()));
+                            args.push_back(std::any(argJson.get<std::string>()));
                         }
                         // Skip other types
                     }
 
-                    config.rmeCommands.push_back(cmd);
+                    config.addCommand(address, args);
                 }
             }
 

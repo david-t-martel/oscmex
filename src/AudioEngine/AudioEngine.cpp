@@ -1,6 +1,7 @@
 #include "AudioEngine.h"
 #include "AsioManager.h"
 #include "OscController.h"
+#include "DeviceStateManager.h"
 #include "AudioBuffer.h"
 #include "AsioNodes.h"
 #include "FileNodes.h"
@@ -1063,6 +1064,25 @@ namespace AudioEngine
                 reportStatus("Warning", "Failed to configure ASIO sink node");
             }
         }
+    }
+
+    // Implementation for the initializeFromJson method
+    bool AudioEngine::initializeFromJson(const std::string &jsonFilePath, std::shared_ptr<IExternalControl> externalControl)
+    {
+        reportStatus("Info", "Initializing from JSON file: " + jsonFilePath);
+
+        // Load the configuration from JSON file
+        bool success = false;
+        Configuration config = Configuration::loadFromFile(jsonFilePath, success);
+
+        if (!success)
+        {
+            reportStatus("Error", "Failed to load configuration from file: " + jsonFilePath);
+            return false;
+        }
+
+        // Initialize the engine with the loaded configuration
+        return initialize(std::move(config), externalControl);
     }
 
 } // namespace AudioEngine

@@ -21,7 +21,10 @@
 			"*.hpp": "cpp",
 			"*.c": "c",
 			"utility": "cpp",
-			"vector": "cpp"
+			"vector": "cpp",
+			"deque": "cpp",
+			"list": "cpp",
+			"xstring": "cpp"
 		},
 		"terminal.integrated.defaultProfile.windows": "Command Prompt"
 	}

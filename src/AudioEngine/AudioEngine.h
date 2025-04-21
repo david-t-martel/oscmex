@@ -55,6 +55,15 @@ namespace AudioEngine
 		bool initialize(Configuration config, std::shared_ptr<IExternalControl> externalControl = nullptr);
 
 		/**
+		 * @brief Initialize the engine from a JSON configuration file
+		 *
+		 * @param jsonFilePath Path to the JSON configuration file
+		 * @param externalControl Optional external control interface (can be nullptr)
+		 * @return true if initialization was successful
+		 */
+		bool initializeFromJson(const std::string &jsonFilePath, std::shared_ptr<IExternalControl> externalControl = nullptr);
+
+		/**
 		 * @brief Start audio processing
 		 *
 		 * @return true if engine was started successfully

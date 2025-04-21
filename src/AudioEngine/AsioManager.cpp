@@ -871,49 +871,91 @@ namespace AudioEngine
 
     long AsioManager::getOptimalBufferSize() const
     {
-        if (!m_driverLoaded)
-            return 0;
-
-        // Get preferred buffer size from ASIO driver
-        long minSize, maxSize, preferredSize, granularity;
-        ASIOError result = ASIOGetBufferSize(&minSize, &maxSize, &preferredSize, &granularity);
-
-        if (result == ASE_OK)
+        if (!m_asioInitialized)
         {
-            return preferredSize;
+            return 0;
         }
 
-        // If no preferred size available, use minimum size
-        return minSize;
+        // Return the preferred buffer size from the driver if available
+        if (m_preferredBufferSize > 0)
+        {
+            return m_preferredBufferSize;
+        }
+
+        // Otherwise, choose a reasonable default based on the driver capabilities
+        if (m_minBufferSize > 0 && m_maxBufferSize > 0)
+        {
+            // Try for a common buffer size that's within the valid range
+            const long commonBufferSizes[] = {256, 512, 1024, 2048};
+
+            for (long size : commonBufferSizes)
+            {
+                if (size >= m_minBufferSize && size <= m_maxBufferSize)
+                {
+                    return size;
+                }
+            }
+
+            // If none of the common sizes work, use the minimum size
+            return m_minBufferSize;
+        }
+
+        // If we can't determine a proper buffer size, use a reasonable default
+        return 1024;
     }
 
     double AsioManager::getOptimalSampleRate() const
     {
-        if (!m_driverLoaded)
-            return 0.0;
-
-        // Get current sample rate as default
-        ASIOSampleRate sampleRate;
-        ASIOError result = ASIOGetSampleRate(&sampleRate);
-
-        if (result == ASE_OK && sampleRate > 0)
+        if (!m_asioInitialized)
         {
-            return sampleRate;
+            return 0.0;
         }
 
-        // If couldn't get current rate, try common rates (48kHz is often a good default)
+        // Return the current sample rate if available
+        if (m_sampleRate > 0.0)
+        {
+            return m_sampleRate;
+        }
+
+        // Get supported sample rates
+        auto supportedRates = getSupportedSampleRates();
+
+        // Preferred sample rates in order of preference
+        const double preferredRates[] = {48000.0, 44100.0, 96000.0, 88200.0, 192000.0};
+
+        // First try to find a preferred rate that is supported
+        for (double rate : preferredRates)
+        {
+            if (std::find(supportedRates.begin(), supportedRates.end(), rate) != supportedRates.end())
+            {
+                return rate;
+            }
+        }
+
+        // If none of the preferred rates are supported, return the first supported rate
+        if (!supportedRates.empty())
+        {
+            return supportedRates[0];
+        }
+
+        // If we can't determine a proper sample rate, use a reasonable default
         return 48000.0;
     }
 
     bool AsioManager::getDefaultDeviceConfiguration(long &bufferSize, double &sampleRate) const
     {
-        if (!m_driverLoaded)
+        if (!m_asioInitialized)
+        {
             return false;
+        }
 
+        // Get the preferred buffer size
         bufferSize = getOptimalBufferSize();
+
+        // Get the optimal sample rate
         sampleRate = getOptimalSampleRate();
 
-        return (bufferSize > 0 && sampleRate > 0);
+        return true;
     }
 
 } // namespace AudioEngine
