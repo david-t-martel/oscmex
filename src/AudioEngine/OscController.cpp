@@ -9,6 +9,8 @@
 #include <map>
 #include <vector> // Added for std::vector
 #include <any>	  // Added for std::any
+#include <sstream>
+#include <fstream>
 
 // liblo headers are now included in OscController.h
 
@@ -266,6 +268,31 @@ namespace AudioEngine
 			// TODO: Store the actual received value associated with the response
 			// For now, just mark as received. Need a way to pass the value back.
 			it->second.store(true);
+		}
+
+		// Check if this is a response to a parameter request
+		{
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			auto it = m_parameterCallbacks.find(pathStr);
+			if (it != m_parameterCallbacks.end())
+			{
+				// Call the parameter callback with the received value
+				it->second(true, args);
+
+				// Remove the callback after it's called
+				m_parameterCallbacks.erase(it);
+
+				// Continue processing (don't return yet)
+			}
+		}
+
+		// Call all registered event callbacks
+		{
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			for (const auto &[id, callback] : m_eventCallbacks)
+			{
+				callback(pathStr, args);
+			}
 		}
 
 		return 0; // Return 0 to indicate we handled the message
@@ -906,6 +933,482 @@ namespace AudioEngine
 	int OscController::getTargetPort() const
 	{
 		return m_targetPort;
+	}
+
+	// =================== IExternalControl Interface Implementation ===================
+
+	bool OscController::configure(const std::string &configFile)
+	{
+		if (m_configured)
+		{
+			std::cerr << "OscController: Already configured. Call cleanup() first." << std::endl;
+			return false;
+		}
+
+		// Parse JSON configuration file
+		std::ifstream file(configFile);
+		if (!file.is_open())
+		{
+			std::cerr << "OscController: Failed to open configuration file: " << configFile << std::endl;
+			return false;
+		}
+
+		// Read file contents
+		std::stringstream buffer;
+		buffer << file.rdbuf();
+		file.close();
+
+		// TODO: Parse JSON configuration
+		// For now, use hardcoded defaults or basic parsing
+		std::string ip = "127.0.0.1";
+		int port = 7001;
+		int receivePort = 9001;
+
+		// Extract IP address (very basic parsing)
+		std::string content = buffer.str();
+		size_t ipPos = content.find("\"ip\"");
+		if (ipPos != std::string::npos)
+		{
+			size_t colonPos = content.find(":", ipPos);
+			if (colonPos != std::string::npos)
+			{
+				size_t quoteStart = content.find("\"", colonPos);
+				size_t quoteEnd = content.find("\"", quoteStart + 1);
+				if (quoteStart != std::string::npos && quoteEnd != std::string::npos)
+				{
+					ip = content.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
+				}
+			}
+		}
+
+		// Extract port (very basic parsing)
+		size_t portPos = content.find("\"port\"");
+		if (portPos != std::string::npos)
+		{
+			size_t colonPos = content.find(":", portPos);
+			if (colonPos != std::string::npos)
+			{
+				size_t commaPos = content.find(",", colonPos);
+				size_t bracketPos = content.find("}", colonPos);
+				size_t endPos = std::min(commaPos, bracketPos);
+				if (endPos != std::string::npos)
+				{
+					std::string portStr = content.substr(colonPos + 1, endPos - colonPos - 1);
+					try
+					{
+						port = std::stoi(portStr);
+					}
+					catch (const std::exception &)
+					{
+						// Ignore parsing errors and use default
+					}
+				}
+			}
+		}
+
+		// Extract receive port (very basic parsing)
+		size_t receivePortPos = content.find("\"receivePort\"");
+		if (receivePortPos != std::string::npos)
+		{
+			size_t colonPos = content.find(":", receivePortPos);
+			if (colonPos != std::string::npos)
+			{
+				size_t commaPos = content.find(",", colonPos);
+				size_t bracketPos = content.find("}", colonPos);
+				size_t endPos = std::min(commaPos, bracketPos);
+				if (endPos != std::string::npos)
+				{
+					std::string receivePortStr = content.substr(colonPos + 1, endPos - colonPos - 1);
+					try
+					{
+						receivePort = std::stoi(receivePortStr);
+					}
+					catch (const std::exception &)
+					{
+						// Ignore parsing errors and use default
+					}
+				}
+			}
+		}
+
+		// Configure with extracted parameters
+		if (!configure(ip, port, receivePort))
+		{
+			return false;
+		}
+
+		std::cout << "OscController: Configured from file " << configFile
+				  << " (IP: " << ip << ", Port: " << port
+				  << ", Receive Port: " << receivePort << ")" << std::endl;
+		return true;
+	}
+
+	bool OscController::configure(const std::string &ip, int port, int receivePort)
+	{
+		if (!configure(ip, port))
+		{
+			return false;
+		}
+
+		// Start receiver if requested
+		if (receivePort > 0)
+		{
+			if (!startReceiver(receivePort))
+			{
+				std::cerr << "OscController: Failed to start receiver on port " << receivePort << std::endl;
+				// Don't fail configuration if just the receiver fails
+				// Some use cases may not need receiving
+			}
+		}
+
+		return true;
+	}
+
+	bool OscController::setParameter(const std::string &address, const std::vector<std::any> &args)
+	{
+		// Direct implementation using sendCommand
+		return sendCommand(address, args);
+	}
+
+	bool OscController::getParameter(const std::string &address,
+									 std::function<void(bool, const std::vector<std::any> &)> callback)
+	{
+		if (!m_configured || !m_oscAddress)
+		{
+			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
+			return false;
+		}
+
+		if (!m_oscServer)
+		{
+			std::cerr << "OscController: OSC server not started, cannot receive responses" << std::endl;
+			return false;
+		}
+
+		// Store the callback for this parameter request
+		{
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			m_parameterCallbacks[address] = callback;
+		}
+
+		// Send query command (empty message to request current value)
+		bool result = sendCommand(address, {});
+
+		if (!result)
+		{
+			// If sending fails, remove the callback and return error
+			std::lock_guard<std::mutex> lock(m_callbackMutex);
+			m_parameterCallbacks.erase(address);
+			return false;
+		}
+
+		return true;
+	}
+
+	bool OscController::queryDeviceState(std::function<void(bool, const Configuration &)> callback)
+	{
+		if (!m_configured || !m_oscAddress)
+		{
+			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
+			return false;
+		}
+
+		// Request a refresh from the device
+		bool result = requestRefresh();
+
+		if (!result)
+		{
+			std::cerr << "OscController: Failed to request device state refresh" << std::endl;
+			// Call the callback with failure
+			Configuration emptyConfig;
+			callback(false, emptyConfig);
+			return false;
+		}
+
+		// In a real implementation, we would store the callback and invoke it
+		// when we have received all the state information. For now, just create
+		// a minimal configuration with device info and invoke the callback.
+		Configuration config;
+		// Add basic device info
+		config.deviceName = "RME Audio Device";
+		config.deviceType = "TotalMix FX";
+		config.targetIp = m_targetIp;
+		config.targetPort = m_targetPort;
+
+		// Use a timer to simulate waiting for device information
+		std::thread([this, callback, config]()
+					{
+			// Wait a bit to simulate device response time
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+			// Call the callback with the configuration
+			callback(true, config); })
+			.detach();
+
+		return true;
+	}
+
+	int OscController::addEventCallback(
+		std::function<void(const std::string &, const std::vector<std::any> &)> callback)
+	{
+		std::lock_guard<std::mutex> lock(m_callbackMutex);
+		int callbackId = m_nextCallbackId++;
+		m_eventCallbacks[callbackId] = callback;
+		return callbackId;
+	}
+
+	void OscController::removeEventCallback(int callbackId)
+	{
+		std::lock_guard<std::mutex> lock(m_callbackMutex);
+		m_eventCallbacks.erase(callbackId);
+	}
+
+	// =================== Standalone Operation ===================
+
+	int OscController::main(int argc, char *argv[])
+	{
+		std::cout << "OSC Controller Standalone Mode" << std::endl;
+		std::cout << "================================" << std::endl;
+
+		// Parse command line arguments
+		std::string configFile;
+		std::string targetIp = "127.0.0.1";
+		int targetPort = 7001;
+		int receivePort = 9001;
+		bool interactive = true;
+
+		// Simple command line parsing
+		for (int i = 1; i < argc; i++)
+		{
+			std::string arg = argv[i];
+			if (arg == "--config" && i + 1 < argc)
+			{
+				configFile = argv[++i];
+			}
+			else if (arg == "--ip" && i + 1 < argc)
+			{
+				targetIp = argv[++i];
+			}
+			else if (arg == "--port" && i + 1 < argc)
+			{
+				try
+				{
+					targetPort = std::stoi(argv[++i]);
+				}
+				catch (const std::exception &)
+				{
+					std::cerr << "Invalid port number: " << argv[i] << std::endl;
+					return 1;
+				}
+			}
+			else if (arg == "--receive-port" && i + 1 < argc)
+			{
+				try
+				{
+					receivePort = std::stoi(argv[++i]);
+				}
+				catch (const std::exception &)
+				{
+					std::cerr << "Invalid receive port number: " << argv[i] << std::endl;
+					return 1;
+				}
+			}
+			else if (arg == "--daemon")
+			{
+				interactive = false;
+			}
+			else if (arg == "--help")
+			{
+				std::cout << "Usage: osc_controller [options]" << std::endl;
+				std::cout << "Options:" << std::endl;
+				std::cout << "  --config <file>        Configuration file (JSON)" << std::endl;
+				std::cout << "  --ip <address>         Target IP address (default: 127.0.0.1)" << std::endl;
+				std::cout << "  --port <port>          Target port number (default: 7001)" << std::endl;
+				std::cout << "  --receive-port <port>  Receiving port number (default: 9001)" << std::endl;
+				std::cout << "  --daemon               Run in daemon mode (non-interactive)" << std::endl;
+				std::cout << "  --help                 Show this help" << std::endl;
+				return 0;
+			}
+		}
+
+		// Create and configure controller
+		OscController controller;
+
+		if (!configFile.empty())
+		{
+			if (!controller.configure(configFile))
+			{
+				std::cerr << "Failed to load configuration from " << configFile << std::endl;
+				return 1;
+			}
+		}
+		else
+		{
+			if (!controller.configure(targetIp, targetPort, receivePort))
+			{
+				std::cerr << "Failed to configure OSC controller" << std::endl;
+				return 1;
+			}
+		}
+
+		// Set message callback for logging received messages
+		controller.setMessageCallback([](const std::string &path, const std::vector<std::any> &args)
+									  {
+			std::cout << "Received OSC message: " << path;
+			if (!args.empty())
+			{
+				std::cout << " with " << args.size() << " argument(s)";
+			}
+			std::cout << std::endl; });
+
+		// Interactive mode with command loop
+		if (interactive)
+		{
+			std::cout << "Enter commands (type 'help' for available commands, 'quit' to exit):" << std::endl;
+			std::string line;
+
+			while (true)
+			{
+				std::cout << "> ";
+				std::getline(std::cin, line);
+
+				if (line == "quit" || line == "exit")
+				{
+					break;
+				}
+				else if (line == "help")
+				{
+					std::cout << "Available commands:" << std::endl;
+					std::cout << "  send <address> <arg1> <arg2> ...   Send OSC message" << std::endl;
+					std::cout << "  vol <channel> <value>              Set output channel volume (dB)" << std::endl;
+					std::cout << "  mute <channel> <0|1>               Set output channel mute" << std::endl;
+					std::cout << "  refresh                            Request device state refresh" << std::endl;
+					std::cout << "  meters <0|1>                       Enable/disable level meters" << std::endl;
+					std::cout << "  status                             Show connection status" << std::endl;
+					std::cout << "  quit                               Exit the program" << std::endl;
+					std::cout << "  help                               Show this help" << std::endl;
+				}
+				else if (line.find("send ") == 0)
+				{
+					// Parse address and arguments
+					std::stringstream ss(line.substr(5));
+					std::string address;
+					ss >> address;
+
+					std::vector<std::any> args;
+					std::string arg;
+					while (ss >> arg)
+					{
+						// Try to parse as different types
+						try
+						{
+							// Check if it's a float (contains decimal point)
+							if (arg.find('.') != std::string::npos)
+							{
+								args.push_back(std::any(std::stof(arg)));
+							}
+							// Check if it's a boolean
+							else if (arg == "true" || arg == "1")
+							{
+								args.push_back(std::any(true));
+							}
+							else if (arg == "false" || arg == "0")
+							{
+								args.push_back(std::any(false));
+							}
+							// Otherwise try as integer
+							else
+							{
+								args.push_back(std::any(std::stoi(arg)));
+							}
+						}
+						catch (const std::exception &)
+						{
+							// If not a number, treat as string
+							args.push_back(std::any(arg));
+						}
+					}
+
+					// Send the command
+					bool result = controller.sendCommand(address, args);
+					std::cout << "Send result: " << (result ? "success" : "failed") << std::endl;
+				}
+				else if (line.find("vol ") == 0)
+				{
+					// Parse channel and volume
+					std::stringstream ss(line.substr(4));
+					int channel;
+					float volume;
+					ss >> channel >> volume;
+
+					bool result = controller.setChannelVolume(OscController::ChannelType::OUTPUT, channel, volume);
+					std::cout << "Set volume result: " << (result ? "success" : "failed") << std::endl;
+				}
+				else if (line.find("mute ") == 0)
+				{
+					// Parse channel and mute state
+					std::stringstream ss(line.substr(5));
+					int channel;
+					int mute;
+					ss >> channel >> mute;
+
+					bool result = controller.setChannelMute(OscController::ChannelType::OUTPUT, channel, mute != 0);
+					std::cout << "Set mute result: " << (result ? "success" : "failed") << std::endl;
+				}
+				else if (line == "refresh")
+				{
+					bool result = controller.requestRefresh();
+					std::cout << "Refresh result: " << (result ? "success" : "failed") << std::endl;
+				}
+				else if (line.find("meters ") == 0)
+				{
+					// Parse enable state
+					std::stringstream ss(line.substr(7));
+					int enable;
+					ss >> enable;
+
+					bool result = controller.enableLevelMeters(enable != 0);
+					std::cout << "Set meters result: " << (result ? "success" : "failed") << std::endl;
+				}
+				else if (line == "status")
+				{
+					bool result = controller.refreshConnectionStatus();
+					std::cout << "Connection status: " << (result ? "OK" : "Failed") << std::endl;
+					std::cout << "Target: " << controller.getTargetIp() << ":" << controller.getTargetPort() << std::endl;
+
+					auto status = controller.getDspStatus();
+					std::cout << "DSP Load: " << status.loadPercent << "%" << std::endl;
+				}
+				else if (!line.empty())
+				{
+					std::cout << "Unknown command. Type 'help' for available commands." << std::endl;
+				}
+			}
+		}
+		else // Daemon mode
+		{
+			std::cout << "Running in daemon mode. Press Ctrl+C to exit." << std::endl;
+
+			// Set up level meter callback
+			controller.setLevelMeterCallback([](OscController::ChannelType type, int channel, const OscController::LevelMeterData &data)
+											 {
+												 // Optional: log level data in daemon mode
+											 });
+
+			// Enable level meters
+			controller.enableLevelMeters(true);
+
+			// Just wait until terminated
+			while (true)
+			{
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+			}
+		}
+
+		// Clean up
+		controller.cleanup();
+		std::cout << "OSC Controller terminated." << std::endl;
+		return 0;
 	}
 
 } // namespace AudioEngine

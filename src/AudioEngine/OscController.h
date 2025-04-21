@@ -7,10 +7,12 @@
 #include <functional>
 #include <atomic>
 #include <map>
-#include <thread> // Added for std::thread
+#include <thread>
+#include <mutex>
 
 // Include Configuration.h for RmeOscCommandConfig structure
 #include "Configuration.h"
+#include "IExternalControl.h"
 
 // Include liblo headers directly
 extern "C"
@@ -25,8 +27,10 @@ namespace AudioEngine
 	 *
 	 * Uses liblo to send and receive OSC messages.
 	 * Can be configured for specific devices like RME TotalMix FX.
+	 * Implements IExternalControl for integration with AudioEngine.
+	 * Can also operate in standalone mode.
 	 */
-	class OscController // Renamed from RmeOscController
+	class OscController : public IExternalControl
 	{
 	public:
 		/**
@@ -102,22 +106,32 @@ namespace AudioEngine
 		/**
 		 * @brief Construct a new OscController
 		 */
-		OscController(); // Renamed from RmeOscController
+		OscController();
 
 		/**
 		 * @brief Destroy the OscController and cleanup resources
 		 */
-		~OscController(); // Renamed from RmeOscController
+		~OscController();
+
+		/**
+		 * @brief Configure the controller with a config file
+		 *
+		 * @param configFile Path to a configuration file
+		 * @return true if configuration succeeded
+		 * @return false if configuration failed
+		 */
+		bool configure(const std::string &configFile);
 
 		/**
 		 * @brief Configure the controller with target IP and port
 		 *
 		 * @param ip Target IP address (e.g., "127.0.0.1")
 		 * @param port Target port number (e.g., 7001)
+		 * @param receivePort Optional port to listen on (0 to disable receiving)
 		 * @return true if configuration succeeded
 		 * @return false if configuration failed
 		 */
-		bool configure(const std::string &ip, int port);
+		bool configure(const std::string &ip, int port, int receivePort = 0);
 
 		/**
 		 * @brief Start the OSC receiver on the specified port
@@ -356,7 +370,68 @@ namespace AudioEngine
 		 * @param config The configuration to apply
 		 * @return true if all commands were sent successfully
 		 */
-		bool applyConfiguration(const Configuration &config);
+		bool applyConfiguration(const Configuration &config) override;
+
+		// =================== IExternalControl Interface Implementation ===================
+
+		/**
+		 * @brief Set a parameter value
+		 * Implementation of IExternalControl::setParameter
+		 *
+		 * @param address Parameter address (e.g., "/1/channel/1/volume")
+		 * @param args Parameter value(s)
+		 * @return true if successful
+		 */
+		bool setParameter(const std::string &address, const std::vector<std::any> &args) override;
+
+		/**
+		 * @brief Get a parameter value
+		 * Implementation of IExternalControl::getParameter
+		 *
+		 * @param address Parameter address (e.g., "/1/channel/1/volume")
+		 * @param callback Function to receive the result (success, value)
+		 * @return true if request was sent successfully
+		 */
+		bool getParameter(const std::string &address,
+						  std::function<void(bool, const std::vector<std::any> &)> callback) override;
+
+		/**
+		 * @brief Query the current device state
+		 * Implementation of IExternalControl::queryDeviceState
+		 *
+		 * @param callback Function to receive the result (success, configuration)
+		 * @return true if query was started successfully
+		 */
+		bool queryDeviceState(std::function<void(bool, const Configuration &)> callback) override;
+
+		/**
+		 * @brief Add an event callback for receiving notifications
+		 * Implementation of IExternalControl::addEventCallback
+		 *
+		 * @param callback Function to call when events occur (address, args)
+		 * @return int Callback ID for later removal
+		 */
+		int addEventCallback(
+			std::function<void(const std::string &, const std::vector<std::any> &)> callback) override;
+
+		/**
+		 * @brief Remove an event callback
+		 * Implementation of IExternalControl::removeEventCallback
+		 *
+		 * @param callbackId ID of the callback to remove
+		 */
+		void removeEventCallback(int callbackId) override;
+
+		// =================== Standalone Operation ===================
+
+		/**
+		 * @brief Main entry point for standalone operation
+		 *
+		 * @param argc Argument count
+		 * @param argv Argument values
+		 * @return int Return code
+		 */
+		static int main(int argc, char *argv[]);
 
 	private:
 		/**
@@ -440,6 +515,18 @@ namespace AudioEngine
 		bool m_levelMetersEnabled = false;							 // Whether level meters are enabled
 		DspStatus m_dspStatus;										 // Current DSP status
 		std::map<std::string, std::atomic<bool>> m_pendingResponses; // For handling query responses
+
+		// Event callback management
+		std::map<int, std::function<void(const std::string &, const std::vector<std::any> &)>> m_eventCallbacks;
+		int m_nextCallbackId = 0;
+		std::mutex m_callbackMutex;
+
+		// For async parameter queries
+		using ParameterCallback = std::function<void(bool, const std::vector<std::any> &)>;
+		std::map<std::string, ParameterCallback> m_parameterCallbacks;
+
+		// For device state queries
+		using DeviceStateCallback = std::function<void(bool, const Configuration &)>;
 
 		// Clamp helpers for parameter bounds (Example: RME)
 		float clampVolumeDb(float db) const { return std::max(-65.0f, std::min(6.0f, db)); }

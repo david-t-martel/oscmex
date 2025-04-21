@@ -1,23 +1,31 @@
 #pragma once
 
-#include "Configuration.h"
-#include "Connection.h"
-#include "AudioNode.h"
+#include <memory>
+#include <string>
 #include <vector>
 #include <map>
-#include <string>
-#include <memory>
-#include <mutex>
-#include <functional>
 #include <atomic>
 #include <thread>
+#include <mutex>
+#include <functional>
+#include <any>
+
+#include "Configuration.h"
+#include "IExternalControl.h"
+
+// Forward declarations
+extern "C"
+{
+	struct AVSampleFormat;
+	struct AVChannelLayout;
+}
 
 namespace AudioEngine
 {
-
 	// Forward declarations
 	class AsioManager;
-	class OscController; // Changed from RmeOscController
+	class AudioNode;
+	class Connection;
 
 	/**
 	 * @brief Core audio engine class
@@ -41,9 +49,10 @@ namespace AudioEngine
 		 * @brief Initialize the engine with configuration
 		 *
 		 * @param config Engine configuration
+		 * @param externalControl Optional external control interface (can be nullptr)
 		 * @return true if initialization was successful
 		 */
-		bool initialize(Configuration config);
+		bool initialize(Configuration config, std::shared_ptr<IExternalControl> externalControl = nullptr);
 
 		/**
 		 * @brief Start audio processing
@@ -69,54 +78,64 @@ namespace AudioEngine
 		 * @param directProcess true if processing is direct
 		 * @return true if processing was successful
 		 */
-		bool processAsioBlock(long doubleBufferIndex, bool directProcess);
-
-		/**
-		 * @brief Get the OSC controller
-		 *
-		 * @return Pointer to OSC controller
-		 */
-		OscController *getOscController() { return m_oscController.get(); } // Changed from getRmeController and updated return type
+		bool processAsioBlock(long doubleBufferIndex, bool directProcess = false);
 
 		/**
 		 * @brief Get a node by name
 		 *
-		 * @param name Node name
-		 * @return Pointer to node or nullptr if not found
+		 * @param name Name of the node
+		 * @return AudioNode* Pointer to the node or nullptr if not found
 		 */
 		AudioNode *getNodeByName(const std::string &name);
 
 		/**
+		 * @brief Get the external control interface
+		 *
+		 * @return std::shared_ptr<IExternalControl> The external control interface or nullptr if not set
+		 */
+		std::shared_ptr<IExternalControl> getExternalControl() const { return m_externalControl; }
+
+		/**
+		 * @brief Set or replace the external control interface
+		 *
+		 * @param externalControl The external control implementation or nullptr to remove
+		 * @return true if successfully set
+		 */
+		bool setExternalControl(std::shared_ptr<IExternalControl> externalControl);
+
+		/**
+		 * @brief Clear (remove) the external control interface
+		 */
+		void clearExternalControl() { m_externalControl.reset(); }
+
+		/**
 		 * @brief Add a status callback
 		 *
-		 * @param callback Status callback function
-		 * @return Callback ID
+		 * @param callback Function to call with status updates (category, message)
+		 * @return int Callback ID used to remove the callback later
 		 */
 		int addStatusCallback(std::function<void(const std::string &, const std::string &)> callback);
 
 		/**
 		 * @brief Remove a status callback
 		 *
-		 * @param callbackId Callback ID
+		 * @param callbackId ID of the callback to remove
 		 */
 		void removeStatusCallback(int callbackId);
 
 	private:
 		// Configuration
 		Configuration m_config;
-
-		// Managers
 		std::unique_ptr<AsioManager> m_asioManager;
-		std::unique_ptr<OscController> m_oscController; // Changed from m_rmeController
+		std::shared_ptr<IExternalControl> m_externalControl; // Optional external control
 
-		// Nodes and connections
-		std::vector<std::unique_ptr<AudioNode>> m_nodes;
-		std::vector<Connection> m_connections;
+		// Node management
+		std::vector<std::shared_ptr<AudioNode>> m_nodes;
 		std::map<std::string, AudioNode *> m_nodeMap;
+		std::vector<Connection> m_connections;
 
-		// Processing state
+		// Status
 		std::atomic<bool> m_running;
-		std::mutex m_processMutex;
 
 		// Status callbacks
 		std::map<int, std::function<void(const std::string &, const std::string &)>> m_statusCallbacks;
@@ -126,7 +145,7 @@ namespace AudioEngine
 		// Helper methods
 		bool createAndConfigureNodes();
 		bool setupConnections();
-		bool sendOscCommands(); // Changed from sendRmeCommands
+		bool sendExternalCommands(); // Changed from sendOscCommands
 		void reportStatus(const std::string &category, const std::string &message);
 
 		// Process graph traversal
@@ -148,6 +167,14 @@ namespace AudioEngine
 		 * @return true if auto-configuration succeeded
 		 */
 		bool autoConfigureAsio();
-	};
 
-} // namespace AudioEngine
+		/**
+		 * @brief Send a control command through the external control interface if available
+		 *
+		 * @param address Command address
+		 * @param args Command arguments
+		 * @return true if command was sent successfully or if no external control is available
+		 */
+		bool sendExternalCommand(const std::string &address, const std::vector<std::any> &args);
+	};
+}

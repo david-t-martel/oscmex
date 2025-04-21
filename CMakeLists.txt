@@ -350,6 +350,10 @@ target_link_libraries(AudioEngine PRIVATE nlohmann_json)
 add_executable(AudioEngineApp src/main.cpp)
 target_link_libraries(AudioEngineApp PRIVATE AudioEngine)
 
+# Define standalone OscController application
+add_executable(OscControllerApp src/tools/osc_controller_app.cpp)
+target_link_libraries(OscControllerApp PRIVATE AudioEngine)
+
 # --- Optional: Build Tools ---
 if(BUILD_LO_TOOLS)
 	# Check if tools directory exists
@@ -434,7 +438,7 @@ else()
 endif()
 
 # Install targets
-install(TARGETS AudioEngine AudioEngineApp
+install(TARGETS AudioEngine AudioEngineApp OscControllerApp
 	RUNTIME DESTINATION bin
 	LIBRARY DESTINATION lib
 	ARCHIVE DESTINATION lib

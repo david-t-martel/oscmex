@@ -510,3 +510,124 @@ flowchart TD
     BUFFER[AudioBuffer] --> IPP
     AVFILTER --> MKL
 ```
+
+## Decoupled Component Architecture
+
+```mermaid
+classDiagram
+    %% Interface for external control
+    class IExternalControl {
+        <<interface>>
+        +setParameter(address, args)
+        +getParameter(address, callback)
+        +applyConfiguration(config)
+        +queryDeviceState(callback)
+        +addEventCallback(callback)
+        +removeEventCallback(id)
+    }
+
+    %% Main components with loose coupling
+    AudioEngine o-- IExternalControl : uses optionally
+    OscController ..|> IExternalControl : implements
+
+    %% Configuration system
+    Configuration <-- AudioEngine : uses
+    Configuration <-- OscController : uses
+
+    %% Hardware interfaces remain unchanged
+    AsioManager <-- AudioEngine : manages
+    AudioEngine o-- "many" AudioNode : owns
+
+    %% OscController can operate independently
+    OscController --> "liblo" : uses
+
+    %% Class details
+    class AudioEngine {
+        -std::shared_ptr~IExternalControl~ m_externalControl
+        +initialize(config, externalControl)
+        +setExternalControl(control)
+        +clearExternalControl()
+        +sendExternalCommand(address, args)
+    }
+
+    class OscController {
+        +configure(configFile)
+        +configure(targetIp, targetPort, receivePort)
+        +static main(argc, argv)
+    }
+
+    class Configuration {
+        +loadAudioConfigFromFile(path)
+        +loadControlConfigFromFile(path)
+        +getAudioConfiguration()
+        +getControlConfiguration()
+    }
+```
+
+## Standalone vs Integrated Operation
+
+```mermaid
+flowchart TD
+    subgraph "Standalone Operation"
+        A[OscController Executable] --> B[OscController]
+        B --> C[liblo OSC Library]
+        B --> D[Device Communication]
+    end
+
+    subgraph "Integrated Operation"
+        E[Main Application] --> F[AudioEngine]
+        E --> G[OscController]
+        F -.-> |Optional| G
+        F --> H[AsioManager]
+        F --> I[Audio Nodes]
+        G --> J[liblo OSC Library]
+        G --> K[Device Communication]
+    end
+
+    subgraph "Shared Components"
+        L[Configuration System]
+        M[IExternalControl Interface]
+        G ..|> M
+        F --> L
+        G --> L
+    end
+```
+
+## Component Initialization Sequence
+
+```mermaid
+sequenceDiagram
+    participant Main
+    participant Engine as AudioEngine
+    participant IControl as IExternalControl
+    participant OSC as OscController (Optional)
+    participant Config as Configuration
+
+    Main->>Config: loadFromFile()
+    Config-->>Main: Configuration
+
+    Main->>Engine: create()
+
+    alt Use OSC Controller
+        Main->>OSC: create()
+        Main->>OSC: configure(ip, port)
+        OSC-->>Main: configured
+        Main->>Engine: initialize(config, oscController)
+    else Without OSC Controller
+        Main->>Engine: initialize(config, nullptr)
+    end
+
+    Engine->>Engine: setupAudio()
+    Engine->>Engine: createNodes()
+
+    opt If External Control Available
+        Engine->>IControl: applyConfiguration(config)
+        IControl-->>Engine: success/failure
+    end
+
+    Engine-->>Main: initialized
+
+    Main->>Engine: run()
+
+    Note over Engine, IControl: Engine operates with or without external control
+```
