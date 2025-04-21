@@ -10,6 +10,7 @@
 #include <mutex>
 #include <functional>
 #include <atomic>
+#include <thread>
 
 namespace AudioEngine
 {
@@ -131,6 +132,15 @@ namespace AudioEngine
 		// Process graph traversal
 		std::vector<AudioNode *> m_processOrder;
 		bool calculateProcessOrder();
+
+		// Non-ASIO processing thread
+		std::thread m_processingThread;
+		std::atomic<bool> m_stopProcessingThread;
+
+		/**
+		 * @brief Run the file processing loop for non-ASIO operation
+		 */
+		void runFileProcessingLoop();
 	};
 
 } // namespace AudioEngine

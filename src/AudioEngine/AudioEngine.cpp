@@ -158,10 +158,10 @@ namespace AudioEngine
         }
         else
         {
-            // TODO: Implement non-ASIO processing loop
-            // This would be a thread that manually processes nodes
-            // in the correct order at regular intervals
-            reportStatus("Warning", "Non-ASIO processing loop not implemented yet");
+            // Start the non-ASIO processing loop
+            m_stopProcessingThread = false;
+            m_processingThread = std::thread(&AudioEngine::runFileProcessingLoop, this);
+            reportStatus("Info", "Started non-ASIO processing thread");
         }
 
         m_running.store(true);
@@ -185,7 +185,13 @@ namespace AudioEngine
         }
         else
         {
-            // TODO: Stop the non-ASIO processing thread if it exists
+            // Stop the non-ASIO processing thread
+            if (m_processingThread.joinable())
+            {
+                m_stopProcessingThread = true;
+                m_processingThread.join();
+                reportStatus("Info", "Non-ASIO processing thread stopped");
+            }
         }
 
         // Stop all nodes
@@ -209,6 +215,13 @@ namespace AudioEngine
         if (m_running.load())
         {
             stop();
+        }
+
+        // Make sure processing thread is stopped
+        if (m_processingThread.joinable())
+        {
+            m_stopProcessingThread = true;
+            m_processingThread.join();
         }
 
         // Clear all nodes and connections
@@ -241,9 +254,70 @@ namespace AudioEngine
 
         try
         {
+            // Get all AsioSourceNodes and AsioSinkNodes
+            std::vector<AsioSourceNode *> asioSources;
+            std::vector<AsioSinkNode *> asioSinks;
+
+            for (const auto &node : m_nodes)
+            {
+                if (node->getType() == NodeType::ASIO_SOURCE)
+                {
+                    asioSources.push_back(static_cast<AsioSourceNode *>(node.get()));
+                }
+                else if (node->getType() == NodeType::ASIO_SINK)
+                {
+                    asioSinks.push_back(static_cast<AsioSinkNode *>(node.get()));
+                }
+            }
+
+            // Get ASIO buffers for all active input channels
+            std::vector<long> inputChannelIndices;
+            std::vector<void *> inputBuffers;
+
+            // Collect all input channel indices from source nodes
+            for (AsioSourceNode *node : asioSources)
+            {
+                // Implementation needed for getting channel indices from node
+                // This is a placeholder - actual implementation needs to access private members
+                // which should be done through a better interface
+
+                // For now, assume we have a getter for channel indices
+                // std::vector<long> indices = node->getChannelIndices();
+                // inputChannelIndices.insert(inputChannelIndices.end(), indices.begin(), indices.end());
+            }
+
+            // Get the input buffer pointers from ASIO
+            if (!inputChannelIndices.empty())
+            {
+                if (!m_asioManager->getBufferPointers(doubleBufferIndex, inputChannelIndices, inputBuffers))
+                {
+                    reportStatus("Error", "Failed to get ASIO input buffer pointers");
+                    return false;
+                }
+            }
+
+            // Deliver input buffers to source nodes
+            // This is a simplified approach - in reality, we might need a more sophisticated
+            // way to map buffer pointers to nodes
+
+            int bufferIndex = 0;
+            for (AsioSourceNode *node : asioSources)
+            {
+                // Again, this is a simplified approach
+                // Would need to get the channel count and slice the buffer array accordingly
+                // node->receiveAsioData(doubleBufferIndex, std::vector<void*>(inputBuffers.begin() + bufferIndex, ...));
+                // bufferIndex += node->getChannelCount();
+            }
+
             // Process all nodes in the calculated order
             for (auto node : m_processOrder)
             {
+                // Skip ASIO nodes - they're handled separately
+                if (node->getType() == NodeType::ASIO_SOURCE || node->getType() == NodeType::ASIO_SINK)
+                {
+                    continue;
+                }
+
                 // Process the node
                 if (!node->process())
                 {
@@ -280,6 +354,39 @@ namespace AudioEngine
                     }
                 }
             }
+
+            // Get ASIO buffers for all active output channels
+            std::vector<long> outputChannelIndices;
+            std::vector<void *> outputBuffers;
+
+            // Collect all output channel indices from sink nodes
+            for (AsioSinkNode *node : asioSinks)
+            {
+                // Implementation needed for getting channel indices from node
+                // Similar to the source nodes above
+            }
+
+            // Get the output buffer pointers from ASIO
+            if (!outputChannelIndices.empty())
+            {
+                if (!m_asioManager->getBufferPointers(doubleBufferIndex, outputChannelIndices, outputBuffers))
+                {
+                    reportStatus("Error", "Failed to get ASIO output buffer pointers");
+                    return false;
+                }
+            }
+
+            // Get output data from sink nodes and copy to ASIO buffers
+            bufferIndex = 0;
+            for (AsioSinkNode *node : asioSinks)
+            {
+                // Again, this is a simplified approach
+                // node->provideAsioData(doubleBufferIndex, std::vector<void*>(outputBuffers.begin() + bufferIndex, ...));
+                // bufferIndex += node->getChannelCount();
+            }
+
+            // Signal ASIO that we're done with this buffer
+            ASIOOutputReady();
 
             return true;
         }
@@ -504,6 +611,311 @@ namespace AudioEngine
         }
 
         return true;
+    }
+
+    void AudioEngine::runFileProcessingLoop()
+    {
+        reportStatus("Info", "Non-ASIO processing loop started");
+
+        // Calculate processing interval based on buffer size and sample rate
+        double framesPerSecond = m_config.getSampleRate();
+        double framesPerBuffer = m_config.getBufferSize();
+        std::chrono::microseconds processingInterval(static_cast<long long>(1000000.0 * framesPerBuffer / framesPerSecond));
+
+        reportStatus("Info", "Processing interval: " + std::to_string(processingInterval.count()) + " microseconds");
+
+        auto nextProcessingTime = std::chrono::high_resolution_clock::now();
+
+        // Get list of file source nodes
+        std::vector<FileSourceNode *> fileSourceNodes;
+        for (const auto &node : m_nodes)
+        {
+            if (node->getType() == NodeType::FILE_SOURCE)
+            {
+                fileSourceNodes.push_back(static_cast<FileSourceNode *>(node.get()));
+            }
+        }
+
+        // Main processing loop
+        while (!m_stopProcessingThread)
+        {
+            auto startTime = std::chrono::high_resolution_clock::now();
+
+            try
+            {
+                // Process all nodes in the calculated order
+                for (auto node : m_processOrder)
+                {
+                    // Skip file source nodes, as they're handled separately
+                    if (node->getType() == NodeType::FILE_SOURCE)
+                        continue;
+
+                    // Process the node
+                    if (!node->process())
+                    {
+                        reportStatus("Warning", "Node processing failed: " + node->getName());
+                        // Continue with other nodes
+                    }
+                }
+
+                // Transfer data between connected nodes
+                for (const auto &connection : m_connections)
+                {
+                    // Get output buffer from source node
+                    auto sourceNode = connection.getSourceNode();
+                    auto sinkNode = connection.getSinkNode();
+
+                    if (!sourceNode || !sinkNode)
+                    {
+                        continue;
+                    }
+
+                    int sourcePad = connection.getSourcePad();
+                    int sinkPad = connection.getSinkPad();
+
+                    // Get output buffer from source node
+                    auto buffer = sourceNode->getOutputBuffer(sourcePad);
+
+                    // Set input buffer on sink node
+                    if (buffer)
+                    {
+                        if (!sinkNode->setInputBuffer(buffer, sinkPad))
+                        {
+                            reportStatus("Warning", "Failed to transfer buffer from " +
+                                                        sourceNode->getName() + " to " + sinkNode->getName());
+                        }
+                    }
+                }
+
+                // Check if any file source is at end of file
+                bool allDone = !fileSourceNodes.empty();
+                for (auto fileSource : fileSourceNodes)
+                {
+                    if (!fileSource->isEndOfFile())
+                    {
+                        allDone = false;
+                        break;
+                    }
+                }
+
+                if (allDone)
+                {
+                    reportStatus("Info", "All file sources reached end of file");
+                    break;
+                }
+            }
+            catch (const std::exception &e)
+            {
+                reportStatus("Error", "Exception in processing loop: " + std::string(e.what()));
+                // Continue processing
+            }
+            catch (...)
+            {
+                reportStatus("Error", "Unknown exception in processing loop");
+                // Continue processing
+            }
+
+            // Calculate elapsed time and sleep if needed
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+
+            // Update next processing time
+            nextProcessingTime += processingInterval;
+
+            // If we're ahead of schedule, sleep until the next processing time
+            if (endTime < nextProcessingTime)
+            {
+                std::this_thread::sleep_until(nextProcessingTime);
+            }
+            else
+            {
+                // We're behind schedule, log a warning and adjust the next processing time
+                reportStatus("Warning", "Processing took longer than interval: " +
+                                            std::to_string(elapsedTime.count()) + " microseconds");
+                nextProcessingTime = endTime + processingInterval;
+            }
+        }
+
+        reportStatus("Info", "Non-ASIO processing loop ended");
+    }
+
+    /**
+     * @brief Configure ASIO using the device's default settings
+     *
+     * This method initializes the ASIO device with its preferred settings,
+     * and creates a default configuration with the first stereo input and
+     * stereo output channels.
+     *
+     * @param deviceName Name of the ASIO device to use
+     * @return true if configuration was successful
+     */
+    bool AudioEngine::configureAsioDefaults(const std::string &deviceName)
+    {
+        if (!m_asioManager)
+        {
+            m_asioManager = std::make_unique<AsioManager>();
+        }
+
+        // Load the selected driver
+        if (!m_asioManager->loadDriver(deviceName))
+        {
+            reportStatus("Error", "Failed to load ASIO driver: " + deviceName);
+            return false;
+        }
+
+        // Initialize the device with its default settings
+        // Pass 0 for preferredSampleRate and preferredBufferSize to use the device defaults
+        if (!m_asioManager->initDevice(0, 0))
+        {
+            reportStatus("Error", "Failed to initialize ASIO device");
+            return false;
+        }
+
+        // Get the device's default configuration
+        double sampleRate = m_asioManager->getSampleRate();
+        long bufferSize = m_asioManager->getPreferredBufferSize();
+
+        // Get available channels
+        long inputChannelCount = m_asioManager->getInputChannelCount();
+        long outputChannelCount = m_asioManager->getOutputChannelCount();
+
+        // Prepare default channel configuration:
+        // Use first two input channels and first two output channels if available
+        std::vector<long> inputChannels;
+        std::vector<long> outputChannels;
+
+        // Add up to 2 input channels
+        for (long i = 0; i < std::min(2L, inputChannelCount); i++)
+        {
+            inputChannels.push_back(i);
+        }
+
+        // Add up to 2 output channels
+        for (long i = 0; i < std::min(2L, outputChannelCount); i++)
+        {
+            outputChannels.push_back(i);
+        }
+
+        // Create buffers for the selected channels
+        if (!m_asioManager->createBuffers(inputChannels, outputChannels))
+        {
+            reportStatus("Error", "Failed to create ASIO buffers");
+            return false;
+        }
+
+        // Configure the audio engine with the ASIO device's settings
+        bool success = configure(sampleRate, bufferSize);
+        if (!success)
+        {
+            reportStatus("Error", "Failed to configure audio engine with ASIO settings");
+            return false;
+        }
+
+        // Set up the ASIO callback
+        m_asioManager->setCallback([this](long doubleBufferIndex)
+                                   { processAsioBlock(doubleBufferIndex, true); });
+
+        // Create default ASIO nodes based on the configured channels
+        createDefaultAsioNodes(inputChannels, outputChannels);
+
+        reportStatus("Info", "ASIO configured with device defaults: " +
+                                 std::to_string(sampleRate) + " Hz, " +
+                                 std::to_string(bufferSize) + " samples buffer size");
+
+        return true;
+    }
+
+    /**
+     * @brief Create default ASIO source and sink nodes
+     *
+     * Creates ASIO nodes with default names for the specified channels
+     *
+     * @param inputChannels Vector of input channel indices
+     * @param outputChannels Vector of output channel indices
+     */
+    void AudioEngine::createDefaultAsioNodes(const std::vector<long> &inputChannels, const std::vector<long> &outputChannels)
+    {
+        // Get channel names for better node labeling
+        auto inputChannelNames = m_asioManager->getInputChannelNames();
+        auto outputChannelNames = m_asioManager->getOutputChannelNames();
+
+        // Create an ASIO source node if we have input channels
+        if (!inputChannels.empty())
+        {
+            std::string nodeName = "AsioInput";
+            std::map<std::string, std::string> sourceParams;
+
+            // Add channel indices to the parameters
+            std::string channelIndices;
+            for (size_t i = 0; i < inputChannels.size(); i++)
+            {
+                if (i > 0)
+                    channelIndices += ",";
+                channelIndices += std::to_string(inputChannels[i]);
+
+                // Add a readable name if available
+                if (inputChannels[i] < inputChannelNames.size())
+                {
+                    nodeName = "AsioInput_" + inputChannelNames[inputChannels[i]];
+                    break; // Just use the first channel name to keep it simple
+                }
+            }
+
+            sourceParams["channels"] = channelIndices;
+
+            // Create the node
+            auto sourceNode = std::make_shared<AsioSourceNode>(nodeName, this, m_asioManager.get());
+
+            // Configure the node and add it to the engine
+            if (sourceNode->configure(sourceParams, m_sampleRate, m_bufferSize, m_sampleFormat, m_channelLayout))
+            {
+                addNode(sourceNode);
+                reportStatus("Info", "Created ASIO source node: " + nodeName);
+            }
+            else
+            {
+                reportStatus("Warning", "Failed to configure ASIO source node");
+            }
+        }
+
+        // Create an ASIO sink node if we have output channels
+        if (!outputChannels.empty())
+        {
+            std::string nodeName = "AsioOutput";
+            std::map<std::string, std::string> sinkParams;
+
+            // Add channel indices to the parameters
+            std::string channelIndices;
+            for (size_t i = 0; i < outputChannels.size(); i++)
+            {
+                if (i > 0)
+                    channelIndices += ",";
+                channelIndices += std::to_string(outputChannels[i]);
+
+                // Add a readable name if available
+                if (outputChannels[i] < outputChannelNames.size())
+                {
+                    nodeName = "AsioOutput_" + outputChannelNames[outputChannels[i]];
+                    break; // Just use the first channel name to keep it simple
+                }
+            }
+
+            sinkParams["channels"] = channelIndices;
+
+            // Create the node
+            auto sinkNode = std::make_shared<AsioSinkNode>(nodeName, this, m_asioManager.get());
+
+            // Configure the node and add it to the engine
+            if (sinkNode->configure(sinkParams, m_sampleRate, m_bufferSize, m_sampleFormat, m_channelLayout))
+            {
+                addNode(sinkNode);
+                reportStatus("Info", "Created ASIO sink node: " + nodeName);
+            }
+            else
+            {
+                reportStatus("Warning", "Failed to configure ASIO sink node");
+            }
+        }
     }
 
 } // namespace AudioEngine

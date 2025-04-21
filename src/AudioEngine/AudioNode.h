@@ -17,10 +17,11 @@ namespace AudioEngine
 	 */
 	enum class NodeType
 	{
-		ASIO_SOURCE,
-		ASIO_SINK,
+		UNKNOWN,
 		FILE_SOURCE,
 		FILE_SINK,
+		ASIO_SOURCE, // New node type for ASIO input
+		ASIO_SINK,	 // New node type for ASIO output
 		FFMPEG_PROCESSOR
 	};
 
