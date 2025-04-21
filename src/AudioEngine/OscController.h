@@ -433,6 +433,18 @@ namespace AudioEngine
 		 */
 		static int main(int argc, char *argv[]);
 
+		/**
+		 * @brief Query a single parameter value from the device
+		 *
+		 * This is a synchronous method that sends a query and waits for the response
+		 * with a timeout. It's used by DeviceStateManager for state queries.
+		 *
+		 * @param address OSC address to query
+		 * @param value Reference to store the returned value
+		 * @return true if successful, false otherwise
+		 */
+		bool querySingleValue(const std::string &address, float &value);
+
 	private:
 		/**
 		 * @brief Handle an incoming OSC message (liblo callback)

@@ -537,108 +537,93 @@ namespace AudioEngine
 		return true;
 	}
 
-	bool OscController::querySingleValue(const std::string &address, float &outValue, int timeoutMs)
+	bool OscController::querySingleValue(const std::string &address, float &value)
 	{
 		if (!m_configured || !m_oscAddress)
 		{
-			std::cerr << "OscController: OSC address not configured" << std::endl;
+			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
 			return false;
 		}
 
-		if (!m_oscServer)
+		// Create a unique response identifier for this query
+		std::string responseKey = address + "_" + std::to_string(std::rand());
+
+		// Set up tracking for the response
+		m_pendingResponses[responseKey] = false;
+
+		// Set up a temporary callback to handle the response
+		auto previousCallback = m_messageCallback;
+
+		// Keep track of the result
+		std::atomic<bool> gotResponse(false);
+		std::atomic<float> responseValue(0.0f);
+
+		// Set a temporary callback to capture the response
+		setMessageCallback([&, responseKey, address](const std::string &path, const std::vector<std::any> &args)
+						   {
+        // Check if this is the response we're waiting for
+        if (path == address && !args.empty()) {
+            try {
+                // Extract the value from the first argument
+                if (args[0].type() == typeid(float)) {
+                    responseValue = std::any_cast<float>(args[0]);
+                    gotResponse = true;
+                    m_pendingResponses[responseKey] = true;
+                }
+                else if (args[0].type() == typeid(int)) {
+                    responseValue = static_cast<float>(std::any_cast<int>(args[0]));
+                    gotResponse = true;
+                    m_pendingResponses[responseKey] = true;
+                }
+                else if (args[0].type() == typeid(bool)) {
+                    responseValue = std::any_cast<bool>(args[0]) ? 1.0f : 0.0f;
+                    gotResponse = true;
+                    m_pendingResponses[responseKey] = true;
+                }
+            }
+            catch (const std::bad_any_cast &) {
+                // Ignore type conversion errors
+            }
+        }
+
+        // Forward to the original callback if set
+        if (previousCallback) {
+            previousCallback(path, args);
+        } });
+
+		// Send the query (for most RME devices, just sending the address will trigger a response)
+		bool sentOk = sendCommand(address, {});
+
+		if (!sentOk)
 		{
-			std::cerr << "OscController: OSC server not started, cannot receive responses" << std::endl;
-			return false;
-		}
-
-		// Create a promise/future for the response value
-		std::promise<std::optional<float>> responsePromise;
-		std::future<std::optional<float>> responseFuture = responsePromise.get_future();
-
-		// Set up a callback to handle the response
-		{
-			std::lock_guard<std::mutex> lock(m_callbackMutex);
-			m_parameterCallbacks[address] = [&responsePromise](bool success, const std::vector<std::any> &args)
-			{
-				if (success && !args.empty())
-				{
-					try
-					{
-						// Try to extract a float value from the first argument
-						if (args[0].type() == typeid(float))
-						{
-							responsePromise.set_value(std::any_cast<float>(args[0]));
-						}
-						else if (args[0].type() == typeid(int))
-						{
-							responsePromise.set_value(static_cast<float>(std::any_cast<int>(args[0])));
-						}
-						else if (args[0].type() == typeid(double))
-						{
-							responsePromise.set_value(static_cast<float>(std::any_cast<double>(args[0])));
-						}
-						else
-						{
-							// Unsupported type
-							responsePromise.set_value(std::nullopt);
-						}
-					}
-					catch (const std::exception &e)
-					{
-						std::cerr << "OscController: Error parsing response value: " << e.what() << std::endl;
-						responsePromise.set_value(std::nullopt);
-					}
-				}
-				else
-				{
-					// No data or failure
-					responsePromise.set_value(std::nullopt);
-				}
-			};
-		}
-
-		// Mark the address as pending a response
-		m_pendingResponses[address].store(false);
-
-		// Send query command (empty message to request current value)
-		bool sendResult = sendCommand(address, {});
-		if (!sendResult)
-		{
-			// If sending fails, remove the callback and return error
-			std::lock_guard<std::mutex> lock(m_callbackMutex);
-			m_parameterCallbacks.erase(address);
-			m_pendingResponses.erase(address);
+			// Restore original callback
+			setMessageCallback(previousCallback);
+			m_pendingResponses.erase(responseKey);
 			return false;
 		}
 
 		// Wait for the response with timeout
-		std::future_status status = responseFuture.wait_for(std::chrono::milliseconds(timeoutMs));
+		const int timeoutMs = 500; // 500ms timeout
+		const int sleepIntervalMs = 10;
+		int elapsedMs = 0;
+
+		while (!gotResponse && elapsedMs < timeoutMs)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(sleepIntervalMs));
+			elapsedMs += sleepIntervalMs;
+		}
+
+		// Restore original callback
+		setMessageCallback(previousCallback);
 
 		// Clean up
-		m_pendingResponses.erase(address);
+		m_pendingResponses.erase(responseKey);
 
+		// Check if we got a response
+		if (gotResponse)
 		{
-			std::lock_guard<std::mutex> lock(m_callbackMutex);
-			m_parameterCallbacks.erase(address);
-		}
-
-		// Check result
-		if (status == std::future_status::ready)
-		{
-			std::optional<float> result = responseFuture.get();
-			if (result.has_value())
-			{
-				outValue = result.value();
-				return true;
-			}
-		}
-		else if (status == std::future_status::timeout)
-		{
-			std::cerr << "OscController: Timeout waiting for response to " << address << std::endl;
-		}
-		else
-		{
-			std::cerr << "OscController: Error waiting for response to " << address << std::endl;
+			value = responseValue;
+			return true;
 		}
 
 		return false;

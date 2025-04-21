@@ -402,11 +402,72 @@ namespace AudioEngine
                 // Allow time for the device to process the refresh
                 std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-                // TODO: Query individual parameters (volumes, mutes, etc)
-                // This would need an enhanced OscController with full query support
-                // For now, we'll simulate success
+                // Prepare the list of parameters to query
+                std::vector<std::string> paramAddresses;
+                const int maxChannels = 16; // Adjust based on device capabilities
 
-                callback(true, "Device state queried successfully");
+                // Add inputs, playbacks, and outputs volume/mute parameters
+                for (int chType = 0; chType < 3; chType++) {
+                    std::string typePrefix;
+                    switch (chType) {
+                        case 0: typePrefix = "/input"; break;
+                        case 1: typePrefix = "/playback"; break;
+                        case 2: typePrefix = "/output"; break;
+                    }
+
+                    for (int ch = 1; ch <= maxChannels; ch++) {
+                        paramAddresses.push_back("/" + std::to_string(ch) + typePrefix + "/volume");
+                        paramAddresses.push_back("/" + std::to_string(ch) + typePrefix + "/mute");
+                    }
+                }
+
+                // Add matrix routing parameters
+                for (int output = 1; output <= maxChannels; output++) {
+                    for (int input = 1; input <= maxChannels; input++) {
+                        paramAddresses.push_back("/matrix/volA/" + std::to_string(input) + "/" + std::to_string(output));
+                    }
+                }
+
+                // Add global parameters
+                paramAddresses.push_back("/main/volume");
+                paramAddresses.push_back("/main/mute");
+
+                // Create a Configuration object to hold the results
+                Configuration config;
+                config.asioDeviceName = "RME Device"; // Placeholder
+                config.rmeOscIp = controller->getTargetIp();
+                config.rmeOscPort = controller->getTargetPort();
+
+                // Query all parameters
+                int totalQueries = paramAddresses.size();
+                int completedQueries = 0;
+                int successfulQueries = 0;
+
+                for (const auto& address : paramAddresses) {
+                    float value = 0.0f;
+                    bool success = controller->querySingleValue(address, value);
+
+                    if (success) {
+                        successfulQueries++;
+
+                        // Create command config
+                        RmeOscCommandConfig cmd;
+                        cmd.address = address;
+                        cmd.args.push_back(std::any(value));
+                        config.rmeCommands.push_back(cmd);
+                    }
+
+                    completedQueries++;
+                    // Add small delay between queries to avoid overwhelming the device
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                }
+
+                bool overallSuccess = (successfulQueries > 0);
+                std::string resultMessage = "Device state query completed. " +
+                                            std::to_string(successfulQueries) + "/" +
+                                            std::to_string(totalQueries) + " parameters retrieved successfully.";
+
+                callback(overallSuccess, resultMessage);
             }
             catch (const std::exception& e)
             {
@@ -449,19 +510,85 @@ namespace AudioEngine
                     {
             try
             {
-                // Query the device state
-                Configuration config = deviceStateToConfig(
-                    "RME Device", // TODO: Get actual device name
-                    controller->getTargetIp(),
-                    controller->getTargetPort()
-                );
+                // Request a refresh to ensure we get current state
+                controller->requestRefresh();
+
+                // Allow time for the device to process the refresh
+                std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+                // Prepare the list of parameters to query
+                std::vector<std::string> paramAddresses;
+                const int maxChannels = 16; // Adjust based on device capabilities
+
+                // Add inputs, playbacks, and outputs volume/mute parameters
+                for (int chType = 0; chType < 3; chType++) {
+                    std::string typePrefix;
+                    switch (chType) {
+                        case 0: typePrefix = "/input"; break;
+                        case 1: typePrefix = "/playback"; break;
+                        case 2: typePrefix = "/output"; break;
+                    }
+
+                    for (int ch = 1; ch <= maxChannels; ch++) {
+                        paramAddresses.push_back("/" + std::to_string(ch) + typePrefix + "/volume");
+                        paramAddresses.push_back("/" + std::to_string(ch) + typePrefix + "/mute");
+                    }
+                }
+
+                // Add matrix routing parameters
+                for (int output = 1; output <= maxChannels; output++) {
+                    for (int input = 1; input <= maxChannels; input++) {
+                        paramAddresses.push_back("/matrix/volA/" + std::to_string(input) + "/" + std::to_string(output));
+                    }
+                }
+
+                // Add global parameters
+                paramAddresses.push_back("/main/volume");
+                paramAddresses.push_back("/main/mute");
+
+                // Create a Configuration object to hold the results
+                Configuration config;
+                config.asioDeviceName = "RME Device"; // Placeholder - would ideally query this
+                config.rmeOscIp = controller->getTargetIp();
+                config.rmeOscPort = controller->getTargetPort();
+
+                // Query all parameters
+                int totalQueries = paramAddresses.size();
+                int completedQueries = 0;
+                int successfulQueries = 0;
+                std::vector<RmeOscCommandConfig> commands;
+
+                for (const auto& address : paramAddresses) {
+                    float value = 0.0f;
+                    bool success = controller->querySingleValue(address, value);
+
+                    if (success) {
+                        successfulQueries++;
+
+                        // Create command config
+                        RmeOscCommandConfig cmd;
+                        cmd.address = address;
+                        cmd.args.push_back(std::any(value));
+                        commands.push_back(cmd);
+                    }
+
+                    completedQueries++;
+                    // Add small delay between queries to avoid overwhelming the device
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                }
+
+                // Store the commands in the configuration
+                config.rmeCommands = commands;
 
                 // Save to file
-                bool success = config.saveToFile(filePath);
+                bool saveSuccess = config.saveToFile(filePath);
 
-                if (success)
+                if (saveSuccess)
                 {
-                    callback(true, "Device state saved to " + filePath);
+                    std::string resultMessage = "Device state saved to " + filePath + ". " +
+                                                std::to_string(successfulQueries) + "/" +
+                                                std::to_string(totalQueries) + " parameters retrieved.";
+                    callback(true, resultMessage);
                 }
                 else
                 {
@@ -1098,6 +1225,42 @@ namespace AudioEngine
     void Configuration::clearCommands()
     {
         m_commands.clear();
+    }
+
+    // Helper methods for the Configuration class
+    void Configuration::setChannelMute(int channel, const std::string &type, bool mute)
+    {
+        std::string address = "/" + std::to_string(channel) + "/" + type + "/mute";
+        std::vector<std::any> args = {std::any(mute ? 1.0f : 0.0f)};
+        addCommand(address, args);
+    }
+
+    void Configuration::setChannelVolume(int channel, const std::string &type, float normalizedValue)
+    {
+        std::string address = "/" + std::to_string(channel) + "/" + type + "/volume";
+        std::vector<std::any> args = {std::any(normalizedValue)};
+        addCommand(address, args);
+    }
+
+    void Configuration::setChannelPhase(int channel, const std::string &type, bool phase)
+    {
+        std::string address = "/" + std::to_string(channel) + "/" + type + "/phase";
+        std::vector<std::any> args = {std::any(phase ? 1.0f : 0.0f)};
+        addCommand(address, args);
+    }
+
+    void Configuration::setChannelSolo(int channel, const std::string &type, bool solo)
+    {
+        std::string address = "/" + std::to_string(channel) + "/" + type + "/solo";
+        std::vector<std::any> args = {std::any(solo ? 1.0f : 0.0f)};
+        addCommand(address, args);
+    }
+
+    void Configuration::setPhantomPower(int channel, bool enabled)
+    {
+        std::string address = "/" + std::to_string(channel) + "/input/phantom";
+        std::vector<std::any> args = {std::any(enabled ? 1.0f : 0.0f)};
+        addCommand(address, args);
     }
 
     // DeviceStateManager implementation
