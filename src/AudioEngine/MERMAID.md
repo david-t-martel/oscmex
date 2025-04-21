@@ -356,37 +356,52 @@ sequenceDiagram
     Config-->>Main: Configuration
 
     Main->>Engine: initialize(config)
-    Engine->>Engine: createAndConfigureNodes()
 
-    Engine->>FFmpeg: Initialize from local source
-    FFmpeg-->>Engine: FFmpeg initialized
+    %% Phase 1: Hardware Connection & Auto-configuration
+    rect rgb(230, 240, 255)
+        Note over Engine,ASIO: Phase 1: Hardware Connection & Auto-configuration
 
-    loop For each node in config
-        Engine->>Engine: Create node of appropriate type
-        Engine->>Nodes: configure(params, sampleRate, bufferSize, format, layout)
+        Engine->>FFmpeg: Initialize from local source
+        FFmpeg-->>Engine: FFmpeg initialized
+
+        Engine->>ASIO: loadDriver(deviceName)
+        ASIO-->>Engine: driver loaded
+
+        Engine->>ASIO: initDevice(preferredSampleRate, preferredBufferSize)
+
+        ASIO->>ASIO: Query driver for optimal settings
+        ASIO-->>Engine: Return actual sample rate, buffer size, and capabilities
+
+        Engine->>Engine: Update configuration with device capabilities
+
+        Engine->>ASIO: createBuffers(inputChannels, outputChannels)
+        ASIO-->>Engine: buffers created
     end
 
-    Engine->>OSC: configure(ip, port)
-    OSC-->>Engine: configured
+    %% Phase 2: Create Engine Components and Apply Device-specific Settings
+    rect rgb(240, 230, 255)
+        Note over Engine,OSC: Phase 2: Create Engine Components and Apply Device-specific Settings
 
-    Engine->>ASIO: loadDriver(deviceName)
-    ASIO-->>Engine: driver loaded
+        Engine->>Engine: createAndConfigureNodes()
 
-    Engine->>ASIO: initDevice(sampleRate, bufferSize)
-    ASIO-->>Engine: device initialized
+        loop For each node in config
+            Engine->>Engine: Create node of appropriate type
+            Engine->>Nodes: configure(params, sampleRate, bufferSize, format, layout)
+        end
 
-    Engine->>Engine: setupConnections()
+        Engine->>Engine: setupConnections()
 
-    loop For each connection in config
-        Engine->>Engine: Create Connection(sourceNode, sourcePad, sinkNode, sinkPad)
+        loop For each connection in config
+            Engine->>Engine: Create Connection(sourceNode, sourcePad, sinkNode, sinkPad)
+        end
+
+        Engine->>OSC: configure(ip, port)
+        OSC-->>Engine: configured
+
+        Engine->>OSC: applyConfiguration(config)
+        OSC->>OSC: sendBatch(commands)
+        OSC-->>Engine: configuration applied
     end
-
-    Engine->>ASIO: createBuffers(inputChannels, outputChannels)
-    ASIO-->>Engine: buffers created
-
-    Engine->>OSC: applyConfiguration(config)
-    OSC->>OSC: sendBatch(commands)
-    OSC-->>Engine: configuration applied
 
     Engine-->>Main: initialization complete
 

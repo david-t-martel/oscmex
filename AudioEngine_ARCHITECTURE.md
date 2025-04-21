@@ -76,6 +76,38 @@ This design facilitates flexible routing between hardware I/O (via ASIO), file I
         * `libavutil`: Common utility functions
         * `libswresample`: Sample format conversion and resampling
 
+## Dual-Phase Device Configuration
+
+The system implements a two-phase device configuration approach:
+
+1. **Hardware Connection & Auto-Configuration Phase**:
+   * When the engine starts, it first connects to the specified audio device via `AsioManager`
+   * Once connected, `AsioManager` queries the device driver for optimal settings:
+     * Available sample rates
+     * Optimal/preferred buffer sizes
+     * Channel count and names
+     * Device capabilities
+   * This information is used to configure the engine's audio processing pipeline:
+     * Setting the appropriate sample rate for all nodes
+     * Configuring buffer sizes based on hardware capabilities
+     * Creating appropriate audio format converters between nodes
+   * The `AudioEngine::autoConfigureAsio()` method handles this auto-configuration when enabled
+
+2. **Device-Specific Configuration Phase**:
+   * After hardware connection and auto-configuration, device-specific settings are applied via OSC
+   * The `OscController` sends commands defined in the `Configuration` to configure:
+     * Channel volumes, mutes, and other parameters
+     * Matrix routing between inputs and outputs
+     * EQ settings, dynamics, and effects
+     * Global device settings (main volume, dim, mono, etc.)
+   * These settings can be applied from a saved configuration file or built programmatically
+   * The `AudioEngine::sendOscCommands()` method handles this phase
+
+This approach allows the engine to:
+1. First establish a working connection to the hardware with optimal settings
+2. Then apply user or application-specific configurations to the device
+3. Support querying the current state through `DeviceStateManager` for persistence or UI feedback
+
 ## Configuration System
 
 The JSON configuration system has been enhanced to provide:
@@ -103,6 +135,7 @@ The JSON configuration system has been enhanced to provide:
     * `main` parses command-line arguments and/or loads a JSON configuration file.
     * `ConfigurationParser` creates a `Configuration` object with nodes, connections, and OSC commands.
     * `AudioEngine` initializes based on the `Configuration`.
+    * `AudioEngine` connects to the audio device and auto-configures based on hardware capabilities.
     * `OscController` sends commands to configure the RME device according to the loaded settings.
     * `AudioEngine` creates all nodes and connections for the processing graph.
 
