@@ -1,0 +1,11 @@
+{
+  "asioAutoConfig": true,
+  "asioDeviceName": "",
+  "nodes": [],
+  "connections": [],
+  "oscEnabled": true,
+  "oscServerPort": 9000,
+  "oscClientAddress": "127.0.0.1",
+  "oscClientPort": 8000,
+  "oscCommands": []
+}

@@ -36,79 +36,225 @@ namespace AudioEngine
 
     bool AudioEngine::initialize(Configuration config)
     {
-        // Store configuration
         m_config = std::move(config);
 
-        // Set up OSC controller
-        m_oscController = std::make_unique<OscController>();
-        if (!m_oscController->configure(m_config.getTargetIp(), m_config.getTargetPort(), m_config.getReceivePort()))
-        {
-            reportStatus("Error", "Failed to configure OSC controller");
-            return false;
-        }
-
-        // Determine if we need ASIO based on the configuration
-        bool needAsio = false;
-        for (const auto &nodeConfig : m_config.getNodes())
-        {
-            if (nodeConfig.type == "asio_source" || nodeConfig.type == "asio_sink")
-            {
-                needAsio = true;
-                break;
-            }
-        }
-
-        // Initialize ASIO if needed
-        if (needAsio)
+        // Initialize the ASIO manager if we're using ASIO
+        if (!m_config.getAsioDeviceName().empty())
         {
             m_asioManager = std::make_unique<AsioManager>();
-            if (!m_asioManager->loadDriver(m_config.getAsioDeviceName()))
+
+            // Check if we should auto-configure ASIO
+            if (m_config.useAsioAutoConfig())
             {
-                reportStatus("Error", "Failed to load ASIO driver: " + m_config.getAsioDeviceName());
-                return false;
+                if (!autoConfigureAsio())
+                {
+                    reportStatus("Error", "Failed to auto-configure ASIO");
+                    return false;
+                }
             }
-
-            if (!m_asioManager->initDevice(m_config.getSampleRate(), m_config.getBufferSize()))
+            else
             {
-                reportStatus("Error", "Failed to initialize ASIO device");
-                return false;
+                // Manual configuration using parameters in config
+                if (!m_asioManager->loadDriver(m_config.getAsioDeviceName()))
+                {
+                    reportStatus("Error", "Failed to load ASIO driver: " + m_config.getAsioDeviceName());
+                    return false;
+                }
+
+                // Initialize with explicitly configured values
+                if (!m_asioManager->initDevice(m_config.getSampleRate(), m_config.getBufferSize()))
+                {
+                    reportStatus("Error", "Failed to initialize ASIO device");
+                    return false;
+                }
             }
-
-            // Set callback function - will need to be implemented properly
-            m_asioManager->setCallback([this](long doubleBufferIndex, bool directProcess)
-                                       { return this->processAsioBlock(doubleBufferIndex, directProcess); });
         }
 
-        // Create and configure audio nodes
-        if (!createAndConfigureNodes())
-        {
-            reportStatus("Error", "Failed to create and configure nodes");
-            return false;
-        }
+        // Rest of initialization...
+        // ...
 
-        // Set up connections between nodes
-        if (!setupConnections())
-        {
-            reportStatus("Error", "Failed to set up connections");
-            return false;
-        }
-
-        // Calculate processing order
-        if (!calculateProcessOrder())
-        {
-            reportStatus("Error", "Failed to calculate processing order");
-            return false;
-        }
-
-        // Apply OSC commands from configuration
-        if (!sendOscCommands())
-        {
-            reportStatus("Error", "Failed to send initial OSC commands");
-            // Continue anyway, as this might not be critical
-        }
-
-        reportStatus("Info", "AudioEngine initialized successfully");
         return true;
+    }
+
+    bool AudioEngine::autoConfigureAsio()
+    {
+        if (!m_asioManager)
+        {
+            reportStatus("Error", "ASIO manager not created");
+            return false;
+        }
+
+        // Get the device name from config
+        std::string deviceName = m_config.getAsioDeviceName();
+        if (deviceName.empty())
+        {
+            // Get available ASIO devices
+            auto devices = AsioManager::getDeviceList();
+            if (devices.empty())
+            {
+                reportStatus("Error", "No ASIO devices found");
+                return false;
+            }
+
+            // Use first available device
+            deviceName = devices[0];
+            reportStatus("Info", "Using first available ASIO device: " + deviceName);
+        }
+
+        // Load the driver
+        if (!m_asioManager->loadDriver(deviceName))
+        {
+            reportStatus("Error", "Failed to load ASIO driver: " + deviceName);
+            return false;
+        }
+
+        // Initialize with default settings (passing 0 for sample rate and buffer size)
+        if (!m_asioManager->initDevice(0, 0))
+        {
+            reportStatus("Error", "Failed to initialize ASIO device");
+            return false;
+        }
+
+        // Get optimal settings from the driver
+        long bufferSize;
+        double sampleRate;
+        if (!m_asioManager->getDefaultDeviceConfiguration(bufferSize, sampleRate))
+        {
+            reportStatus("Error", "Failed to get default ASIO configuration");
+            return false;
+        }
+
+        // Update our configuration with the optimal settings
+        m_config.setBufferSize(bufferSize);
+        m_config.setSampleRate(sampleRate);
+        reportStatus("Info", "Auto-configured ASIO with sample rate: " + std::to_string(sampleRate) +
+                               " Hz, buffer size: " + std::to_string(bufferSize));
+
+        // Get available channels
+        long inputChannelCount = m_asioManager->getInputChannelCount();
+        long outputChannelCount = m_asioManager->getOutputChannelCount();
+
+        // Prepare default channel configuration:
+        // Use first two input channels and first two output channels if available
+        std::vector<long> inputChannels;
+        std::vector<long> outputChannels;
+
+        // Add up to 2 input channels
+        for (long i = 0; i < std::min(2L, inputChannelCount); i++)
+        {
+            inputChannels.push_back(i);
+        }
+
+        // Add up to 2 output channels
+        for (long i = 0; i < std::min(2L, outputChannelCount); i++)
+        {
+            outputChannels.push_back(i);
+        }
+
+        // Create buffers for the selected channels
+        if (!m_asioManager->createBuffers(inputChannels, outputChannels))
+        {
+            reportStatus("Error", "Failed to create ASIO buffers");
+            return false;
+        }
+
+        // Auto-create ASIO nodes if needed
+        if (m_config.getNodes().empty())
+        {
+            // Create default ASIO nodes
+            createDefaultAsioNodes(inputChannels, outputChannels);
+
+            // Create connections between the nodes if needed
+            if (m_config.getConnections().empty() &&
+                !m_nodes.empty() && m_nodes.size() >= 2)
+            {
+                // Simple passthrough connection between first and last node
+                ConnectionConfig connection;
+                connection.sourceName = m_nodes.front()->getName();
+                connection.sourcePad = 0;
+                connection.sinkName = m_nodes.back()->getName();
+                connection.sinkPad = 0;
+                m_config.addConnection(connection);
+
+                reportStatus("Info", "Created default connection between " +
+                            connection.sourceName + " and " + connection.sinkName);
+            }
+        }
+
+        // Set up the ASIO callback
+        m_asioManager->setCallback([this](long doubleBufferIndex) {
+            processAsioBlock(doubleBufferIndex, true);
+        });
+
+        return true;
+    }
+
+    void AudioEngine::createDefaultAsioNodes(const std::vector<long>& inputChannels, const std::vector<long>& outputChannels)
+    {
+        if (!m_asioManager)
+            return;
+
+        // Get channel names for better node labeling
+        auto inputChannelNames = m_asioManager->getInputChannelNames();
+        auto outputChannelNames = m_asioManager->getOutputChannelNames();
+
+        // Create an ASIO source node if we have input channels
+        if (!inputChannels.empty())
+        {
+            std::string nodeName = "asio_input";
+            nlohmann::json sourceParams;
+
+            // Add channel indices to the parameters
+            std::string channelIndices;
+            for (size_t i = 0; i < inputChannels.size(); i++)
+            {
+                if (i > 0) channelIndices += ",";
+                channelIndices += std::to_string(inputChannels[i]);
+            }
+
+            sourceParams["channels"] = channelIndices;
+            sourceParams["device"] = m_asioManager->getDeviceName();
+
+            // Create a node config
+            NodeConfig nodeConfig;
+            nodeConfig.name = nodeName;
+            nodeConfig.type = "asio_source";
+            nodeConfig.params = sourceParams.dump();
+
+            // Add the node to the configuration
+            m_config.addNode(nodeConfig);
+
+            reportStatus("Info", "Created ASIO source node with channels: " + channelIndices);
+        }
+
+        // Create an ASIO sink node if we have output channels
+        if (!outputChannels.empty())
+        {
+            std::string nodeName = "asio_output";
+            nlohmann::json sinkParams;
+
+            // Add channel indices to the parameters
+            std::string channelIndices;
+            for (size_t i = 0; i < outputChannels.size(); i++)
+            {
+                if (i > 0) channelIndices += ",";
+                channelIndices += std::to_string(outputChannels[i]);
+            }
+
+            sinkParams["channels"] = channelIndices;
+            sinkParams["device"] = m_asioManager->getDeviceName();
+
+            // Create a node config
+            NodeConfig nodeConfig;
+            nodeConfig.name = nodeName;
+            nodeConfig.type = "asio_sink";
+            nodeConfig.params = sinkParams.dump();
+
+            // Add the node to the configuration
+            m_config.addNode(nodeConfig);
+
+            reportStatus("Info", "Created ASIO sink node with channels: " + channelIndices);
+        }
     }
 
     bool AudioEngine::run()

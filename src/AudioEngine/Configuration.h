@@ -302,6 +302,34 @@ namespace AudioEngine
 		 */
 		long getBufferSize() const { return m_bufferSize; }
 
+		/**
+		 * @brief Get whether to use auto-configuration for ASIO
+		 *
+		 * @return true if auto-configuration should be used
+		 */
+		bool useAsioAutoConfig() const { return m_useAsioAutoConfig; }
+
+		/**
+		 * @brief Set whether to use auto-configuration for ASIO
+		 *
+		 * @param value true to enable auto-configuration
+		 */
+		void setUseAsioAutoConfig(bool value) { m_useAsioAutoConfig = value; }
+
+		/**
+		 * @brief Get the name of the ASIO device to use
+		 *
+		 * @return ASIO device name
+		 */
+		std::string getAsioDeviceName() const { return m_asioDeviceName; }
+
+		/**
+		 * @brief Set the name of the ASIO device to use
+		 *
+		 * @param name ASIO device name
+		 */
+		void setAsioDeviceName(const std::string &name) { m_asioDeviceName = name; }
+
 	private:
 		DeviceType m_deviceType;					 // Type of device for this configuration
 		std::string m_targetIp;						 // Target IP address
@@ -313,6 +341,7 @@ namespace AudioEngine
 		long m_bufferSize;							 // Buffer size in samples
 		std::vector<NodeConfig> m_nodes;			 // Audio processing nodes
 		std::vector<ConnectionConfig> m_connections; // Connections between nodes
+		bool m_useAsioAutoConfig = false;
 	};
 
 	/**

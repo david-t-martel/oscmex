@@ -141,6 +141,13 @@ namespace AudioEngine
 		 * @brief Run the file processing loop for non-ASIO operation
 		 */
 		void runFileProcessingLoop();
+
+		/**
+		 * @brief Configure ASIO automatically using driver information
+		 *
+		 * @return true if auto-configuration succeeded
+		 */
+		bool autoConfigureAsio();
 	};
 
 } // namespace AudioEngine

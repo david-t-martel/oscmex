@@ -191,3 +191,22 @@ This project uses multiple components with different licenses:
 - FFmpeg: LGPL v2.1 or later
 - nlohmann/json: MIT
 - Project-specific code: MIT
+
+# ASIO Auto-Configuration
+
+The AudioEngine supports automatic configuration of ASIO devices. This feature allows the engine to query the ASIO driver for optimal settings, which can simplify setup and ensure compatibility.
+
+## Using Auto-Configuration
+
+To use ASIO auto-configuration, you can:
+
+1. **Command Line**: Use the `--asio-auto-config` flag and optionally specify a device with `--asio-device "Device Name"`.
+
+2. **Configuration File**: Set `"asioAutoConfig": true` in your JSON configuration file:
+
+```json
+{
+  "asioAutoConfig": true,
+  "asioDeviceName": "RME Fireface UCX II"
+}
+```

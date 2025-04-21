@@ -138,12 +138,24 @@ int main(int argc, char *argv[])
 
 	// Check if we should run in standalone RME OSC demonstration mode
 	bool demonstrationMode = false;
+	bool autoConfigAsio = false;
+	std::string asioDevice;
+
 	for (int i = 1; i < argc; i++)
 	{
 		if (std::string(argv[i]) == "--demo-osc")
 		{
 			demonstrationMode = true;
 			break;
+		}
+		else if (std::string(argv[i]) == "--asio-auto-config")
+		{
+			autoConfigAsio = true;
+		}
+		else if (std::string(argv[i]) == "--asio-device" && i + 1 < argc)
+		{
+			asioDevice = argv[i + 1];
+			i++; // Skip the next argument
 		}
 	}
 
@@ -165,6 +177,18 @@ int main(int argc, char *argv[])
 		{
 			std::cerr << "Failed to parse configuration.\n";
 			return 1;
+		}
+
+		// Override with command line auto-configuration if specified
+		if (autoConfigAsio)
+		{
+			config.setUseAsioAutoConfig(true);
+		}
+
+		// Override with command line ASIO device if specified
+		if (!asioDevice.empty())
+		{
+			config.setAsioDeviceName(asioDevice);
 		}
 
 		// Initialize the engine
