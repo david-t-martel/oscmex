@@ -5,8 +5,8 @@
 
 namespace AudioEngine
 {
-    DeviceStateManager::DeviceStateManager(OscController *controller)
-        : m_controller(controller), m_pendingQueries(0)
+    DeviceStateManager::DeviceStateManager(std::unique_ptr<DeviceStateInterface> deviceInterface)
+        : m_deviceInterface(std::move(deviceInterface)), m_pendingQueries(0)
     {
         // Constructor implementation
     }
@@ -18,15 +18,19 @@ namespace AudioEngine
 
     bool DeviceStateManager::queryDeviceState(std::function<void(bool, const Configuration &)> callback)
     {
-        if (!m_controller)
-        {
-            std::cerr << "DeviceStateManager: No OscController available" << std::endl;
-            Configuration emptyConfig;
-            callback(false, emptyConfig);
-            return false;
-        }
-
-        return m_controller->queryDeviceState(callback);
+        return m_deviceInterface->queryState(m_currentDevice,
+                                             [callback, this](bool success, const DeviceState &state)
+                                             {
+                                                 if (success)
+                                                 {
+                                                     Configuration config = DeviceStateInterface::stateToConfiguration(state);
+                                                     callback(true, config);
+                                                 }
+                                                 else
+                                                 {
+                                                     callback(false, Configuration());
+                                                 }
+                                             });
     }
 
     bool DeviceStateManager::queryDeviceStateWithChannels(std::function<void(bool, const Configuration &)> callback, int channelCount)
@@ -331,21 +335,56 @@ namespace AudioEngine
         }
     }
 
-    bool DeviceStateManager::applyConfiguration(const Configuration &config, std::function<void(bool)> callback)
+    std::map<std::string, std::any> DeviceStateManager::calculateStateChanges(
+        const Configuration &targetConfig) const
     {
-        if (!m_controller)
+        // Convert target configuration to a state
+        DeviceState targetState = DeviceState::fromConfiguration(targetConfig);
+
+        // Calculate differences
+        return m_currentState.diffFrom(targetState);
+    }
+
+    bool DeviceStateManager::applyConfiguration(
+        const Configuration &config,
+        DeviceStateCallback callback)
+    {
+        // Calculate changes needed
+        auto changes = calculateStateChanges(config);
+
+        // If no changes needed
+        if (changes.empty())
         {
-            std::cerr << "DeviceStateManager: No OscController available" << std::endl;
-            callback(false);
-            return false;
+            callback(true, "No changes needed");
+            return true;
         }
 
-        // Apply the configuration asynchronously
-        std::thread([this, config, callback]()
-                    {
-            bool result = m_controller->applyConfiguration(config);
-            callback(result); })
-            .detach();
+        // Apply changes via OSC controller
+        std::vector<OscCommand> commands = convertChangesToCommands(changes);
+
+        // Track how many pending operations we have
+        m_pendingQueries.fetch_add(commands.size());
+
+        // Send all commands
+        for (const auto &cmd : commands)
+        {
+            m_controller->sendOscMessage(cmd.address, cmd.args,
+                                         [this, callback](bool success)
+                                         {
+                                             if (!success)
+                                             {
+                                                 // Handle failed command
+                                                 errorOccurred = true;
+                                             }
+
+                                             // Check if all commands are complete
+                                             if (m_pendingQueries.fetch_sub(1) == 1)
+                                             {
+                                                 // All commands have completed
+                                                 callback(!errorOccurred, errorOccurred ? "Failed to apply some settings" : "Configuration applied successfully");
+                                             }
+                                         });
+        }
 
         return true;
     }

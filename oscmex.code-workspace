@@ -3,6 +3,9 @@
 		{
 			"path": "."
 		},
+		{
+			"path": "../../../Program Files (x86)/Intel/oneAPI"
+		}
 	],
 	"settings": {
 		"files.associations": {

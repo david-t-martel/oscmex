@@ -7,7 +7,20 @@
 #include <functional>
 #include <memory>
 #include <nlohmann/json.hpp> // Updated to use nlohmann/json directly
-
+/**
+ * @file Configuration.h
+ * @brief Configuration system for the audio engine
+ *
+ * The Configuration class defines how the audio engine is set up, including:
+ * - Device settings (ASIO device, sample rate, buffer size)
+ * - Audio processing node definitions
+ * - Node connection specifications
+ * - External control commands
+ *
+ * A Configuration object represents the *desired state* of the system,
+ * not necessarily its current state. The DeviceStateManager is responsible
+ * for applying configuration to devices and tracking their current state.
+ */
 namespace AudioEngine
 {
 	// Forward declaration for classes that will be referenced
@@ -421,6 +434,45 @@ namespace AudioEngine
 		 * @return std::string Channel layout specification
 		 */
 		std::string getInternalLayout() const { return m_internalLayout; }
+
+		/**
+		 * @brief Create an ASIO input node configuration
+		 *
+		 * @param name Node name
+		 * @param channels Channel indices to use
+		 * @return NodeConfig Configured node
+		 */
+		static NodeConfig createAsioInputNode(const std::string &name, const std::vector<long> &channels);
+
+		/**
+		 * @brief Create an ASIO output node configuration
+		 *
+		 * @param name Node name
+		 * @param channels Channel indices to use
+		 * @return NodeConfig Configured node
+		 */
+		static NodeConfig createAsioOutputNode(const std::string &name, const std::vector<long> &channels);
+
+		/**
+		 * @brief Create a processor node configuration
+		 *
+		 * @param name Node name
+		 * @param filterGraph FFmpeg filter graph
+		 * @return NodeConfig Configured node
+		 */
+		static NodeConfig createProcessorNode(const std::string &name, const std::string &filterGraph);
+
+		/**
+		 * @brief Create a file source node configuration
+		 *
+		 * @param name Node name
+		 * @param filePath Path to the audio file
+		 * @param format Format specification (optional)
+		 * @return NodeConfig Configured node
+		 */
+		static NodeConfig createFileSourceNode(const std::string &name,
+											   const std::string &filePath,
+											   const std::string &format = "");
 
 	private:
 		DeviceType m_deviceType;					 // Type of device for this configuration

@@ -3,53 +3,275 @@
 #include <string>
 #include <nlohmann/json.hpp>
 
+const std::vector<ConfigurationParser::CommandOption> &ConfigurationParser::getCommandOptions()
+{
+    static std::vector<CommandOption> options = {
+        {"--asio-auto-config",
+         false,
+         "Enable automatic configuration of ASIO device",
+         [](Configuration &config, const std::string &)
+         {
+             config.setUseAsioAutoConfig(true);
+             return true;
+         }},
+        {"--no-asio-auto-config",
+         false,
+         "Disable automatic configuration of ASIO device",
+         [](Configuration &config, const std::string &)
+         {
+             config.setUseAsioAutoConfig(false);
+             return true;
+         }},
+        {"--asio-device",
+         true,
+         "Specify ASIO device name",
+         [](Configuration &config, const std::string &value)
+         {
+             config.setAsioDeviceName(value);
+             return true;
+         }},
+        {"--ip",
+         true,
+         "Specify target IP address for OSC communication",
+         [](Configuration &config, const std::string &value)
+         {
+             config.setTargetIp(value);
+             return true;
+         }},
+        {"--port",
+         true,
+         "Specify target port for OSC communication",
+         [](Configuration &config, const std::string &value)
+         {
+             try
+             {
+                 config.setTargetPort(std::stoi(value));
+                 return true;
+             }
+             catch (const std::exception &e)
+             {
+                 std::cerr << "Invalid port number: " << value << std::endl;
+                 return false;
+             }
+         }},
+        {"--receive-port",
+         true,
+         "Specify receive port for OSC communication",
+         [](Configuration &config, const std::string &value)
+         {
+             try
+             {
+                 config.setReceivePort(std::stoi(value));
+                 return true;
+             }
+             catch (const std::exception &e)
+             {
+                 std::cerr << "Invalid port number: " << value << std::endl;
+                 return false;
+             }
+         }},
+        {"--sample-rate",
+         true,
+         "Specify sample rate in Hz",
+         [](Configuration &config, const std::string &value)
+         {
+             try
+             {
+                 config.setSampleRate(std::stod(value));
+                 return true;
+             }
+             catch (const std::exception &e)
+             {
+                 std::cerr << "Invalid sample rate: " << value << std::endl;
+                 return false;
+             }
+         }},
+        {"--buffer-size",
+         true,
+         "Specify buffer size in samples",
+         [](Configuration &config, const std::string &value)
+         {
+             try
+             {
+                 config.setBufferSize(std::stol(value));
+                 return true;
+             }
+             catch (const std::exception &e)
+             {
+                 std::cerr << "Invalid buffer size: " << value << std::endl;
+                 return false;
+             }
+         }},
+        {"--config",
+         true,
+         "Load configuration from file",
+         [](Configuration &config, const std::string &value)
+         {
+             return ConfigurationParser::parseJsonFile(value, config);
+         }},
+        {"--help",
+         false,
+         "Show help text",
+         [](Configuration &config, const std::string &)
+         {
+             ConfigurationParser::printHelp("audioEngine");
+             return false; // Returning false will stop parsing
+         }}};
+
+    return options;
+}
+
 bool ConfigurationParser::parseCommandLine(int argc, char *argv[], Configuration &config)
 {
-    // ...existing code...
+    const auto &options = getCommandOptions();
 
-    // Parse ASIO auto-configuration options
     for (int i = 1; i < argc; i++)
     {
         std::string arg = argv[i];
+        bool optionHandled = false;
 
-        if (arg == "--asio-auto-config")
+        for (const auto &option : options)
         {
-            config.setUseAsioAutoConfig(true);
+            if (arg == option.flag)
+            {
+                std::string argValue;
+
+                if (option.hasArg)
+                {
+                    if (i + 1 >= argc)
+                    {
+                        std::cerr << "Missing argument for option: " << option.flag << std::endl;
+                        return false;
+                    }
+                    argValue = argv[++i];
+                }
+
+                if (!option.handler(config, argValue))
+                {
+                    // Handler returned false, stop parsing
+                    return false;
+                }
+
+                optionHandled = true;
+                break;
+            }
         }
-        else if (arg == "--asio-device" && i + 1 < argc)
+
+        if (!optionHandled)
         {
-            config.setAsioDeviceName(argv[++i]);
+            std::cerr << "Unknown option: " << arg << std::endl;
+            printHelp(argv[0]);
+            return false;
         }
-        // ...other parsing code...
     }
 
-    // ...existing code...
+    return true;
 }
 
 bool ConfigurationParser::parseJsonFile(const std::string &filePath, Configuration &config)
 {
-    // ...existing code...
-
-    // Parse ASIO auto-configuration options
-    nlohmann::json json;
-    std::ifstream file(filePath);
-    if (file.is_open())
+    try
     {
-        file >> json;
-        file.close();
+        // Open and parse the JSON file
+        nlohmann::json json;
+        std::ifstream file(filePath);
+        if (!file.is_open())
+        {
+            std::cerr << "Failed to open configuration file: " << filePath << std::endl;
+            return false;
+        }
+
+        try
+        {
+            file >> json;
+            file.close();
+        }
+        catch (const nlohmann::json::exception &e)
+        {
+            std::cerr << "Error parsing JSON file: " << e.what() << std::endl;
+            return false;
+        }
+
+        // Parse ASIO auto-configuration options
+        if (json.contains("asioAutoConfig"))
+        {
+            config.setUseAsioAutoConfig(json["asioAutoConfig"].get<bool>());
+        }
+
+        if (json.contains("asioDeviceName"))
+        {
+            config.setAsioDeviceName(json["asioDeviceName"].get<std::string>());
+        }
+
+        // Use parseJsonString to handle the rest of the JSON parsing
+        return parseJsonString(json.dump(), config);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error in parseJsonFile: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool ConfigurationParser::parseJsonString(const std::string &jsonContent, Configuration &config)
+{
+    try
+    {
+        auto json = nlohmann::json::parse(jsonContent);
+
+        // Parse all sections using helper methods
+        bool success = true;
+        success &= parseBasicSettings(json, config);
+        success &= parseNodeConfigs(json, config);
+        success &= parseConnectionConfigs(json, config);
+        success &= parseCommandConfigs(json, config);
+
+        return success;
+    }
+    catch (const nlohmann::json::exception &e)
+    {
+        std::cerr << "JSON parsing error: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool ConfigurationParser::parseBasicSettings(const nlohmann::json &json, Configuration &config)
+{
+    // Parse device type
+    if (json.contains("deviceType"))
+        config.setDeviceType(stringToDeviceType(json["deviceType"].get<std::string>()));
+
+    // Parse connection info
+    if (json.contains("targetIp") && json.contains("targetPort"))
+    {
+        int receivePort = json.contains("receivePort") ? json["receivePort"].get<int>() : 0;
+        config.setConnectionParams(
+            json["targetIp"].get<std::string>(),
+            json["targetPort"].get<int>(),
+            receivePort);
     }
 
-    if (json.contains("asioAutoConfig"))
-    {
-        config.setUseAsioAutoConfig(json["asioAutoConfig"].get<bool>());
-    }
-
+    // Parse ASIO settings
     if (json.contains("asioDeviceName"))
-    {
         config.setAsioDeviceName(json["asioDeviceName"].get<std::string>());
-    }
 
-    // ...existing code...
+    if (json.contains("sampleRate"))
+        config.setSampleRate(json["sampleRate"].get<double>());
+
+    if (json.contains("bufferSize"))
+        config.setBufferSize(json["bufferSize"].get<long>());
+
+    if (json.contains("useAsioAutoConfig"))
+        config.setUseAsioAutoConfig(json["useAsioAutoConfig"].get<bool>());
+
+    // Parse internal format settings
+    if (json.contains("internalFormat"))
+        config.setInternalFormat(json["internalFormat"].get<std::string>());
+
+    if (json.contains("internalLayout"))
+        config.setInternalLayout(json["internalLayout"].get<std::string>());
+
+    return true;
 }
 
 /**
@@ -88,61 +310,29 @@ bool ConfigurationParser::autoConfigureAsio(Configuration &config, AsioManager *
         // Create source node if we have inputs
         if (inputChannels > 0)
         {
-            NodeConfig sourceNode;
-            sourceNode.name = "asio_input";
-            sourceNode.type = "asio_source";
-            sourceNode.inputPads = 0; // Source has no inputs
-            sourceNode.outputPads = 1;
-            sourceNode.description = "ASIO Hardware Input";
-
-            // Use first 2 channels by default (or whatever is available)
-            std::string channelIndices;
+            std::vector<long> channels;
             for (long i = 0; i < std::min(2L, inputChannels); i++)
             {
-                if (i > 0)
-                    channelIndices += ",";
-                channelIndices += std::to_string(i);
+                channels.push_back(i);
             }
-            sourceNode.params["channels"] = channelIndices;
-
-            config.addNodeConfig(sourceNode);
+            config.addNodeConfig(Configuration::createAsioInputNode("asio_input", channels));
         }
 
         // Create processor node if we have both inputs and outputs
         if (inputChannels > 0 && outputChannels > 0)
         {
-            NodeConfig procNode;
-            procNode.name = "main_processor";
-            procNode.type = "ffmpeg_processor";
-            procNode.inputPads = 1;
-            procNode.outputPads = 1;
-            procNode.description = "Main Processor";
-            procNode.filterGraph = "volume=0dB"; // Identity filter by default
-
-            config.addNodeConfig(procNode);
+            config.addNodeConfig(Configuration::createProcessorNode("main_processor", "volume=0dB"));
         }
 
         // Create sink node if we have outputs
         if (outputChannels > 0)
         {
-            NodeConfig sinkNode;
-            sinkNode.name = "asio_output";
-            sinkNode.type = "asio_sink";
-            sinkNode.inputPads = 1;
-            sinkNode.outputPads = 0; // Sink has no outputs
-            sinkNode.description = "ASIO Hardware Output";
-
-            // Use first 2 channels by default (or whatever is available)
-            std::string channelIndices;
+            std::vector<long> channels;
             for (long i = 0; i < std::min(2L, outputChannels); i++)
             {
-                if (i > 0)
-                    channelIndices += ",";
-                channelIndices += std::to_string(i);
+                channels.push_back(i);
             }
-            sinkNode.params["channels"] = channelIndices;
-
-            config.addNodeConfig(sinkNode);
+            config.addNodeConfig(Configuration::createAsioOutputNode("asio_output", channels));
         }
 
         // Create connections if we have created nodes
@@ -182,4 +372,22 @@ bool ConfigurationParser::autoConfigureAsio(Configuration &config, AsioManager *
     }
 
     return true;
+}
+
+void ConfigurationParser::printHelp(const std::string &programName)
+{
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << "Options:" << std::endl;
+
+    const auto &options = getCommandOptions();
+    for (const auto &option : options)
+    {
+        std::cout << "  " << option.flag;
+        if (option.hasArg)
+        {
+            std::cout << " <value>";
+        }
+        std::cout << std::endl;
+        std::cout << "      " << option.description << std::endl;
+    }
 }

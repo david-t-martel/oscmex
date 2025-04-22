@@ -366,155 +366,11 @@ namespace AudioEngine
     Configuration Configuration::fromJsonString(const std::string &jsonStr)
     {
         Configuration config;
-        try
+        bool success = ConfigurationParser::parseJsonString(jsonStr, config);
+        if (!success)
         {
-            json j = json::parse(jsonStr);
-
-            // Parse basic configuration
-            if (j.contains("deviceType"))
-                config.setDeviceType(stringToDeviceType(j["deviceType"].get<std::string>()));
-
-            if (j.contains("targetIp") && j.contains("targetPort"))
-            {
-                int receivePort = j.contains("receivePort") ? j["receivePort"].get<int>() : 0;
-                config.setConnectionParams(
-                    j["targetIp"].get<std::string>(),
-                    j["targetPort"].get<int>(),
-                    receivePort);
-            }
-
-            if (j.contains("asioDeviceName"))
-                config.setAsioDeviceName(j["asioDeviceName"].get<std::string>());
-
-            if (j.contains("sampleRate"))
-                config.setSampleRate(j["sampleRate"].get<double>());
-
-            if (j.contains("bufferSize"))
-                config.setBufferSize(j["bufferSize"].get<long>());
-
-            if (j.contains("useAsioAutoConfig"))
-                config.setUseAsioAutoConfig(j["useAsioAutoConfig"].get<bool>());
-
-            if (j.contains("internalFormat"))
-                config.setInternalFormat(j["internalFormat"].get<std::string>());
-
-            if (j.contains("internalLayout"))
-                config.setInternalLayout(j["internalLayout"].get<std::string>());
-
-            // Parse OSC commands
-            if (j.contains("commands") && j["commands"].is_array())
-            {
-                for (const auto &cmdJson : j["commands"])
-                {
-                    if (cmdJson.contains("address") && cmdJson.contains("args"))
-                    {
-                        std::string address = cmdJson["address"].get<std::string>();
-                        std::vector<std::any> args;
-
-                        for (const auto &arg : cmdJson["args"])
-                        {
-                            if (arg.is_number_float())
-                                args.push_back(std::any(arg.get<float>()));
-                            else if (arg.is_number_integer())
-                                args.push_back(std::any(arg.get<int>()));
-                            else if (arg.is_boolean())
-                                args.push_back(std::any(arg.get<bool>()));
-                            else if (arg.is_string())
-                                args.push_back(std::any(arg.get<std::string>()));
-                        }
-
-                        config.addCommand(address, args);
-                    }
-                }
-            }
-
-            // Parse nodes
-            if (j.contains("nodes") && j["nodes"].is_array())
-            {
-                for (const auto &nodeJson : j["nodes"])
-                {
-                    NodeConfig node;
-
-                    if (nodeJson.contains("name"))
-                        node.name = nodeJson["name"].get<std::string>();
-
-                    if (nodeJson.contains("type"))
-                        node.type = nodeJson["type"].get<std::string>();
-
-                    if (nodeJson.contains("inputPads"))
-                        node.inputPads = nodeJson["inputPads"].get<int>();
-
-                    if (nodeJson.contains("outputPads"))
-                        node.outputPads = nodeJson["outputPads"].get<int>();
-
-                    if (nodeJson.contains("description"))
-                        node.description = nodeJson["description"].get<std::string>();
-
-                    if (nodeJson.contains("filterGraph"))
-                        node.filterGraph = nodeJson["filterGraph"].get<std::string>();
-
-                    if (nodeJson.contains("filePath"))
-                        node.filePath = nodeJson["filePath"].get<std::string>();
-
-                    if (nodeJson.contains("fileFormat"))
-                        node.fileFormat = nodeJson["fileFormat"].get<std::string>();
-
-                    // Parse channel indices
-                    if (nodeJson.contains("channelIndices") && nodeJson["channelIndices"].is_array())
-                    {
-                        for (const auto &idx : nodeJson["channelIndices"])
-                        {
-                            node.channelIndices.push_back(idx.get<long>());
-                        }
-                    }
-
-                    // Parse parameters
-                    if (nodeJson.contains("params") && nodeJson["params"].is_object())
-                    {
-                        for (auto it = nodeJson["params"].begin(); it != nodeJson["params"].end(); ++it)
-                        {
-                            node.params[it.key()] = it.value().is_string() ? it.value().get<std::string>() : it.value().dump();
-                        }
-                    }
-
-                    config.addNodeConfig(node);
-                }
-            }
-
-            // Parse connections
-            if (j.contains("connections") && j["connections"].is_array())
-            {
-                for (const auto &connJson : j["connections"])
-                {
-                    ConnectionConfig conn;
-
-                    if (connJson.contains("sourceName"))
-                        conn.sourceName = connJson["sourceName"].get<std::string>();
-
-                    if (connJson.contains("sourcePad"))
-                        conn.sourcePad = connJson["sourcePad"].get<int>();
-
-                    if (connJson.contains("sinkName"))
-                        conn.sinkName = connJson["sinkName"].get<std::string>();
-
-                    if (connJson.contains("sinkPad"))
-                        conn.sinkPad = connJson["sinkPad"].get<int>();
-
-                    if (connJson.contains("formatConversion"))
-                        conn.formatConversion = connJson["formatConversion"].get<bool>();
-
-                    if (connJson.contains("bufferPolicy"))
-                        conn.bufferPolicy = connJson["bufferPolicy"].get<std::string>();
-
-                    config.addConnectionConfig(conn);
-                }
-            }
+            // Log error or handle failure
         }
-        catch (const json::exception &e)
-        {
-            std::cerr << "JSON parsing error: " << e.what() << std::endl;
-        }
-
         return config;
     }
 
@@ -1957,6 +1813,29 @@ namespace AudioEngine
             queryParameter(address, [individualCallback, address](bool success, float value)
                            { individualCallback(address, success, value); });
         }
+    }
+
+    NodeConfig Configuration::createAsioInputNode(const std::string &name, const std::vector<long> &channels)
+    {
+        NodeConfig node;
+        node.name = name;
+        node.type = "asio_source";
+        node.inputPads = 0; // Source has no inputs
+        node.outputPads = 1;
+        node.description = "ASIO Hardware Input";
+        node.channelIndices = channels;
+
+        // Create the channels parameter string
+        std::string channelStr;
+        for (size_t i = 0; i < channels.size(); i++)
+        {
+            if (i > 0)
+                channelStr += ",";
+            channelStr += std::to_string(channels[i]);
+        }
+        node.params["channels"] = channelStr;
+
+        return node;
     }
 
 } // namespace AudioEngine
