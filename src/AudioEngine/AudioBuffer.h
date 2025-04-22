@@ -8,8 +8,8 @@
 // FFmpeg includes
 extern "C"
 {
-#include "libavutil / samplefmt.h"
-#include "libavutil / channel_layout.h"
+#include <libavutil/samplefmt.h>
+#include <libavutil/channel_layout.h>
 }
 
 namespace AudioEngine
