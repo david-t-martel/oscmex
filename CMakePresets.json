@@ -9,7 +9,8 @@
       "binaryDir": "${sourceDir}/build/default",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "VENDOR_DIR": "${sourceDir}/vendor"
+        "VENDOR_DIR": "${sourceDir}/vendor",
+        "BUILD_FFMPEG_FROM_SOURCE": "OFF"
       }
     },
     {
@@ -25,7 +26,8 @@
         "VENDOR_DIR": "${sourceDir}/vendor",
         "INTELONEAPI_ENABLE_TBB": "ON",
         "INTELONEAPI_ENABLE_IPP": "ON",
-        "INTELONEAPI_ENABLE_MKL": "ON"
+        "INTELONEAPI_ENABLE_MKL": "ON",
+        "BUILD_FFMPEG_FROM_SOURCE": "OFF"
       }
     },
     {
@@ -41,7 +43,8 @@
         "VENDOR_DIR": "${sourceDir}/vendor",
         "INTELONEAPI_ENABLE_TBB": "ON",
         "INTELONEAPI_ENABLE_IPP": "ON",
-        "INTELONEAPI_ENABLE_MKL": "ON"
+        "INTELONEAPI_ENABLE_MKL": "ON",
+        "BUILD_FFMPEG_FROM_SOURCE": "OFF"
       }
     },
     {
@@ -55,7 +58,8 @@
         "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx",
         "VENDOR_DIR": "${sourceDir}/vendor",
-        "INTELONEAPI_VECTORIZATION_REPORT": "ON"
+        "INTELONEAPI_VECTORIZATION_REPORT": "ON",
+        "BUILD_FFMPEG_FROM_SOURCE": "OFF"
       }
     },
     {
@@ -67,7 +71,23 @@
       "architecture": "x64",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "VENDOR_DIR": "${sourceDir}/vendor"
+        "VENDOR_DIR": "${sourceDir}/vendor",
+        "BUILD_FFMPEG_FROM_SOURCE": "OFF"
+      }
+    },
+    {
+      "name": "ffmpeg-build",
+      "displayName": "FFmpeg Build (Release)",
+      "description": "Configuration that builds FFmpeg from source.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ffmpeg-build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VENDOR_DIR": "${sourceDir}/vendor",
+        "BUILD_FFMPEG_FROM_SOURCE": "ON",
+        "FFMPEG_ENABLE_ENCODERS": "ON",
+        "FFMPEG_ENABLE_DECODERS": "ON",
+        "FFMPEG_ENABLE_FILTERS": "ON"
       }
     }
   ],
@@ -97,6 +117,11 @@
       "configurePreset": "vs2022-desktop",
       "displayName": "Build with Visual Studio 2022",
       "configuration": "Release"
+    },
+    {
+      "name": "ffmpeg-build-preset",
+      "configurePreset": "ffmpeg-build",
+      "displayName": "Build with FFmpeg from Source"
     }
   ]
 }

@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Enable generation of compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Add cmake modules directory
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -14,11 +17,19 @@ if(NOT DEFINED VENDOR_DIR)
 	set(VENDOR_DIR "${CMAKE_SOURCE_DIR}/vendor")
 endif()
 
+# Include BuildFFmpeg module
+include(BuildFFmpeg)
+
 # Find required packages using custom find modules
-find_package(FFmpeg REQUIRED)
 find_package(ASIO REQUIRED)
 find_package(Threads REQUIRED)
-find_package(IntelOneAPI) # Added Intel oneAPI integration
+find_package(IntelOneAPI)
+
+# Check if we need to build FFmpeg from source
+check_ffmpeg_components()
+
+# Find FFmpeg components
+find_package(FFmpeg REQUIRED)
 
 # Add vendor include directories
 include_directories(
@@ -34,7 +45,7 @@ link_directories(
 	${VENDOR_DIR}/lib
 )
 
-# Define source files
+# Define source files for the main application
 set(SOURCES
 	src/main.cpp
 	src/AudioEngine/AudioBuffer.cpp
@@ -51,6 +62,16 @@ set(SOURCES
 
 	# Add any additional source files here
 )
+
+# ASIO SDK integration
+set(ASIO_SOURCES
+	${VENDOR_DIR}/asiosdk/common/asio.cpp
+	${VENDOR_DIR}/asiosdk/host/asiodrivers.cpp
+	${VENDOR_DIR}/asiosdk/host/pc/asiolist.cpp
+)
+
+# Add ASIO sources to the project
+list(APPEND SOURCES ${ASIO_SOURCES})
 
 # Define target
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -97,13 +118,56 @@ elseif(APPLE)
 	)
 endif()
 
+# Add FFmpeg-specific compile definitions
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+	HAVE_FFMPEG
+	FF_API_OLD_CHANNEL_LAYOUT=0
+)
+
+# Add ASIO-specific compile definitions
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+	ASIO_STANDALONE=1
+)
+
+if(WIN32)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE
+		_WIN32=1
+		WINDOWS=1
+	)
+elseif(APPLE)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE
+		MAC=1
+	)
+endif()
+
 # Set output directory
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
+# Define standalone OscController application
+add_executable(OscControllerApp tools/osc/osc_controller_app.cpp)
+target_link_libraries(OscControllerApp PRIVATE
+	lo
+	nlohmann_json::nlohmann_json
+	${FFMPEG_LIBRARIES}
+	${CMAKE_THREAD_LIBS_INIT}
+)
+
+# Apply Intel oneAPI optimizations to OscControllerApp if available
+if(INTELONEAPI_FOUND)
+	inteloneapi_apply_compiler_flags(OscControllerApp)
+	inteloneapi_link_libraries(OscControllerApp)
+endif()
+
+# Add FFmpeg-specific compile definitions to OscControllerApp
+target_compile_definitions(OscControllerApp PRIVATE
+	HAVE_FFMPEG
+	FF_API_OLD_CHANNEL_LAYOUT=0
+)
+
 # Install directives
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+install(TARGETS ${PROJECT_NAME} OscControllerApp DESTINATION bin)
 install(FILES ${CMAKE_SOURCE_DIR}/config/default_config.json DESTINATION config)
 
 # Enable testing
@@ -164,70 +228,6 @@ option(USE_INTEL_TBB "Use Intel Threading Building Blocks" ON)
 option(USE_INTEL_IPP "Use Intel Integrated Performance Primitives" ON)
 option(USE_INTEL_MKL "Use Intel Math Kernel Library" ON)
 option(USE_INTEL_DPCPP "Use Intel Data Parallel C++" OFF)
-
-# --- FFmpeg Configuration ---
-# Use local FFmpeg source code instead of system installation
-set(FFMPEG_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/ffmpeg-master")
-
-# Set required FFmpeg components
-set(FFMPEG_COMPONENTS
-	avutil
-	avformat
-	avcodec
-	avfilter
-	swresample
-	swscale
-)
-
-# Print status message
-message(STATUS "Using local FFmpeg source from: ${FFMPEG_SOURCE_DIR}")
-
-# Create FFmpeg include paths
-set(FFMPEG_INCLUDE_DIRS
-	"${FFMPEG_SOURCE_DIR}"
-)
-
-# Add each component's include directory
-foreach(component ${FFMPEG_COMPONENTS})
-	list(APPEND FFMPEG_INCLUDE_DIRS "${FFMPEG_SOURCE_DIR}/lib${component}")
-endforeach()
-
-# Build FFmpeg libraries from source
-set(FFMPEG_LIBRARIES)
-
-# Define sources for each FFmpeg component
-foreach(component ${FFMPEG_COMPONENTS})
-	file(GLOB_RECURSE FFMPEG_${component}_SOURCES
-		"${FFMPEG_SOURCE_DIR}/lib${component}/*.c"
-	)
-
-	# Create library target
-	add_library(ffmpeg_${component} STATIC ${FFMPEG_${component}_SOURCES})
-
-	# Add component-specific include paths and definitions
-	target_include_directories(ffmpeg_${component} PRIVATE
-		${FFMPEG_INCLUDE_DIRS}
-	)
-
-	# Add component to libraries list
-	list(APPEND FFMPEG_LIBRARIES ffmpeg_${component})
-
-	# Common compile definitions for all FFmpeg components
-	target_compile_definitions(ffmpeg_${component} PRIVATE
-		HAVE_AV_CONFIG_H
-		_CRT_SECURE_NO_WARNINGS
-		_CRT_NONSTDC_NO_DEPRECATE
-		_WINSOCK_DEPRECATED_NO_WARNINGS
-		FF_API_OLD_CHANNEL_LAYOUT=0
-	)
-
-	# Disable specific warnings for FFmpeg code
-	if(MSVC)
-		target_compile_options(ffmpeg_${component} PRIVATE
-			/wd4244 /wd4267 /wd4018 /wd4996
-		)
-	endif()
-endforeach()
 
 # --- liblo Configuration ---
 option(LIBLO_ENABLE_THREADS "Build liblo with threading support" ON)
@@ -333,6 +333,22 @@ file(GLOB AUDIO_ENGINE_SOURCES
 # Define AudioEngine library
 add_library(AudioEngine SHARED ${AUDIO_ENGINE_SOURCES})
 
+# Update AudioEngine source list to explicitly include AudioBufferPool
+target_sources(AudioEngine PRIVATE
+	src/AudioEngine/AudioBufferPool.cpp
+	src/AudioEngine/AudioBufferPool.h
+)
+
+# Add OSC-related source files
+set(OSC_SOURCES
+	src/AudioEngine/OscController.cpp
+	src/AudioEngine/OscMessageDispatcher.cpp
+	src/AudioEngine/RmeOscMessageHandler.cpp
+)
+
+# Add these to AudioEngine
+target_sources(AudioEngine PRIVATE ${OSC_SOURCES})
+
 # Link with oneAPI components and liblo
 target_link_libraries(AudioEngine PRIVATE liblo)
 
@@ -435,6 +451,14 @@ target_include_directories(AudioEngine PRIVATE ${FFMPEG_INCLUDE_DIRS})
 
 # Add FFmpeg dependencies to AudioEngine
 target_link_libraries(AudioEngine PRIVATE ${FFMPEG_LIBRARIES})
+
+# Ensure AudioEngine links with the correct FFmpeg components
+foreach(component ${FFMPEG_COMPONENTS})
+	target_link_libraries(AudioEngine PRIVATE ffmpeg_${component})
+endforeach()
+
+# Make sure the FFmpeg components are built before AudioEngine
+add_dependencies(AudioEngine ${FFMPEG_LIBRARIES})
 
 # Add nlohmann/json library
 include(FetchContent)
@@ -541,6 +565,25 @@ else()
 	message(STATUS "Doxygen not found, documentation will not be built")
 	set(BUILD_DOCUMENTATION OFF CACHE BOOL "Build Doxygen documentation" FORCE)
 endif()
+
+# Build additional tools
+file(GLOB MATLAB_TOOLS "tools/matlab/*.cpp")
+
+foreach(TOOL_SRC ${MATLAB_TOOLS})
+	get_filename_component(TOOL_NAME ${TOOL_SRC} NAME_WE)
+	add_executable(${TOOL_NAME} ${TOOL_SRC})
+	target_link_libraries(${TOOL_NAME} PRIVATE AudioEngine)
+endforeach()
+
+# Additional OSC tools (excluding already defined OscControllerApp)
+file(GLOB OSC_TOOLS "tools/osc/*.cpp")
+list(REMOVE_ITEM OSC_TOOLS "${CMAKE_CURRENT_SOURCE_DIR}/tools/osc/osc_controller_app.cpp")
+
+foreach(TOOL_SRC ${OSC_TOOLS})
+	get_filename_component(TOOL_NAME ${TOOL_SRC} NAME_WE)
+	add_executable(${TOOL_NAME} ${TOOL_SRC})
+	target_link_libraries(${TOOL_NAME} PRIVATE AudioEngine)
+endforeach()
 
 # Install targets
 install(TARGETS AudioEngine AudioEngineApp OscControllerApp

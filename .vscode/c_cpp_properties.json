@@ -4,16 +4,18 @@
       "name": "Win32",
       "includePath": [
         "${workspaceFolder}/**",
-        "${workspaceFolder}/vendor/json/include",
-        "${workspaceFolder}/src/**",
-        "${workspaceFolder}/include/**",
         "${workspaceFolder}/vendor/ffmpeg/include",
+        "${workspaceFolder}/vendor/ffmpeg",
+        "${workspaceFolder}/vendor",
         "${workspaceFolder}/vendor/ffmpeg/include/libavformat",
         "${workspaceFolder}/vendor/ffmpeg/include/libavcodec",
         "${workspaceFolder}/vendor/ffmpeg/include/libavutil",
         "${workspaceFolder}/vendor/ffmpeg/include/libavfilter",
         "${workspaceFolder}/vendor/ffmpeg/include/libswresample",
         "${workspaceFolder}/vendor/ffmpeg/include/libswscale",
+        "${workspaceFolder}/vendor/json/include",
+        "${workspaceFolder}/src/**",
+        "${workspaceFolder}/include/**",
         "${workspaceFolder}/vendor/asiosdk/common",
         "${workspaceFolder}/vendor/asiosdk/host",
         "${workspaceFolder}/vendor/asiosdk/host/pc",
@@ -84,7 +86,7 @@
       "cppStandard": "c++17",
       "intelliSenseMode": "windows-clang-x64",
       "configurationProvider": "ms-vscode.cmake-tools",
-      "compileCommands": "${workspaceFolder}/build/intel-release/compile_commands.json"
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
     }
   ],
   "version": 4
