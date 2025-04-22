@@ -1,5 +1,13 @@
 #include "OscController.h"
+
+// Make sure we include all necessary liblo headers
+#include "vendor/lo/lo.h"
 #include "vendor/lo/lo_cpp.h"
+#include "vendor/lo/lo_errors.h"
+#include "vendor/lo/lo_types.h"
+#include "vendor/lo/lo_osc_types.h"
+#include "vendor/lo/lo_lowlevel.h"
+
 #include "Configuration.h"
 
 #include <iostream>
@@ -39,7 +47,7 @@ namespace AudioEngine
 	}
 
 	OscController::OscController()
-		: m_oscAddress(nullptr), m_oscServer(nullptr),
+		: m_oscServer(nullptr),
 		  m_messageCallback(nullptr), m_levelCallback(nullptr),
 		  m_targetIp("127.0.0.1"), m_targetPort(0), m_receivePort(0),
 		  m_running(false), m_nextCallbackId(1), m_configured(false)
@@ -60,12 +68,6 @@ namespace AudioEngine
 	void OscController::cleanup()
 	{
 		stopReceiver();
-
-		if (m_oscAddress)
-		{
-			lo_address_free(m_oscAddress);
-			m_oscAddress = nullptr;
-		}
 		m_configured = false; // Mark as not configured after cleanup
 	}
 
@@ -82,18 +84,21 @@ namespace AudioEngine
 		m_receivePort = receivePort;
 
 		// Create OSC address for sending
-		m_oscAddress = lo_address_new(targetIp.c_str(), std::to_string(targetPort).c_str());
-		if (!m_oscAddress)
+		try
 		{
-			std::cerr << "OscController: Failed to create OSC address for " << targetIp << ":" << targetPort << std::endl;
+			m_oscAddress = lo::Address(targetIp, std::to_string(targetPort));
+		}
+		catch (const std::exception &e)
+		{
+			std::cerr << "OscController: Failed to create OSC address: " << e.what() << std::endl;
 			return false;
 		}
 
 		// Set UDP transmission timeout (default is -1 which can hang indefinitely)
-		lo_address_set_ttl(m_oscAddress, 4); // Reasonable TTL for local network
+		m_oscAddress.set_ttl(4); // Reasonable TTL for local network
 
 		// Configure timeout to prevent blocking for too long
-		lo_address_set_timeout_ms(m_oscAddress, 500); // 500ms timeout
+		m_oscAddress.set_timeout_ms(500); // 500ms timeout
 
 		m_configured = true;
 		std::cout << "OSC Controller configured for " << targetIp << ":" << targetPort << std::endl;
@@ -338,72 +343,72 @@ namespace AudioEngine
 
 	bool OscController::setParameter(const std::string &address, const std::vector<std::any> &args)
 	{
-		if (!m_configured || !m_oscAddress)
+		if (!m_configured || !m_oscAddress.is_valid())
 		{
 			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
 			return false;
 		}
 
 		// Create OSC message
-		lo_message msg = lo_message_new();
-		if (!msg)
+		try
 		{
-			std::cerr << "OscController: Failed to create OSC message" << std::endl;
-			return false;
-		}
+			lo::Message msg;
 
-		// Add arguments to message
-		for (const auto &arg : args)
-		{
-			try
+			// Add arguments to message
+			for (const auto &arg : args)
 			{
-				if (arg.type() == typeid(float))
+				try
 				{
-					lo_message_add_float(msg, std::any_cast<float>(arg));
+					if (arg.type() == typeid(float))
+					{
+						msg.add_float(std::any_cast<float>(arg));
+					}
+					else if (arg.type() == typeid(int))
+					{
+						msg.add_int32(std::any_cast<int>(arg));
+					}
+					else if (arg.type() == typeid(bool))
+					{
+						msg.add_float(std::any_cast<bool>(arg) ? 1.0f : 0.0f);
+					}
+					else if (arg.type() == typeid(std::string))
+					{
+						msg.add_string(std::any_cast<const std::string &>(arg).c_str());
+					}
+					else if (arg.type() == typeid(const char *))
+					{
+						msg.add_string(std::any_cast<const char *>(arg));
+					}
+					else
+					{
+						std::cerr << "OscController: Unsupported argument type: " << arg.type().name() << std::endl;
+						return false;
+					}
 				}
-				else if (arg.type() == typeid(int))
+				catch (const std::bad_any_cast &e)
 				{
-					lo_message_add_int32(msg, std::any_cast<int>(arg));
-				}
-				else if (arg.type() == typeid(bool))
-				{
-					lo_message_add_float(msg, std::any_cast<bool>(arg) ? 1.0f : 0.0f);
-				}
-				else if (arg.type() == typeid(std::string))
-				{
-					lo_message_add_string(msg, std::any_cast<const std::string &>(arg).c_str());
-				}
-				else if (arg.type() == typeid(const char *))
-				{
-					lo_message_add_string(msg, std::any_cast<const char *>(arg));
-				}
-				else
-				{
-					std::cerr << "OscController: Unsupported argument type: " << arg.type().name() << std::endl;
-					lo_message_free(msg);
+					std::cerr << "OscController: Bad any_cast sending command: " << e.what() << std::endl;
 					return false;
 				}
 			}
-			catch (const std::bad_any_cast &e)
+
+			// Send the message
+			int result = m_oscAddress.send(address, msg);
+
+			if (result < 0)
 			{
-				std::cerr << "OscController: Bad any_cast sending command: " << e.what() << std::endl;
-				lo_message_free(msg);
+				std::cerr << "OscController: Failed to send OSC message to " << address << ": "
+						  << m_oscAddress.errstr() << std::endl;
 				return false;
 			}
+
+			return true;
 		}
-
-		// Send the message
-		int result = lo_send_message(m_oscAddress, address.c_str(), msg);
-		lo_message_free(msg);
-
-		if (result == -1)
+		catch (const std::exception &e)
 		{
-			std::cerr << "OscController: Failed to send OSC message to " << address << ": "
-					  << lo_address_errstr(m_oscAddress) << std::endl;
+			std::cerr << "OscController: Exception while sending OSC message: " << e.what() << std::endl;
 			return false;
 		}
-
-		return true;
 	}
 
 	bool OscController::getParameter(const std::string &address,
@@ -422,7 +427,7 @@ namespace AudioEngine
 
 	bool OscController::applyConfiguration(const Configuration &config)
 	{
-		if (!m_configured || !m_oscAddress)
+		if (!m_configured || !m_oscAddress.is_valid())
 		{
 			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
 			return false;
@@ -446,7 +451,7 @@ namespace AudioEngine
 
 	bool OscController::queryDeviceState(std::function<void(bool, const Configuration &)> callback)
 	{
-		if (!m_configured || !m_oscAddress)
+		if (!m_configured || !m_oscAddress.is_valid())
 		{
 			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
 			callback(false, Configuration());
@@ -608,7 +613,7 @@ namespace AudioEngine
 
 	bool OscController::refreshConnectionStatus()
 	{
-		if (!m_configured || !m_oscAddress)
+		if (!m_configured || !m_oscAddress.is_valid())
 		{
 			std::cerr << "OscController: Not configured or no OSC address" << std::endl;
 			return false;

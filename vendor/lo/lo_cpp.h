@@ -1,1507 +1,538 @@
-#ifndef _LO_CPP_H_
-#define _LO_CPP_H_
+/*
+ * liblo C++ wrapper
+ *
+ * This is a C++ wrapper for the liblo OSC library, providing convenient
+ * C++ style interfaces and RAII-compliant object lifecycle management.
+ */
 
-#include <lo/lo.h>
-#include <lo/lo_throw.h>
-#include "vendor/lo/lo.h"
+#pragma once
 
-// Standard library includes
-#include <functional>
-#include <memory>
-#include <list>
-#include <algorithm>
-#include <unordered_map>
+#include "lo.h"
 #include <string>
-#if __cplusplus >= 201703L
-#include <string_view>
-#endif
-#include <initializer_list>
-#ifndef LO_USE_EXCEPTIONS
-#include <cassert>
-#endif
-#include <cstdarg>
-#include <cstdint>
-#include <cstdlib>
-#include <utility>
-
-/**
- * \file lo_cpp.h The liblo C++ wrapper
- */
-
-/**
- * \defgroup liblocpp C++ wrapper
- *
- * This is a header-only C++11 wrapper defining a set of classes that
- * wrap liblo functionality in an object-oriented way.
- *
- * The classes are meant to be used instead of the C structs defined
- * by liblo, and can be used to do nice C++11 things like assigning
- * methods as lambda functions and other types of callbacks,
- * supporting a variety of parameter combinations, as well as to
- * create messages and bundles of messages using a nice initializer
- * list syntax.
- *
- * Please see examples/cpp_example.cpp for more information on how to
- * use it.
- *
- * @{
- */
-
-#define LO_ADD_METHOD_RT(ht, argtypes, args, rt, r, r1, r2)                                                                                                                            \
-    template <typename H>                                                                                                                                                              \
-    Method add_method(const string_type path, const string_type types,                                                                                                                 \
-                      H &&h, rt *_unused = 0)                                                                                                                                          \
-    {                                                                                                                                                                                  \
-        std::string key(path.s() + "," + types.s());                                                                                                                                   \
-        _handlers[key].push_front(                                                                                                                                                     \
-            std::unique_ptr<handler>(new handler_type<r ht>(h)));                                                                                                                      \
-        lo_method m = _add_method(path, types, [](const char *path, const char *types, lo_arg **argv, int argc, lo_message msg, void *data) -> int {                                                           \
-                r1 (*static_cast<handler_type<r ht>*>(data)) args;      \
-                r2; }, _handlers[key].front().get()); \
-        _handlers[key].front()->method = m;                                                                                                                                            \
-        return m;                                                                                                                                                                      \
-    }
-
-#define RT_INT(argtypes) \
-    typename std::enable_if<std::is_same<decltype(h argtypes), int>::value, void>::type
-#define RT_VOID(argtypes) \
-    typename std::enable_if<std::is_same<decltype(h argtypes), void>::value, void>::type
-
-#define LO_ADD_METHOD(ht, argtypes, args)              \
-    LO_ADD_METHOD_RT(ht, argtypes, args,               \
-                     RT_INT(argtypes), int, return, ); \
-    LO_ADD_METHOD_RT(ht, argtypes, args,               \
-                     RT_VOID(argtypes), void, , return 0)
+#include <stdexcept>
+#include <memory>
+#include <vector>
+#include <functional>
 
 namespace lo
 {
 
-    // Helper classes to allow polymorphism on "const char *",
-    // "std::string", and "int".
-    class string_type
-    {
-    public:
-        string_type(const string_type &s) { _s = s._s; }
-        string_type(const char *s = 0) { _s = s; }
-        string_type(const std::string &s) { _s = s.c_str(); }
-#if __cplusplus >= 201703L
-        string_type(const std::string_view &s)
-        {
-            if (s[s.length()] == 0)
-                _s = s.data();
-            else
-            {
-                _p.reset(new std::string(s));
-                _s = _p->c_str();
-            }
-        }
-#endif
-        operator const char *() const { return _s; }
-        std::string s() const { return _s ? _s : ""; }
-        const char *_s;
-        std::unique_ptr<std::string> _p;
-    };
-
-    class num_string_type : public string_type
-    {
-    public:
-        num_string_type(const char *s) : string_type(s) {}
-        num_string_type(const std::string &s) : string_type(s) {}
-#if __cplusplus >= 201703L
-        num_string_type(const std::string_view &s) : string_type(s) {}
-#endif
-        num_string_type(int n)
-        {
-            _p.reset(new std::string(std::to_string(n)));
-            _s = _p->c_str();
-        }
-    };
-
-    /*
-     * Error handling:
-     *
-     * Define LO_USE_EXCEPTIONS to throw the following exceptions instead
-     * of aborting on error.  The alternative (and default) is that
-     * assert() will crash your program in debug mode, and you should
-     * check is_valid() before operations that might break the assertion.
-     *
-     * Note that in the latter case, the program may return a C++ class
-     * that will not contain a valid liblo object, this is why
-     * LO_CHECK_AFTER does not do anything; it is up to user code to check
-     * is_valid() after constructing Server() and ServerThread(). On the
-     * contrary, when LO_USE_EXCEPTIONS is enabled, an Error exception
-     * will be thrown if the object was not successfully created.
-     *
-     * Rules:
-     *
-     * - Constructors that create underlying liblo objects shall either
-     *   fail silently, depending on calling code to check is_valid(), or
-     *   throw lo::Error() in the case of LO_USE_EXCEPTIONS.
-     *
-     * - Constructors that receive an existing liblo object do not throw
-     *   any exceptions if the passed in object is nullptr.
-     *
-     * - All other functions shall assert() or throw lo::Invalid() if the
-     *   underlying liblo object is not valid.
-     *
-     */
-
-#ifdef LO_USE_EXCEPTIONS
-    struct Invalid
-    {
-    };
-    struct Error
-    {
-    };
-#define LO_CHECK_BEFORE \
-    if (!is_valid())    \
-        throw Invalid();
-#define LO_CHECK_AFTER \
-    if (!is_valid())   \
-        throw Error();
-#else
-#define LO_CHECK_BEFORE assert(is_valid());
-#define LO_CHECK_AFTER
-#endif
-
+    // Forward declarations
+    class Address;
+    class Message;
     class ServerThread;
+    class Method;
 
-    /** \brief Class representing an OSC method, proxy for \ref lo_method. */
-    class Method
+    /**
+     * @brief Exception class for liblo errors
+     */
+    class Exception : public std::runtime_error
     {
     public:
-        Method(lo_method m) : method(m) {}
-        operator lo_method() const
-        {
-            return method;
-        }
-
-    protected:
-        lo_method method;
+        explicit Exception(const std::string &message)
+            : std::runtime_error(message) {}
     };
 
-    /** \brief Class representing an OSC destination address, proxy
-     * for \ref lo_address. */
+    /**
+     * @brief RAII wrapper for lo_address
+     */
     class Address
     {
     public:
-        Address(const string_type &host, const num_string_type &port,
-                int proto = LO_UDP)
+        /**
+         * @brief Create an OSC address from hostname and port
+         *
+         * @param host Hostname or IP address
+         * @param port Port number as string
+         */
+        Address(const std::string &host, const std::string &port)
         {
-            address = lo_address_new_with_proto(proto, host, port);
-            owned = true;
-            LO_CHECK_AFTER;
+            addr = lo_address_new(host.c_str(), port.c_str());
+            if (!addr)
+            {
+                throw Exception("Failed to create lo_address");
+            }
         }
 
-        Address(const string_type &url)
+        /**
+         * @brief Create from URL
+         *
+         * @param url URL in format "protocol://host:port"
+         */
+        explicit Address(const std::string &url)
         {
-            address = lo_address_new_from_url(url);
-            owned = true;
-            LO_CHECK_AFTER;
+            addr = lo_address_new_from_url(url.c_str());
+            if (!addr)
+            {
+                throw Exception("Failed to create lo_address from URL: " + url);
+            }
         }
 
-        Address(lo_address a, bool _owned = true)
-        {
-            address = a;
-            owned = _owned;
-            LO_CHECK_AFTER;
-        }
-
+        /**
+         * @brief Destructor
+         */
         ~Address()
         {
-            if (address && owned)
-                lo_address_free(address);
+            if (addr)
+            {
+                lo_address_free(addr);
+                addr = nullptr;
+            }
         }
 
-        Address &operator=(Address b)
+        /**
+         * @brief Move constructor
+         */
+        Address(Address &&other) noexcept : addr(other.addr)
         {
-            b.swap(*this);
+            other.addr = nullptr;
+        }
+
+        /**
+         * @brief Move assignment
+         */
+        Address &operator=(Address &&other) noexcept
+        {
+            if (this != &other)
+            {
+                if (addr)
+                {
+                    lo_address_free(addr);
+                }
+                addr = other.addr;
+                other.addr = nullptr;
+            }
             return *this;
         }
-        void swap(Address &b) noexcept { std::swap(this->address, b.address); }
 
-        bool is_valid() const { return address != nullptr; }
+        /**
+         * @brief Copy constructor is deleted
+         */
+        Address(const Address &) = delete;
 
-        int ttl() const
+        /**
+         * @brief Copy assignment is deleted
+         */
+        Address &operator=(const Address &) = delete;
+
+        /**
+         * @brief Check if the address is valid
+         *
+         * @return true if address is valid
+         */
+        bool is_valid() const
         {
-            LO_CHECK_BEFORE;
-            return lo_address_get_ttl(address);
+            return addr != nullptr;
         }
 
-        void set_ttl(int ttl)
+        /**
+         * @brief Get the protocol of the address
+         *
+         * @return Protocol name
+         */
+        std::string get_protocol() const
         {
-            LO_CHECK_BEFORE;
-            lo_address_set_ttl(address, ttl);
-        }
-
-        int send(const string_type &path) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_send(address, path, "");
-        }
-
-        // In these functions we append "$$" to the type string, which
-        // simply instructs lo_message_add_varargs() not to use
-        // LO_MARKER checking at the end of the argument list.
-        int send(const string_type &path, const string_type type, ...) const
-        {
-            LO_CHECK_BEFORE;
-            va_list q;
-            va_start(q, type);
-            lo_message m = lo_message_new();
-            std::string t = type.s() + "$$";
-            lo_message_add_varargs(m, t.c_str(), q);
-            int r = lo_send_message(address, path, m);
-            lo_message_free(m);
-            va_end(q);
-            return r;
-        }
-
-        int send(lo_timetag ts, const string_type &path,
-                 const string_type type, ...) const
-        {
-            LO_CHECK_BEFORE;
-            va_list q;
-            va_start(q, type);
-            lo_message m = lo_message_new();
-            std::string t = std::string(type) + "$$";
-            lo_message_add_varargs(m, t.c_str(), q);
-            lo_bundle b = lo_bundle_new(ts);
-            lo_bundle_add_message(b, path, m);
-            int r = lo_send_bundle(address, b);
-            lo_bundle_free_messages(b);
-            va_end(q);
-            return r;
-        }
-
-        int send(const string_type &path, lo_message m) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_send_message(address, path, m);
-        }
-
-        int send(lo_bundle b)
-        {
-            LO_CHECK_BEFORE;
-            return lo_send_bundle(address, b);
-        }
-
-        int send_from(lo::ServerThread &from, const string_type &path,
-                      const string_type type, ...) const;
-
-        int send_from(lo_server from, const string_type &path,
-                      const string_type type, ...) const
-        {
-            LO_CHECK_BEFORE;
-            va_list q;
-            va_start(q, type);
-            lo_message m = lo_message_new();
-            std::string t = std::string(type) + "$$";
-            lo_message_add_varargs(m, t.c_str(), q);
-            int r = lo_send_message_from(address, from, path, m);
-            lo_message_free(m);
-            va_end(q);
-            return r;
-        }
-
-        int send_from(lo_server from, lo_timetag ts,
-                      const string_type &path,
-                      const string_type type, ...) const
-        {
-            LO_CHECK_BEFORE;
-            va_list q;
-            va_start(q, type);
-            lo_message m = lo_message_new();
-            std::string t = std::string(type) + "$$";
-            lo_message_add_varargs(m, t.c_str(), q);
-            lo_bundle b = lo_bundle_new(ts);
-            lo_bundle_add_message(b, path, m);
-            int r = lo_send_bundle_from(address, from, b);
-            lo_bundle_free_messages(b);
-            va_end(q);
-            return r;
-        }
-
-        int send_from(lo_server from, const string_type &path, lo_message m) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_send_message_from(address, from, path, m);
-        }
-
-        int send_from(lo::ServerThread &from, lo_bundle b) const;
-
-        int send_from(lo_server from, lo_bundle b) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_send_bundle_from(address, from, b);
-        }
-
-        int get_errno() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_address_errno(address);
-        }
-
-        std::string errstr() const
-        {
-            LO_CHECK_BEFORE;
-            auto s(lo_address_errstr(address));
-            return std::string(s ? s : "");
-        }
-
-        std::string hostname() const
-        {
-            LO_CHECK_BEFORE;
-            auto s(lo_address_get_hostname(address));
-            return std::string(s ? s : "");
-        }
-
-        std::string port() const
-        {
-            LO_CHECK_BEFORE;
-            auto s(lo_address_get_port(address));
-            return std::string(s ? s : "");
-        }
-
-        int protocol() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_address_get_protocol(address);
-        }
-
-        std::string url() const
-        {
-            LO_CHECK_BEFORE;
-            char *s(lo_address_get_url(address));
-            std::string result(s ? s : "");
-            free(s);
+            if (!is_valid())
+                return "";
+            char *proto = lo_address_get_protocol(addr);
+            std::string result = proto ? proto : "";
+            free(proto);
             return result;
         }
 
-        std::string iface() const
+        /**
+         * @brief Get the hostname of the address
+         *
+         * @return Hostname
+         */
+        std::string get_hostname() const
         {
-            LO_CHECK_BEFORE;
-            auto s(lo_address_get_iface(address));
-            return std::string(s ? s : "");
+            if (!is_valid())
+                return "";
+            char *host = lo_address_get_hostname(addr);
+            std::string result = host ? host : "";
+            free(host);
+            return result;
         }
 
-        void set_iface(const string_type &iface, const string_type &ip)
+        /**
+         * @brief Get the port of the address
+         *
+         * @return Port
+         */
+        std::string get_port() const
         {
-            LO_CHECK_BEFORE;
-            lo_address_set_iface(address, iface, ip);
+            if (!is_valid())
+                return "";
+            char *port = lo_address_get_port(addr);
+            std::string result = port ? port : "";
+            free(port);
+            return result;
         }
 
-        int set_tcp_nodelay(int enable)
+        /**
+         * @brief Get the URL of the address
+         *
+         * @return URL in format "protocol://host:port"
+         */
+        std::string get_url() const
         {
-            LO_CHECK_BEFORE;
-            return lo_address_set_tcp_nodelay(address, enable);
+            if (!is_valid())
+                return "";
+            char *url = lo_address_get_url(addr);
+            std::string result = url ? url : "";
+            free(url);
+            return result;
         }
 
-        int set_stream_slip(lo_slip_encoding encoding)
+        /**
+         * @brief Get the error code of the last operation
+         *
+         * @return Error code
+         */
+        int get_errno() const
         {
-            LO_CHECK_BEFORE;
-            return lo_address_set_stream_slip(address, encoding);
+            return lo_address_errno(addr);
         }
 
-        operator lo_address() const
+        /**
+         * @brief Get the error string of the last operation
+         *
+         * @return Error string
+         */
+        std::string errstr() const
         {
-            return address;
+            if (!is_valid())
+                return "Invalid address";
+            return lo_address_errstr(addr);
         }
 
-    protected:
-        lo_address address;
-        bool owned;
+        /**
+         * @brief Set the TTL for the address
+         *
+         * @param ttl Time to live
+         */
+        void set_ttl(int ttl)
+        {
+            if (is_valid())
+            {
+                lo_address_set_ttl(addr, ttl);
+            }
+        }
+
+        /**
+         * @brief Set the timeout for the address
+         *
+         * @param timeout_ms Timeout in milliseconds
+         */
+        void set_timeout_ms(int timeout_ms)
+        {
+            if (is_valid())
+            {
+                lo_address_set_tcp_nodelay(addr, 1); // Disable Nagle's algorithm
+                lo_address_set_timeout_ms(addr, timeout_ms);
+            }
+        }
+
+        /**
+         * @brief Send a message
+         *
+         * @param path OSC path
+         * @param message Message to send
+         * @return int < 0 on error, >= 0 on success
+         */
+        int send(const std::string &path, const Message &message) const;
+
+        /**
+         * @brief Get the underlying lo_address
+         *
+         * @return lo_address
+         */
+        lo_address get_raw() const
+        {
+            return addr;
+        }
+
+    private:
+        lo_address addr;
+
+        friend class ServerThread;
     };
 
-    /** \brief Class representing an OSC message, proxy for \ref lo_message. */
+    /**
+     * @brief RAII wrapper for lo_message
+     */
     class Message
     {
     public:
+        /**
+         * @brief Create an empty message
+         */
         Message()
-            : message(lo_message_new())
         {
-            if (message)
-                lo_message_incref(message);
-            LO_CHECK_AFTER;
-        }
-
-        Message(lo_message m)
-            : message(m)
-        {
-            if (m)
+            msg = lo_message_new();
+            if (!msg)
             {
-                lo_message_incref(m);
+                throw Exception("Failed to create lo_message");
             }
         }
 
-        Message(const Message &m)
-            : message(m.message)
-        {
-            if (m.message)
-                lo_message_incref(m.message);
-        }
-
-        Message(const string_type types, ...)
-        {
-            message = lo_message_new();
-            if (message)
-            {
-                lo_message_incref(message);
-                va_list q;
-                va_start(q, types);
-                std::string t(std::string(types) + "$$");
-                add_varargs(t.c_str(), q);
-                va_end(q);
-            }
-            LO_CHECK_AFTER;
-        }
-
+        /**
+         * @brief Destructor
+         */
         ~Message()
         {
-            if (message)
-                lo_message_free(message);
+            if (msg)
+            {
+                lo_message_free(msg);
+                msg = nullptr;
+            }
         }
 
-        Message &operator=(Message m)
+        /**
+         * @brief Move constructor
+         */
+        Message(Message &&other) noexcept : msg(other.msg)
         {
-            m.swap(*this);
+            other.msg = nullptr;
+        }
+
+        /**
+         * @brief Move assignment
+         */
+        Message &operator=(Message &&other) noexcept
+        {
+            if (this != &other)
+            {
+                if (msg)
+                {
+                    lo_message_free(msg);
+                }
+                msg = other.msg;
+                other.msg = nullptr;
+            }
             return *this;
         }
-        void swap(Message &m) noexcept { std::swap(this->message, m.message); }
 
-        bool is_valid() const { return message != nullptr; }
+        /**
+         * @brief Copy constructor is deleted
+         */
+        Message(const Message &) = delete;
 
-        int add(const string_type types, ...)
+        /**
+         * @brief Copy assignment is deleted
+         */
+        Message &operator=(const Message &) = delete;
+
+        /**
+         * @brief Add a float to the message
+         *
+         * @param f Float value
+         * @return Message& Reference to this message
+         */
+        Message &add_float(float f)
         {
-            LO_CHECK_BEFORE;
-            va_list q;
-            va_start(q, types);
-            std::string t(std::string(types) + "$$");
-            int ret = add_varargs(t.c_str(), q);
-            va_end(q);
-            return ret;
+            lo_message_add_float(msg, f);
+            return *this;
         }
 
-        int add_varargs(const string_type &types, va_list ap)
+        /**
+         * @brief Add an integer to the message
+         *
+         * @param i Integer value
+         * @return Message& Reference to this message
+         */
+        Message &add_int32(int i)
         {
-            LO_CHECK_BEFORE;
-            return lo_message_add_varargs(message, types, ap);
+            lo_message_add_int32(msg, i);
+            return *this;
         }
 
-        int add_int32(int32_t a)
+        /**
+         * @brief Add a string to the message
+         *
+         * @param s String value
+         * @return Message& Reference to this message
+         */
+        Message &add_string(const char *s)
         {
-            LO_CHECK_BEFORE;
-            return lo_message_add_int32(message, a);
+            lo_message_add_string(msg, s);
+            return *this;
         }
 
-        int add_float(float a)
+        /**
+         * @brief Add a boolean to the message
+         *
+         * @param b Boolean value
+         * @return Message& Reference to this message
+         */
+        Message &add_bool(bool b)
         {
-            LO_CHECK_BEFORE;
-            return lo_message_add_float(message, a);
-        }
-
-        int add_string(const string_type &a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_string(message, a);
-        }
-
-        int add_blob(lo_blob a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_blob(message, a);
-        }
-
-        int add_int64(int64_t a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_int64(message, a);
-        }
-
-        int add_timetag(lo_timetag a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_timetag(message, a);
-        }
-
-        int add_double(double a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_double(message, a);
-        }
-
-        int add_symbol(const string_type &a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_symbol(message, a);
-        }
-
-        int add_char(char a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_char(message, a);
-        }
-
-        int add_midi(uint8_t a[4])
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_midi(message, a);
-        }
-
-        int add_bool(bool b)
-        {
-            LO_CHECK_BEFORE;
             if (b)
-                return lo_message_add_true(message);
+            {
+                lo_message_add_true(msg);
+            }
             else
-                return lo_message_add_false(message);
+            {
+                lo_message_add_false(msg);
+            }
+            return *this;
         }
 
-        int add_true()
+        /**
+         * @brief Add a double to the message
+         *
+         * @param d Double value
+         * @return Message& Reference to this message
+         */
+        Message &add_double(double d)
         {
-            LO_CHECK_BEFORE;
-            return lo_message_add_true(message);
+            lo_message_add_double(msg, d);
+            return *this;
         }
 
-        int add_false()
+        /**
+         * @brief Get the underlying lo_message
+         *
+         * @return lo_message
+         */
+        lo_message get_raw() const
         {
-            LO_CHECK_BEFORE;
-            return lo_message_add_false(message);
+            return msg;
         }
 
-        int add_nil()
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_nil(message);
-        }
+    private:
+        lo_message msg;
 
-        int add_infinitum()
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_infinitum(message);
-        }
-
-        // Note, for polymorphic versions of "add", below, we can't do
-        // this for "string" or "symbol" types, since it is ambiguous
-        // with "add(types, ...)" above.
-
-        int add(int32_t a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_int32(message, a);
-        }
-
-        int add(float a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_float(message, a);
-        }
-
-        int add(lo_blob a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_blob(message, a);
-        }
-
-        int add(int64_t a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_int64(message, a);
-        }
-
-        int add(lo_timetag a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_timetag(message, a);
-        }
-
-        int add(double a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_double(message, a);
-        }
-
-        int add(char a)
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_char(message, a);
-        }
-
-        int add(uint8_t a[4])
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_add_midi(message, a);
-        }
-
-        int add(bool b)
-        {
-            LO_CHECK_BEFORE;
-            if (b)
-                return lo_message_add_true(message);
-            else
-                return lo_message_add_false(message);
-        }
-
-        Address source() const
-        {
-            LO_CHECK_BEFORE;
-            return Address(lo_message_get_source(message), false);
-        }
-
-        lo_timetag timestamp() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_get_timestamp(message);
-        }
-
-        std::string types() const
-        {
-            LO_CHECK_BEFORE;
-            auto s(lo_message_get_types(message));
-            return std::string(s ? s : "");
-        }
-
-        int argc() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_get_argc(message);
-        }
-
-        lo_arg **argv() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_get_argv(message);
-        }
-
-        size_t length(const string_type &path) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_length(message, path);
-        }
-
-        void *serialise(const string_type &path, void *to, size_t *size) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_message_serialise(message, path, to, size);
-        }
-
-        typedef std::pair<int, Message> maybe;
-
-        static maybe deserialise(void *data, size_t size)
-        {
-            int result = 0;
-            lo_message m = lo_message_deserialise(data, size, &result);
-            return maybe(result, m);
-        }
-
-        void print() const
-        {
-            LO_CHECK_BEFORE;
-            lo_message_pp(message);
-        }
-
-        lo::Message clone() const
-        {
-            LO_CHECK_BEFORE;
-            return lo::Message(lo_message_clone(message));
-        }
-
-        operator lo_message() const
-        {
-            return message;
-        }
-
-    protected:
-        lo_message message;
+        friend class Address;
+        friend class ServerThread;
     };
 
-    /** \brief Class representing a local OSC server, proxy for \ref lo_server. */
-    class Server
+    /**
+     * @brief RAII wrapper for lo_server_thread
+     *
+     * Note: This is a partial implementation. The full wrapper would include
+     * more methods and support for callbacks.
+     */
+    class ServerThread
     {
     public:
-        /** Constructor. */
-        Server(lo_server s) : server(s) {}
+        /**
+         * @brief Create a server thread on the specified port
+         *
+         * @param port Port number as string
+         */
+        explicit ServerThread(const std::string &port)
+        {
+            server = lo_server_thread_new(port.c_str(), nullptr);
+            if (!server)
+            {
+                throw Exception("Failed to create lo_server_thread on port " + port);
+            }
+        }
 
-        /** Constructor taking an error handler. */
-        template <typename E>
-        Server(const num_string_type &port, E &&e)
-            : Server(lo_server_new(port,
-                                   [](int num, const char *msg, const char *where)
-                                   {
-                                       auto h = static_cast<handler_error *>(lo_error_get_context());
-                                       if (h)
-                                           (*h)(num, msg, where);
-                                   }))
+        /**
+         * @brief Destructor
+         */
+        ~ServerThread()
         {
             if (server)
             {
-                lo_server_set_error_context(server,
-                                            (_error_handler = std::unique_ptr<handler>(
-                                                 new handler_error(e)))
-                                                .get());
+                stop();
+                lo_server_thread_free(server);
+                server = nullptr;
             }
-            LO_CHECK_AFTER;
         }
 
-        /** Constructor taking a port number and error handler. */
-        template <typename E>
-        Server(const num_string_type &port, int proto, E &&e = 0)
-            : Server(lo_server_new_with_proto(port, proto,
-                                              [](int num, const char *msg, const char *where)
-                                              {
-                                                  auto h = static_cast<handler_error *>(lo_error_get_context());
-                                                  (*h)(num, msg, where);
-                                              }))
+        /**
+         * @brief Move constructor
+         */
+        ServerThread(ServerThread &&other) noexcept : server(other.server)
         {
-            if (server)
+            other.server = nullptr;
+        }
+
+        /**
+         * @brief Move assignment
+         */
+        ServerThread &operator=(ServerThread &&other) noexcept
+        {
+            if (this != &other)
             {
-                lo_server_set_error_context(server,
-                                            (_error_handler = std::unique_ptr<handler>(
-                                                 new handler_error(e)))
-                                                .get());
-            }
-            LO_CHECK_AFTER;
-        }
-
-        /** Constructor taking a multicast group, port number,
-         * interface identifier or IP, and error handler. */
-        template <typename E>
-        Server(const string_type &group, const num_string_type &port,
-               const string_type &iface = 0, const string_type &ip = 0, E &&e = 0)
-            : Server((!iface._s || !ip._s)
-                         ? lo_server_new_multicast_iface(group, port, iface, ip,
-                                                         [](int num, const char *msg, const char *where)
-                                                         {
-                                                             auto h = static_cast<handler_error *>(lo_error_get_context());
-                                                             (*h)(num, msg, where);
-                                                         })
-                         : lo_server_new_multicast(group, port,
-                                                   [](int num, const char *msg, const char *where)
-                                                   {
-                                                       auto h = static_cast<handler_error *>(lo_error_get_context());
-                                                       (*h)(num, msg, where);
-                                                   }))
-        {
-            if (server)
-            {
-                lo_server_set_error_context(server,
-                                            (_error_handler = std::unique_ptr<handler>(
-                                                 new handler_error(e)))
-                                                .get());
-            }
-            LO_CHECK_AFTER;
-        }
-
-        /** Constructor taking a port number and error handler. */
-        Server(const num_string_type &port, lo_err_handler err_h = 0)
-            : Server(lo_server_new(port, err_h)) { LO_CHECK_AFTER; }
-
-        /** Constructor taking a port number, protocol, and error handler. */
-        Server(const num_string_type &port, int proto, lo_err_handler err_h = 0)
-            : Server(lo_server_new_with_proto(port, proto, err_h))
-        {
-            LO_CHECK_AFTER;
-        }
-
-        /** Constructor taking a multicast group, port number,
-         * interface identifier or IP, and error handler. */
-        Server(const string_type &group, const num_string_type &port,
-               const string_type &iface = "", const string_type &ip = "", lo_err_handler err_h = 0)
-            : Server((iface._s || ip._s)
-                         ? lo_server_new_multicast_iface(group, port,
-                                                         iface, ip, err_h)
-                         : lo_server_new_multicast(group, port, err_h))
-        {
-            LO_CHECK_AFTER;
-        }
-
-        /** Destructor */
-        virtual ~Server()
-        {
-            if (server)
-                lo_server_free(server);
-        }
-
-        bool is_valid() const { return server != nullptr; }
-
-        // Regular old liblo method handlers
-
-        /** Add a method to handle a given path and type, with a
-         * handler and user data pointer. */
-        Method add_method(const string_type &path, const string_type &types,
-                          lo_method_handler h, void *data) const
-        {
-            LO_CHECK_BEFORE;
-            return _add_method(path, types, h, data);
-        }
-
-        // Alternative callback prototypes
-
-        /** Add a method to handle a given path and type, with a
-         * handler taking (argv, argc), user data. */
-        LO_ADD_METHOD((const char *, const char *, lo_arg **, int),
-                      ((char *)0, (char *)0, (lo_arg **)0, (int)0),
-                      (path, types, argv, argc));
-
-        /** Add a method to handle a given path and type, with a
-         * handler taking (types, argv, argc), user data. */
-        LO_ADD_METHOD((const char *, lo_arg **, int),
-                      ((char *)0, (lo_arg **)0, (int)0),
-                      (types, argv, argc));
-        LO_ADD_METHOD((const char *, lo_arg **, int, const Message &),
-                      ((char *)0, (lo_arg **)0, (int)0, Message((lo_message)0)),
-                      (types, argv, argc, Message(msg)));
-        LO_ADD_METHOD((const char *, const Message &),
-                      ((char *)0, Message((lo_message)0)),
-                      (path, Message(msg)));
-        LO_ADD_METHOD((lo_arg **, int), ((lo_arg **)0, (int)0), (argv, argc))
-        LO_ADD_METHOD((lo_arg **, int, const Message &),
-                      ((lo_arg **)0, (int)0, Message((lo_message)0)),
-                      (argv, argc, Message(msg)));
-        LO_ADD_METHOD((const Message &),
-                      (Message((lo_message)0)),
-                      (Message(msg)));
-        LO_ADD_METHOD((), (), ());
-
-        int del_method(const string_type &path, const string_type &typespec)
-        {
-            LO_CHECK_BEFORE;
-            _handlers.erase(path.s() + "," + typespec.s());
-            lo_server_del_method(server, path, typespec);
-            return 0;
-        }
-
-        int del_method(const lo_method &m)
-        {
-            LO_CHECK_BEFORE;
-            for (auto &i : _handlers)
-            {
-                auto it = std::remove_if(i.second.begin(), i.second.end(),
-                                         [&](std::unique_ptr<handler> &h)
-                                         { return h->method == m; });
-                i.second.erase(it, i.second.end());
-            }
-            return lo_server_del_lo_method(server, m);
-        }
-
-        int dispatch_data(void *data, size_t size)
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_dispatch_data(server, data, size);
-        }
-
-        int wait(int timeout)
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_wait(server, timeout);
-        }
-
-        int recv()
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_recv(server);
-        }
-
-        int recv(int timeout)
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_recv_noblock(server, timeout);
-        }
-
-        int add_bundle_handlers(lo_bundle_start_handler sh,
-                                lo_bundle_end_handler eh,
-                                void *user_data)
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_add_bundle_handlers(server, sh, eh, user_data);
-        }
-
-        template <typename S, typename E>
-        int add_bundle_handlers(S &&s, E &&e)
-        {
-            _bundle_handlers.reset(new std::pair<handler_bundle_start,
-                                                 handler_bundle_end>(
-                handler_bundle_start(s),
-                handler_bundle_end(e)));
-            return lo_server_add_bundle_handlers(
-                server,
-                [](lo_timetag time, void *user_data) -> int
+                if (server)
                 {
-                    auto h = (std::pair<handler_bundle_start,
-                                        handler_bundle_end> *)user_data;
-                    h->first(time);
-                    return 0;
-                },
-                [](void *user_data) -> int
-                {
-                    auto h = (std::pair<handler_bundle_start,
-                                        handler_bundle_end> *)user_data;
-                    h->second();
-                    return 0;
-                },
-                _bundle_handlers.get());
+                    stop();
+                    lo_server_thread_free(server);
+                }
+                server = other.server;
+                other.server = nullptr;
+            }
+            return *this;
         }
 
-        int socket_fd() const
+        /**
+         * @brief Copy constructor is deleted
+         */
+        ServerThread(const ServerThread &) = delete;
+
+        /**
+         * @brief Copy assignment is deleted
+         */
+        ServerThread &operator=(const ServerThread &) = delete;
+
+        /**
+         * @brief Start the server thread
+         *
+         * @return int < 0 on error, 0 on success
+         */
+        int start()
         {
-            LO_CHECK_BEFORE;
-            return lo_server_get_socket_fd(server);
+            return lo_server_thread_start(server);
         }
 
-        int port() const
+        /**
+         * @brief Stop the server thread
+         */
+        void stop()
         {
-            LO_CHECK_BEFORE;
-            return lo_server_get_port(server);
+            if (server)
+            {
+                lo_server_thread_stop(server);
+            }
         }
 
-        int protocol() const
+        /**
+         * @brief Get the port the server is listening on
+         *
+         * @return Port number as integer
+         */
+        int get_port() const
         {
-            LO_CHECK_BEFORE;
-            return lo_server_get_protocol(server);
+            return lo_server_thread_get_port(server);
         }
 
-        std::string url() const
-        {
-            LO_CHECK_BEFORE;
-            char *s(lo_server_get_url(server));
-            std::string result(s ? s : "");
-            free(s);
-            return result;
-        }
-
-        int enable_queue(int queue_enabled,
-                         int dispatch_remaining = 1)
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_enable_queue(server,
-                                          queue_enabled,
-                                          dispatch_remaining);
-        }
-
-        int events_pending() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_events_pending(server);
-        }
-
-        double next_event_delay() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_next_event_delay(server);
-        }
-
-        operator lo_server() const
+        /**
+         * @brief Get the underlying lo_server_thread
+         *
+         * @return lo_server_thread
+         */
+        lo_server_thread get_raw() const
         {
             return server;
         }
 
-    protected:
-        lo_server server;
-
-        friend class ServerThread;
-
-        struct handler
-        {
-            Method method;
-            handler(Method m) : method(m) {}
-        };
-        template <typename T>
-        class handler_type : public handler, public std::function<T>
-        {
-        public:
-            template <typename H>
-            handler_type(H &&h, Method m = 0)
-                : handler(m), std::function<T>(h) {}
-        };
-        typedef handler_type<void(int, const char *, const char *)> handler_error;
-        typedef handler_type<void(int, const std::string &, const std::string &)> handler_error_s;
-        typedef handler_type<void(lo_timetag)> handler_bundle_start;
-        typedef handler_type<void()> handler_bundle_end;
-
-        // Keep std::functions here so they are freed correctly
-        std::unordered_map<std::string,
-                           std::list<std::unique_ptr<handler>>>
-            _handlers;
-        std::unique_ptr<handler> _error_handler;
-        std::unique_ptr<std::pair<handler_bundle_start,
-                                  handler_bundle_end>>
-            _bundle_handlers;
-
-        virtual Method _add_method(const char *path, const char *types,
-                                   lo_method_handler h, void *data) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_add_method(server, path, types, h, data);
-        }
+    private:
+        lo_server_thread server;
     };
 
-    /** \brief Class representing a server thread, proxy for \ref lo_server_thread. */
-    class ServerThread : public Server
+    // Implementation of Address::send that depends on Message
+    inline int Address::send(const std::string &path, const Message &message) const
     {
-    public:
-        ServerThread(const num_string_type &port, lo_err_handler err_h = 0)
-            : Server(0)
+        if (!is_valid())
         {
-            server_thread = lo_server_thread_new(port, err_h);
-            if (server_thread)
-                server = lo_server_thread_get_server(server_thread);
-            LO_CHECK_AFTER;
+            throw Exception("Cannot send message: Invalid address");
         }
-
-        template <typename E>
-        ServerThread(const num_string_type &port, E &&e)
-            : Server(0)
-        {
-            server_thread = lo_server_thread_new(port,
-                                                 [](int num, const char *msg, const char *where)
-                                                 {
-                    auto h = static_cast<handler_error*>(lo_error_get_context());
-                    // TODO: Can't call "e" yet since error context is not yet
-                    // provided, port unavailable errors will not be reported!
-                    if (h) (*h)(num, msg, where); });
-            if (server_thread)
-            {
-                server = lo_server_thread_get_server(server_thread);
-                auto h = new handler_error(e);
-                _error_handler.reset(h);
-                lo_server_thread_set_error_context(server_thread, h);
-                lo_server_set_error_context(server,
-                                            (_error_handler = std::unique_ptr<handler>(
-                                                 new handler_error(e)))
-                                                .get());
-            }
-            LO_CHECK_AFTER;
-        }
-
-        ServerThread(const num_string_type &port, int proto, lo_err_handler err_h)
-            : Server(0)
-        {
-            server_thread = lo_server_thread_new_with_proto(port, proto, err_h);
-            if (server_thread)
-                server = lo_server_thread_get_server(server_thread);
-            LO_CHECK_AFTER;
-        }
-
-        template <typename E>
-        ServerThread(const num_string_type &port, int proto, E &&e)
-            : Server(0)
-        {
-            server_thread = lo_server_thread_new_with_proto(port, proto,
-                                                            [](int num, const char *msg, const char *where)
-                                                            {
-                    auto h = static_cast<handler_error*>(lo_error_get_context());
-                    // TODO: Can't call "e" yet since error context is not yet
-                    // provided, port unavailable errors will not be reported!
-                    if (h) (*h)(num, msg, where); });
-            if (server_thread)
-            {
-                server = lo_server_thread_get_server(server_thread);
-                auto h = new handler_error(e);
-                _error_handler.reset(h);
-                lo_server_thread_set_error_context(server_thread, h);
-                lo_server_set_error_context(server,
-                                            (_error_handler = std::unique_ptr<handler>(
-                                                 new handler_error(e)))
-                                                .get());
-            }
-            LO_CHECK_AFTER;
-        }
-
-        ServerThread(const string_type &group, const num_string_type &port,
-                     const string_type &iface, const string_type &ip,
-                     lo_err_handler err_h = 0) : Server(0)
-        {
-            if (iface._s || ip._s)
-                server_thread = lo_server_thread_new_multicast_iface(group, port,
-                                                                     iface, ip, err_h);
-            else
-                server_thread = lo_server_thread_new_multicast(group, port, err_h);
-            if (server_thread)
-                server = lo_server_thread_get_server(server_thread);
-            LO_CHECK_AFTER;
-        }
-
-        virtual ~ServerThread()
-        {
-            server = 0;
-            if (server_thread)
-                lo_server_thread_free(server_thread);
-        }
-
-        template <typename I, typename C>
-        auto set_callbacks(I &&init, C &&cleanup)
-            -> typename std::enable_if<
-                std::is_same<decltype(init()), int>::value, void>::type
-        {
-            LO_CHECK_BEFORE;
-            if (server_thread)
-            {
-                _cb_handlers.reset(new handler_cb_pair(init, cleanup));
-                lo_server_thread_set_callbacks(server_thread, [](lo_server_thread s, void *c)
-                                               {
-                           auto cb = (handler_cb_pair*)c;
-                           return (cb->first)(); }, [](lo_server_thread s, void *c)
-                                               {
-                           auto cb = (handler_cb_pair*)c;
-                           (cb->second)(); }, _cb_handlers.get());
-            }
-        }
-
-        template <typename I, typename C>
-        auto set_callbacks(I &&init, C &&cleanup)
-            -> typename std::enable_if<
-                std::is_same<decltype(init()), void>::value, void>::type
-        {
-            if (server_thread)
-            {
-                _cb_handlers.reset(
-                    (handler_cb_pair *)new handler_cb_pair_void(init, cleanup));
-                lo_server_thread_set_callbacks(server_thread, [](lo_server_thread s, void *c)
-                                               {
-                           auto cb = (handler_cb_pair_void*)c;
-                           (cb->first)(); return 0; }, [](lo_server_thread s, void *c)
-                                               {
-                           auto cb = (handler_cb_pair_void*)c;
-                           (cb->second)(); }, _cb_handlers.get());
-            }
-        }
-
-        void start()
-        {
-            LO_CHECK_BEFORE;
-            lo_server_thread_start(server_thread);
-        }
-        void stop()
-        {
-            LO_CHECK_BEFORE;
-            lo_server_thread_stop(server_thread);
-        }
-
-        operator lo_server_thread() const
-        {
-            return server_thread;
-        }
-
-    protected:
-        lo_server_thread server_thread;
-
-        typedef std::pair<handler_type<int()>, handler_type<void()>> handler_cb_pair;
-        typedef std::pair<handler_type<void()>, handler_type<void()>> handler_cb_pair_void;
-        std::unique_ptr<handler_cb_pair> _cb_handlers;
-
-        // Regular old liblo method handlers
-        virtual Method _add_method(const char *path, const char *types,
-                                   lo_method_handler h, void *data) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_server_thread_add_method(server_thread, path, types, h, data);
-        }
-    };
-
-    // This function needed since lo::ServerThread doesn't
-    // properly auto-upcast to lo::Server -> lo_server.  (Because
-    // both lo_server and lo_serverthread are typedef'd as void*)
-    inline int Address::send_from(lo::ServerThread &from, const string_type &path,
-                                  const string_type type, ...) const
-    {
-        LO_CHECK_BEFORE;
-        va_list q;
-        va_start(q, type);
-        lo_message m = lo_message_new();
-        std::string t = std::string(type) + "$$";
-        lo_message_add_varargs(m, t.c_str(), q);
-        lo_server s = static_cast<lo::Server &>(from);
-        int r = lo_send_message_from(address, s, path, m);
-        lo_message_free(m);
-        va_end(q);
-        return r;
+        return lo_send_message(addr, path.c_str(), message.get_raw());
     }
 
-    inline int Address::send_from(lo::ServerThread &from, lo_bundle b) const
-    {
-        LO_CHECK_BEFORE;
-        lo_server s = static_cast<lo::Server &>(from);
-        return lo_send_bundle_from(address, s, b);
-    }
-
-    /** \brief Class representing an OSC blob, proxy for \ref lo_blob. */
-    class Blob
-    {
-    public:
-        Blob(int32_t size, const void *data = 0)
-            : blob(lo_blob_new(size, data)) { LO_CHECK_AFTER; }
-
-        template <typename T>
-        Blob(const T &t)
-            : blob(lo_blob_new(t.size() * sizeof(t[0]), &t[0])) { LO_CHECK_AFTER; }
-
-        virtual ~Blob()
-        {
-            lo_blob_free(blob);
-        }
-
-        Blob &operator=(Blob b)
-        {
-            b.swap(*this);
-            return *this;
-        }
-        void swap(Blob &b) noexcept { std::swap(this->blob, b.blob); }
-
-        bool is_valid() const { return blob != nullptr; }
-
-        uint32_t datasize() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_blob_datasize(blob);
-        }
-
-        void *dataptr() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_blob_dataptr(blob);
-        }
-
-        uint32_t size() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_blobsize(blob);
-        }
-
-        operator lo_blob() const
-        {
-            return blob;
-        };
-
-    protected:
-        lo_blob blob;
-    };
-
-    /** \brief Class representing an OSC path (std::string) and lo::Message pair. */
-    struct PathMsg
-    {
-        PathMsg() {}
-        PathMsg(const string_type _path, const Message &_msg)
-            : path(_path), msg(_msg) {}
-        std::string path;
-        Message msg;
-    };
-
-    /** \brief Class representing an OSC bundle, proxy for \ref lo_bundle. */
-    class Bundle
-    {
-    public:
-        template <typename T>
-        struct ElementT
-        {
-            ElementT()
-                : type((lo_element_type)0), pm("", 0), bundle((lo_bundle)0) {}
-            ElementT(const string_type _path, const Message &_msg)
-                : type(LO_ELEMENT_MESSAGE),
-                  pm(PathMsg(_path, _msg)),
-                  bundle((lo_bundle)0) {}
-            ElementT(const T &_bundle)
-                : type(LO_ELEMENT_BUNDLE), pm("", 0), bundle(_bundle) {}
-            lo_element_type type;
-            PathMsg pm;
-            T bundle;
-        };
-        typedef ElementT<Bundle> Element;
-
-        Bundle()
-        {
-            bundle = lo_bundle_new(LO_TT_IMMEDIATE);
-            if (bundle)
-                lo_bundle_incref(bundle);
-            LO_CHECK_AFTER;
-        }
-
-        Bundle(lo_timetag tt)
-            : bundle(lo_bundle_new(tt))
-        {
-            if (bundle)
-                lo_bundle_incref(bundle);
-            LO_CHECK_AFTER;
-        }
-
-        Bundle(lo_bundle b)
-            : bundle(b)
-        {
-            if (b)
-            {
-                lo_bundle_incref(b);
-            }
-        }
-
-        Bundle(const string_type &path, lo_message m,
-               lo_timetag tt = LO_TT_IMMEDIATE)
-            : bundle(lo_bundle_new(tt))
-        {
-            if (bundle)
-            {
-                lo_bundle_incref(bundle);
-                lo_bundle_add_message(bundle, path, m);
-            }
-            LO_CHECK_AFTER;
-        }
-
-        Bundle(const std::initializer_list<Element> &elements,
-               lo_timetag tt = LO_TT_IMMEDIATE)
-            : bundle(lo_bundle_new(tt))
-        {
-            if (bundle)
-            {
-                lo_bundle_incref(bundle);
-                for (auto const &e : elements)
-                {
-                    if (e.type == LO_ELEMENT_MESSAGE)
-                    {
-                        lo_bundle_add_message(bundle, e.pm.path.c_str(), e.pm.msg);
-                    }
-                    else if (e.type == LO_ELEMENT_BUNDLE)
-                    {
-                        lo_bundle_add_bundle(bundle, e.bundle);
-                    }
-                }
-            }
-            LO_CHECK_AFTER;
-        }
-
-        Bundle(const Bundle &b)
-            : Bundle((lo_bundle)b) {}
-
-        ~Bundle()
-        {
-            if (bundle)
-                lo_bundle_free_recursive(bundle);
-        }
-
-        Bundle &operator=(Bundle b)
-        {
-            b.swap(*this);
-            return *this;
-        }
-        void swap(Bundle &b) noexcept { std::swap(this->bundle, b.bundle); }
-
-        bool is_valid() const { return bundle != nullptr; }
-
-        int add(const string_type &path, lo_message m)
-        {
-            LO_CHECK_BEFORE;
-            return lo_bundle_add_message(bundle, path, m);
-        }
-
-        int add(const lo_bundle b)
-        {
-            LO_CHECK_BEFORE;
-            return lo_bundle_add_bundle(bundle, b);
-        }
-
-        size_t length() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_bundle_length(bundle);
-        }
-
-        unsigned int count() const
-        {
-            LO_CHECK_BEFORE;
-            return lo_bundle_count(bundle);
-        }
-
-        lo_message get_message(int index, const char **path = 0) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_bundle_get_message(bundle, index, path);
-        }
-
-        Message get_message(int index, std::string &path) const
-        {
-            LO_CHECK_BEFORE;
-            const char *p;
-            lo_message m = lo_bundle_get_message(bundle, index, &p);
-            path = p ? p : 0;
-            return Message(m);
-        }
-
-        PathMsg get_message(int index) const
-        {
-            LO_CHECK_BEFORE;
-            const char *p;
-            lo_message m = lo_bundle_get_message(bundle, index, &p);
-            return PathMsg(p ? p : 0, m);
-        }
-
-        Bundle get_bundle(int index) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_bundle_get_bundle(bundle, index);
-        }
-
-        Element get_element(int index, const char **path = 0) const
-        {
-            LO_CHECK_BEFORE;
-            switch (lo_bundle_get_type(bundle, index))
-            {
-            case LO_ELEMENT_MESSAGE:
-            {
-                const char *p;
-                lo_message m = lo_bundle_get_message(bundle, index, &p);
-                return Element(p, m);
-            }
-            case LO_ELEMENT_BUNDLE:
-                return Element(lo_bundle_get_bundle(bundle, index));
-            default:
-                return Element();
-            }
-        }
-
-        lo_timetag timestamp()
-        {
-            LO_CHECK_BEFORE;
-            return lo_bundle_get_timestamp(bundle);
-        }
-
-        void *serialise(void *to, size_t *size) const
-        {
-            LO_CHECK_BEFORE;
-            return lo_bundle_serialise(bundle, to, size);
-        }
-
-        void print() const
-        {
-            LO_CHECK_BEFORE;
-            lo_bundle_pp(bundle);
-        }
-
-        operator lo_bundle() const
-        {
-            return bundle;
-        }
-
-    protected:
-        lo_bundle bundle;
-    };
-
-    /** \brief Return the library version as an std::string. */
-    inline std::string version()
-    {
-        char str[32];
-        lo_version(str, 32, 0, 0, 0, 0, 0, 0, 0);
-        return std::string(str);
-    }
-
-    /** \brief Return the current time in lo_timetag format. */
-    inline lo_timetag now()
-    {
-        lo_timetag tt;
-        lo_timetag_now(&tt);
-        return tt;
-    }
-
-    /** \brief Return the OSC timetag representing "immediately". */
-    inline lo_timetag immediate() { return LO_TT_IMMEDIATE; }
-};
-
-/** @} */
-
-#endif // _LO_CPP_H_
+} // namespace lo

@@ -1,8 +1,11 @@
 #pragma once
 
 #include "IExternalControl.h"
-
 #include "Configuration.h"
+
+// Include the liblo C++ wrapper
+#include "vendor/lo/lo_cpp.h"
+
 #include <string>
 #include <vector>
 #include <map>
@@ -11,18 +14,6 @@
 #include <memory>
 #include <mutex>
 #include <atomic>
-
-// Forward declarations for OSC libraries
-struct lo_address_t;
-typedef struct lo_address_t *lo_address;
-
-struct lo_server_thread_t;
-typedef struct lo_server_thread_t *lo_server_thread;
-
-struct lo_message_t;
-typedef struct lo_message_t *lo_message;
-
-typedef void *lo_arg;
 
 namespace AudioEngine
 {
@@ -86,7 +77,7 @@ namespace AudioEngine
 		 * @brief Get a parameter value from the device
 		 *
 		 * @param address OSC address path
-		 * @param callback Callback function to receive the result
+		 * @param callback Function to receive the result
 		 * @return true if query was sent successfully
 		 */
 		bool getParameter(const std::string &address,
@@ -103,10 +94,15 @@ namespace AudioEngine
 		/**
 		 * @brief Query the current device state
 		 *
-		 * @param callback Callback function to receive the device state
+		 * @param callback Function to receive the device state
 		 * @return true if query was initiated successfully
 		 */
 		bool queryDeviceState(std::function<void(bool, const Configuration &)> callback) override;
+
+		// IExternalControl compatibility methods (deprecated, use setParameter/getParameter instead)
+		bool sendCommand(const std::string &address, const std::vector<std::any> &args) override;
+		bool queryParameter(const std::string &address,
+							std::function<void(bool, const std::vector<std::any> &)> callback) override;
 
 		// Additional OSC-specific methods
 
@@ -126,7 +122,7 @@ namespace AudioEngine
 		/**
 		 * @brief Register a callback for all OSC events
 		 *
-		 * @param callback Callback function to receive OSC messages
+		 * @param callback Function to receive OSC messages
 		 * @return int Callback ID for later removal
 		 */
 		int addEventCallback(std::function<void(const std::string &, const std::vector<std::any> &)> callback);
@@ -210,9 +206,9 @@ namespace AudioEngine
 		static int main(int argc, char *argv[]);
 
 	private:
-		// OSC resources
-		lo_address m_oscAddress;
-		lo_server_thread m_oscServer;
+		// OSC resources using C++ wrapper classes
+		lo::Address m_oscAddress;
+		lo_server_thread m_oscServer; // Still using C API for server_thread as lo::ServerThread would need more changes
 
 		// Callback for incoming messages
 		std::function<void(const std::string &, const std::vector<std::any> &)> m_messageCallback;
