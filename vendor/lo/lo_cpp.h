@@ -3,6 +3,7 @@
 
 #include <lo/lo.h>
 #include <lo/lo_throw.h>
+#include "vendor/lo/lo.h"
 
 // Standard library includes
 #include <functional>
