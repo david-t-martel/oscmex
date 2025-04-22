@@ -4,9 +4,6 @@
 			"path": "."
 		},
 		{
-			"path": "../../../Program Files/ffmpeg/include"
-		},
-		{
 			"path": "../json"
 		}
 	],

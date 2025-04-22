@@ -1,0 +1,108 @@
+{
+  "compileSourceFiles": [
+    "src/main.cpp",
+    "src/AudioEngine/AudioBuffer.cpp",
+    "src/AudioEngine/AudioBufferPool.cpp",
+    "src/AudioEngine/AudioEngine.cpp",
+    "src/AudioEngine/AsioManager.cpp",
+    "src/AudioEngine/OscController.cpp",
+    "src/AudioEngine/AudioNode.cpp",
+    "src/AudioEngine/FfmpegProcessorNode.cpp",
+    "src/AudioEngine/AsioSinkNode.cpp",
+    "src/AudioEngine/AsioSourceNode.cpp",
+    "src/AudioEngine/FileSourceNode.cpp",
+    "src/AudioEngine/FileSinkNode.cpp"
+  ],
+  "externalSources": {
+    "asio": {
+      "sourceFiles": [
+        "vendor/asiosdk/common/asio.cpp",
+        "vendor/asiosdk/host/asiodrivers.cpp",
+        "vendor/asiosdk/host/pc/asiolist.cpp"
+      ],
+      "includePaths": [
+        "vendor/asiosdk/common",
+        "vendor/asiosdk/host",
+        "vendor/asiosdk/host/pc"
+      ]
+    },
+    "liblo": {
+      "sourceFiles": [
+        "vendor/liblo/src/address.c",
+        "vendor/liblo/src/send.c",
+        "vendor/liblo/src/server.c",
+        "vendor/liblo/src/message.c",
+        "vendor/liblo/src/method.c",
+        "vendor/liblo/src/pattern_match.c",
+        "vendor/liblo/src/timetag.c",
+        "vendor/liblo/src/blob.c",
+        "vendor/liblo/src/bundle.c",
+        "vendor/liblo/src/server_thread.c"
+      ],
+      "includePaths": ["vendor/liblo/include"]
+    },
+    "ffmpeg": {
+      "includePaths": [
+        "vendor/ffmpeg/include",
+        "vendor/ffmpeg/include/libavformat",
+        "vendor/ffmpeg/include/libavcodec",
+        "vendor/ffmpeg/include/libavutil",
+        "vendor/ffmpeg/include/libavfilter",
+        "vendor/ffmpeg/include/libswresample",
+        "vendor/ffmpeg/include/libswscale"
+      ],
+      "libraryPaths": ["vendor/ffmpeg/lib"],
+      "libraries": [
+        "avformat",
+        "avcodec",
+        "avutil",
+        "avfilter",
+        "swresample",
+        "swscale"
+      ]
+    },
+    "json": {
+      "includePaths": ["vendor/json/include"],
+      "headerOnly": true
+    }
+  },
+  "buildOptions": {
+    "default": {
+      "cxxFlags": ["-std=c++17", "-Wall", "-O2"],
+      "defines": [
+        "HAVE_FFMPEG",
+        "FF_API_OLD_CHANNEL_LAYOUT=0",
+        "ASIO_SDK_VERSION=233"
+      ]
+    },
+    "intel": {
+      "cxxFlags": [
+        "-std=c++17",
+        "-Wall",
+        "-O3",
+        "-xHost",
+        "-fiopenmp",
+        "-ffast-math",
+        "-finline-functions",
+        "-flto"
+      ],
+      "defines": [
+        "HAVE_FFMPEG",
+        "FF_API_OLD_CHANNEL_LAYOUT=0",
+        "ASIO_SDK_VERSION=233",
+        "HAVE_TBB",
+        "HAVE_IPP",
+        "HAVE_MKL"
+      ]
+    },
+    "debug": {
+      "cxxFlags": ["-std=c++17", "-Wall", "-g", "-O0"],
+      "defines": [
+        "HAVE_FFMPEG",
+        "FF_API_OLD_CHANNEL_LAYOUT=0",
+        "ASIO_SDK_VERSION=233",
+        "_DEBUG"
+      ]
+    }
+  }
+}

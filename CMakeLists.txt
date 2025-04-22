@@ -1,9 +1,114 @@
-cmake_minimum_required(VERSION 3.15)
-project(AudioEngine VERSION 1.0.0 LANGUAGES CXX C)
+cmake_minimum_required(VERSION 3.20)
+project(OscMex VERSION 1.0.0 LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Add cmake modules directory
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Define vendor directory path
+if(NOT DEFINED VENDOR_DIR)
+	set(VENDOR_DIR "${CMAKE_SOURCE_DIR}/vendor")
+endif()
+
+# Find required packages using custom find modules
+find_package(FFmpeg REQUIRED)
+find_package(ASIO REQUIRED)
+find_package(Threads REQUIRED)
+find_package(IntelOneAPI) # Added Intel oneAPI integration
+
+# Add vendor include directories
+include_directories(
+	${CMAKE_SOURCE_DIR}/include
+	${FFMPEG_INCLUDE_DIRS}
+	${ASIO_INCLUDE_DIRS}
+	${VENDOR_DIR}/liblo/include
+	${VENDOR_DIR}/json/include
+)
+
+# Add library directories
+link_directories(
+	${VENDOR_DIR}/lib
+)
+
+# Define source files
+set(SOURCES
+	src/main.cpp
+	src/AudioEngine/AudioBuffer.cpp
+	src/AudioEngine/AudioBufferPool.cpp
+	src/AudioEngine/AudioEngine.cpp
+	src/AudioEngine/AsioManager.cpp
+	src/AudioEngine/OscController.cpp
+	src/AudioEngine/AudioNode.cpp
+	src/AudioEngine/FfmpegProcessorNode.cpp
+	src/AudioEngine/AsioSinkNode.cpp
+	src/AudioEngine/AsioSourceNode.cpp
+	src/AudioEngine/FileSourceNode.cpp
+	src/AudioEngine/FileSinkNode.cpp
+
+	# Add any additional source files here
+)
+
+# Define target
+add_executable(${PROJECT_NAME} ${SOURCES})
+
+# Include subdirectories for vendor libraries that need to be built
+add_subdirectory(${VENDOR_DIR}/liblo)
+
+if(NOT TARGET nlohmann_json)
+	add_subdirectory(${VENDOR_DIR}/json)
+endif()
+
+# Link libraries
+target_link_libraries(${PROJECT_NAME} PRIVATE
+	lo
+	nlohmann_json::nlohmann_json
+	${FFMPEG_LIBRARIES}
+	${CMAKE_THREAD_LIBS_INIT}
+)
+
+# Apply Intel oneAPI optimizations if available
+if(INTELONEAPI_FOUND)
+	inteloneapi_apply_compiler_flags(${PROJECT_NAME})
+	inteloneapi_link_libraries(${PROJECT_NAME})
+endif()
+
+# Define OS-specific settings
+if(WIN32)
+	target_link_libraries(${PROJECT_NAME} PRIVATE
+		winmm
+		ole32
+		uuid
+	)
+elseif(UNIX AND NOT APPLE)
+	target_link_libraries(${PROJECT_NAME} PRIVATE
+		dl
+		rt
+	)
+elseif(APPLE)
+	find_library(COREAUDIO_LIBRARY CoreAudio)
+	find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+	target_link_libraries(${PROJECT_NAME} PRIVATE
+		${COREAUDIO_LIBRARY}
+		${COREFOUNDATION_LIBRARY}
+	)
+endif()
+
+# Set output directory
+set_target_properties(${PROJECT_NAME} PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+# Install directives
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+install(FILES ${CMAKE_SOURCE_DIR}/config/default_config.json DESTINATION config)
+
+# Enable testing
+enable_testing()
+add_subdirectory(tests)
 
 # Output directories - moved out of root directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

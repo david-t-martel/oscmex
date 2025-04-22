@@ -8,7 +8,8 @@
             "args": [
                 "-B", "${workspaceFolder}/build",
                 "-S", "${workspaceFolder}",
-                "-DCMAKE_BUILD_TYPE=Release"
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DVENDOR_DIR=${workspaceFolder}/vendor"
             ],
             "group": "build",
             "problemMatcher": []

@@ -9,9 +9,7 @@
       "binaryDir": "${sourceDir}/build/default",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_LO_TOOLS": "ON",
-        "BUILD_LO_EXAMPLES": "ON",
-        "BUILD_DOCUMENTATION": "ON"
+        "VENDOR_DIR": "${sourceDir}/vendor"
       }
     },
     {
@@ -24,12 +22,13 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx",
-        "BUILD_LO_TOOLS": "ON",
-        "BUILD_LO_EXAMPLES": "ON",
-        "BUILD_DOCUMENTATION": "ON"
+        "VENDOR_DIR": "${sourceDir}/vendor",
+        "INTELONEAPI_ENABLE_TBB": "ON",
+        "INTELONEAPI_ENABLE_IPP": "ON",
+        "INTELONEAPI_ENABLE_MKL": "ON"
       },
       "environment": {
-        "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
+        "PATH": "$env{PATH}"
       }
     },
     {
@@ -42,30 +41,30 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx",
-        "BUILD_LO_TOOLS": "ON",
-        "BUILD_LO_EXAMPLES": "ON",
-        "BUILD_DOCUMENTATION": "ON"
+        "VENDOR_DIR": "${sourceDir}/vendor",
+        "INTELONEAPI_ENABLE_TBB": "ON",
+        "INTELONEAPI_ENABLE_IPP": "ON",
+        "INTELONEAPI_ENABLE_MKL": "ON"
       },
       "environment": {
-        "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
+        "PATH": "$env{PATH}"
       }
     },
     {
-      "name": "intel-release-all",
-      "displayName": "Intel Compilers (Release, All Options)",
-      "description": "Uses Intel compilers, Release build, enables Tools, Examples, and Docs.",
+      "name": "intel-with-vectorization-report",
+      "displayName": "Intel Compilers with Optimization Reports",
+      "description": "Uses Intel compilers, Release build, enables vectorization reports.",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/intel-release-all",
+      "binaryDir": "${sourceDir}/build/intel-opt-report",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx",
-        "BUILD_LO_TOOLS": "ON",
-        "BUILD_LO_EXAMPLES": "ON",
-        "BUILD_DOCUMENTATION": "ON"
+        "VENDOR_DIR": "${sourceDir}/vendor",
+        "INTELONEAPI_VECTORIZATION_REPORT": "ON"
       },
       "environment": {
-        "PATH": "C:/Program Files (x86)/Intel/oneAPI/setvars.bat"
+        "PATH": "$env{PATH}"
       }
     },
     {
@@ -77,9 +76,7 @@
       "architecture": "x64",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_LO_TOOLS": "ON",
-        "BUILD_LO_EXAMPLES": "ON",
-        "BUILD_DOCUMENTATION": "ON"
+        "VENDOR_DIR": "${sourceDir}/vendor"
       }
     }
   ],
@@ -100,9 +97,9 @@
       "displayName": "Build Intel Debug"
     },
     {
-      "name": "intel-release-all-build",
-      "configurePreset": "intel-release-all",
-      "displayName": "Build Intel Release (All Options)"
+      "name": "intel-with-vectorization-report-build",
+      "configurePreset": "intel-with-vectorization-report",
+      "displayName": "Build Intel with Optimization Reports"
     },
     {
       "name": "vs2022-desktop-build",
