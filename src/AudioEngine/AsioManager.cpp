@@ -1,7 +1,4 @@
 #include "AsioManager.h"
-#include "DeviceState.h"
-#include "DeviceStateManager.h"
-#include "HardwareAbstraction.h"
 #include <iostream>
 #include <string>
 #include <algorithm>
@@ -16,6 +13,7 @@
 
 namespace AudioEngine
 {
+
     // Static instance for callback forwarding
     AsioManager *AsioManager::s_instance = nullptr;
 
@@ -102,7 +100,7 @@ namespace AudioEngine
         }
 
         // Initialize ASIO
-        if (asioInit(nullptr) != ASE_OK)
+        if (ASIOInit(nullptr) != ASE_OK)
         {
             LogError("Failed to initialize ASIO");
             return false;
@@ -111,7 +109,7 @@ namespace AudioEngine
         m_asioInitialized = true;
 
         // Get channel counts
-        ASIOError result = asioGetChannels(&m_inputChannels, &m_outputChannels);
+        ASIOError result = ASIOGetChannels(&m_inputChannels, &m_outputChannels);
         if (result != ASE_OK)
         {
             LogError("Failed to get channel counts");
@@ -122,7 +120,7 @@ namespace AudioEngine
         LogInfo(fmt::format("ASIO channels: {} inputs, {} outputs", m_inputChannels, m_outputChannels));
 
         // Get buffer size options
-        result = asioGetBufferSize(&m_minBufferSize, &m_maxBufferSize, &m_preferredBufferSize, &m_bufferSizeGranularity);
+        result = ASIOGetBufferSize(&m_minBufferSize, &m_maxBufferSize, &m_preferredBufferSize, &m_bufferSizeGranularity);
         if (result != ASE_OK)
         {
             LogError("Failed to get buffer size information");
@@ -959,5 +957,83 @@ namespace AudioEngine
 
         return true;
     }
+
+    // Create a hardware-specific implementation of DeviceStateInterface
+    class AsioDeviceStateInterface : public DeviceStateInterface
+    {
+    private:
+        AsioManager &m_asioManager;
+
+    public:
+        AsioDeviceStateInterface(AsioManager &manager) : m_asioManager(manager) {}
+
+        bool queryState(const std::string &deviceName,
+                        std::function<void(bool, const DeviceState &)> callback) override
+        {
+            // Use AsioManager to query hardware state
+            if (!m_asioManager.isDriverLoaded())
+            {
+                if (!m_asioManager.loadDriver(deviceName))
+                {
+                    callback(false, DeviceState(deviceName, deviceName));
+                    return false;
+                }
+            }
+
+            if (!m_asioManager.isInitialized())
+            {
+                if (!m_asioManager.initDevice())
+                {
+                    callback(false, DeviceState(deviceName, deviceName));
+                    return false;
+                }
+            }
+
+            // Create DeviceState from AsioManager state
+            DeviceState state(deviceName, m_asioManager.getDeviceName());
+            state.setInputChannelCount(m_asioManager.getInputChannelCount());
+            state.setOutputChannelCount(m_asioManager.getOutputChannelCount());
+            state.setSampleRate(m_asioManager.getSampleRate());
+            state.setBufferSize(m_asioManager.getBufferSize());
+            state.setActive(m_asioManager.isProcessing());
+
+            callback(true, state);
+            return true;
+        }
+
+        bool applyConfiguration(const std::string &deviceName,
+                                const Configuration &config) override
+        {
+            // Apply configuration to hardware via AsioManager
+            if (!m_asioManager.isDriverLoaded())
+            {
+                if (!m_asioManager.loadDriver(deviceName))
+                {
+                    return false;
+                }
+            }
+
+            double sampleRate = config.getSampleRate();
+            long bufferSize = config.getBufferSize();
+
+            if (!m_asioManager.initDevice(sampleRate, bufferSize))
+            {
+                return false;
+            }
+
+            // Set up channels from configuration
+            std::vector<long> inputChannels;
+            std::vector<long> outputChannels;
+
+            // ... populate channel lists from config ...
+
+            if (!m_asioManager.createBuffers(inputChannels, outputChannels))
+            {
+                return false;
+            }
+
+            return true;
+        }
+    };
 
 } // namespace AudioEngine
