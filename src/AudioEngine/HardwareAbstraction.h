@@ -1,3 +1,105 @@
+#pragma once
+
+#include <string>
+#include <vector>
+#include <memory>
+#include <functional>
+
+namespace AudioEngine
+{
+
+    /**
+     * @brief Defines a hardware device type
+     */
+    enum class DeviceType
+    {
+        AudioInput,
+        AudioOutput,
+        MidiInput,
+        MidiOutput
+    };
+
+    /**
+     * @brief Represents device capabilities
+     */
+    struct DeviceCapabilities
+    {
+        bool supportsBufferSizeChange;
+        bool supportsSampleRateChange;
+        bool supportsAsio;
+        bool supportsDirectSound;
+        std::vector<int> supportedBufferSizes;
+        std::vector<double> supportedSampleRates;
+        int channelCount;
+    };
+
+    /**
+     * @brief Abstract base class for hardware device access
+     */
+    class HardwareAbstraction
+    {
+    public:
+        /**
+         * @brief Virtual destructor
+         */
+        virtual ~HardwareAbstraction() = default;
+
+        /**
+         * @brief Initialize the hardware abstraction layer
+         *
+         * @return true if initialization was successful
+         */
+        virtual bool initialize() = 0;
+
+        /**
+         * @brief Scan for available audio devices
+         *
+         * @return true if scan was successful
+         */
+        virtual bool scanDevices() = 0;
+
+        /**
+         * @brief Get list of available device names by type
+         *
+         * @param type Type of device to list
+         * @return std::vector<std::string> List of device names
+         */
+        virtual std::vector<std::string> getDeviceList(DeviceType type) = 0;
+
+        /**
+         * @brief Get device capabilities
+         *
+         * @param deviceName Name of the device
+         * @param type Type of the device
+         * @return DeviceCapabilities Capabilities of the device
+         */
+        virtual DeviceCapabilities getDeviceCapabilities(const std::string &deviceName, DeviceType type) = 0;
+
+        /**
+         * @brief Register a callback for device hotplug events
+         *
+         * @param callback Function to call when devices are added or removed
+         * @return int Callback ID used to remove the callback later
+         */
+        virtual int registerDeviceChangeCallback(std::function<void()> callback) = 0;
+
+        /**
+         * @brief Unregister a device change callback
+         *
+         * @param callbackId ID of the callback to remove
+         */
+        virtual void unregisterDeviceChangeCallback(int callbackId) = 0;
+    };
+
+    /**
+     * @brief Factory function to create appropriate hardware abstraction implementation
+     *
+     * @return std::unique_ptr<HardwareAbstraction> A new hardware abstraction instance
+     */
+    std::unique_ptr<HardwareAbstraction> createHardwareAbstraction();
+
+} // namespace AudioEngine
+
 // New class in HardwareAbstraction.h
 class DeviceStateInterface
 {

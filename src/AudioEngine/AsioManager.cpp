@@ -1,4 +1,7 @@
 #include "AsioManager.h"
+#include "DeviceState.h"
+#include "DeviceStateManager.h"
+#include "HardwareAbstraction.h"
 #include <iostream>
 #include <string>
 #include <algorithm>
@@ -13,7 +16,6 @@
 
 namespace AudioEngine
 {
-
     // Static instance for callback forwarding
     AsioManager *AsioManager::s_instance = nullptr;
 
