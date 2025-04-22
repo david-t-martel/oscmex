@@ -1,169 +1,134 @@
 #include "AudioNode.h"
 #include "AudioEngine.h"
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 namespace AudioEngine
 {
 
-	AudioNode::AudioNode(const std::string &name, NodeType type, AudioEngine *engine)
-		: m_name(name), m_type(type), m_engine(engine),
-		  m_sampleRate(0), m_bufferSize(0), m_format(AV_SAMPLE_FMT_NONE),
-		  m_configured(false), m_running(false), m_lastError("")
+	AudioNode::AudioNode(const std::string &name, AudioEngine *engine)
+		: m_name(name),
+		  m_engine(engine),
+		  m_sampleRate(0),
+		  m_bufferSize(0),
+		  m_format(AV_SAMPLE_FMT_NONE),
+		  m_configured(false),
+		  m_running(false)
 	{
-		// Initialize default channel layout (mono)
-		av_channel_layout_default(&m_channelLayout, 1);
+		// Initialize channel layout
+		av_channel_layout_default(&m_channelLayout, 2); // Default to stereo
 	}
 
 	AudioNode::~AudioNode()
 	{
-		// Make sure node is stopped before destruction
+		// Stop the node if it's still running
 		if (m_running)
 		{
-			try
-			{
-				stop();
-			}
-			catch (const std::exception &e)
-			{
-				std::cerr << "Exception during node stop in destructor: " << e.what() << std::endl;
-			}
-			catch (...)
-			{
-				std::cerr << "Unknown exception during node stop in destructor" << std::endl;
-			}
+			stop();
 		}
 
-		// Clean up channel layout
+		// Free the channel layout
 		av_channel_layout_uninit(&m_channelLayout);
 	}
 
-	std::string AudioNode::nodeTypeToString(NodeType type)
+	bool AudioNode::configure(const std::map<std::string, std::string> &params, double sampleRate, long bufferSize,
+							  AVSampleFormat format, AVChannelLayout channelLayout)
 	{
-		switch (type)
+		// Convert the parameter map to a JSON string
+		nlohmann::json jsonParams;
+		for (const auto &[key, value] : params)
 		{
-		case NodeType::ASIO_SOURCE:
-			return "ASIO Source";
-		case NodeType::ASIO_SINK:
-			return "ASIO Sink";
-		case NodeType::FILE_SOURCE:
-			return "File Source";
-		case NodeType::FILE_SINK:
-			return "File Sink";
-		case NodeType::FFMPEG_PROCESSOR:
-			return "FFmpeg Processor";
-		default:
-			return "Unknown";
+			jsonParams[key] = value;
 		}
+
+		// Call the string-based configure method
+		return configure(jsonParams.dump(), sampleRate, bufferSize, format, channelLayout);
 	}
 
-	void AudioNode::logMessage(const std::string &message, bool isError)
+	bool AudioNode::sendControlMessage(const std::string &messageType, const std::map<std::string, std::string> &params)
 	{
-		std::string typeStr = nodeTypeToString(m_type);
-		std::string prefix = isError ? "ERROR" : "INFO";
-
-		std::cerr << "[" << prefix << "] " << typeStr << " '" << m_name << "': " << message << std::endl;
-
-		// Store error message for retrieval with getLastError()
-		if (isError)
-		{
-			m_lastError = message;
-		}
-	}
-
-	bool AudioNode::checkConfigure(double sampleRate, long bufferSize,
-								   AVSampleFormat format, const AVChannelLayout &layout)
-	{
-		if (sampleRate <= 0)
-		{
-			logMessage("Invalid sample rate: " + std::to_string(sampleRate), true);
-			return false;
-		}
-
-		if (bufferSize <= 0)
-		{
-			logMessage("Invalid buffer size: " + std::to_string(bufferSize), true);
-			return false;
-		}
-
-		if (format == AV_SAMPLE_FMT_NONE)
-		{
-			logMessage("Invalid sample format", true);
-			return false;
-		}
-
-		if (layout.nb_channels <= 0)
-		{
-			logMessage("Invalid channel layout", true);
-			return false;
-		}
-
-		// Copy the properties
-		m_sampleRate = sampleRate;
-		m_bufferSize = bufferSize;
-		m_format = format;
-
-		// Clean up and copy the channel layout
-		av_channel_layout_uninit(&m_channelLayout);
-		if (av_channel_layout_copy(&m_channelLayout, &layout) < 0)
-		{
-			logMessage("Failed to copy channel layout", true);
-			return false;
-		}
-
-		return true;
-	}
-
-	bool AudioNode::updateParameter(const std::string &paramName, const std::string &paramValue)
-	{
-		// Default implementation returns false - derived classes should override
-		// if they support dynamic parameter updates
-		logMessage("Parameter update not supported for parameter: " + paramName, true);
+		// Base implementation just reports that the message was not handled
+		reportStatus("Warning", "Control message '" + messageType + "' not handled by node type " + nodeTypeToString(getType()));
 		return false;
 	}
 
-	bool AudioNode::isBufferFormatCompatible(const std::shared_ptr<AudioBuffer> &buffer) const
+	void AudioNode::reportStatus(const std::string &category, const std::string &message)
 	{
-		if (!buffer)
+		if (m_engine)
 		{
+			m_engine->reportStatus(category, m_name + ": " + message);
+		}
+		else
+		{
+			std::cerr << "[" << category << "] " << m_name << ": " + message << std::endl;
+		}
+	}
+
+	// Implementation of node type conversion functions
+	std::string nodeTypeToString(AudioNode::NodeType type)
+	{
+		switch (type)
+		{
+		case AudioNode::NodeType::ASIO_SOURCE:
+			return "asio_source";
+		case AudioNode::NodeType::ASIO_SINK:
+			return "asio_sink";
+		case AudioNode::NodeType::FILE_SOURCE:
+			return "file_source";
+		case AudioNode::NodeType::FILE_SINK:
+			return "file_sink";
+		case AudioNode::NodeType::FFMPEG_PROCESSOR:
+			return "ffmpeg_processor";
+		case AudioNode::NodeType::CUSTOM:
+			return "custom";
+		case AudioNode::NodeType::UNKNOWN:
+		default:
+			return "unknown";
+		}
+	}
+
+	AudioNode::NodeType nodeTypeFromString(const std::string &typeStr)
+	{
+		if (typeStr == "asio_source")
+			return AudioNode::NodeType::ASIO_SOURCE;
+		else if (typeStr == "asio_sink")
+			return AudioNode::NodeType::ASIO_SINK;
+		else if (typeStr == "file_source")
+			return AudioNode::NodeType::FILE_SOURCE;
+		else if (typeStr == "file_sink")
+			return AudioNode::NodeType::FILE_SINK;
+		else if (typeStr == "ffmpeg_processor")
+			return AudioNode::NodeType::FFMPEG_PROCESSOR;
+		else if (typeStr == "custom")
+			return AudioNode::NodeType::CUSTOM;
+		else
+			return AudioNode::NodeType::UNKNOWN;
+	}
+
+	// Implementation of Connection class
+	Connection::Connection(AudioNode *sourceNode, int sourcePad, AudioNode *sinkNode, int sinkPad)
+		: m_sourceNode(sourceNode),
+		  m_sourcePad(sourcePad),
+		  m_sinkNode(sinkNode),
+		  m_sinkPad(sinkPad),
+		  m_formatConversion(true),
+		  m_bufferPolicy("auto")
+	{
+	}
+
+	bool Connection::transfer()
+	{
+		if (!m_sourceNode || !m_sinkNode)
 			return false;
-		}
 
-		// Check for format compatibility
-		bool formatMatches = (buffer->getFormat() == m_format);
+		// Get the output buffer from the source node
+		auto buffer = m_sourceNode->getOutputBuffer(m_sourcePad);
 
-		// Check for channel layout compatibility
-		bool channelsMatch = false;
-		AVChannelLayout bufferLayout = buffer->getChannelLayout();
-		channelsMatch = (av_channel_layout_compare(&bufferLayout, &m_channelLayout) == 0);
+		if (!buffer)
+			return false;
 
-		// Check buffer size
-		bool sizeMatches = (buffer->getFrames() == m_bufferSize);
-
-		// For maximum compatibility, just report mismatches but don't fail
-		if (!formatMatches)
-		{
-			std::cerr << "Warning: Buffer format mismatch in " << m_name
-					  << " - expected: " << av_get_sample_fmt_name(m_format)
-					  << ", got: " << av_get_sample_fmt_name(buffer->getFormat()) << std::endl;
-		}
-
-		if (!channelsMatch)
-		{
-			std::cerr << "Warning: Buffer channel layout mismatch in " << m_name << std::endl;
-		}
-
-		if (!sizeMatches)
-		{
-			std::cerr << "Warning: Buffer size mismatch in " << m_name
-					  << " - expected: " << m_bufferSize
-					  << ", got: " << buffer->getFrames() << std::endl;
-		}
-
-		// If we want strict compatibility, return this:
-		// return formatMatches && channelsMatch && sizeMatches;
-
-		// For now, we're just returning if the buffer is valid at all
-		return buffer->isValid();
+		// Set the buffer to the sink node
+		return m_sinkNode->setInputBuffer(buffer, m_sinkPad);
 	}
 
 } // namespace AudioEngine

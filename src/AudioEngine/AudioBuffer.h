@@ -219,6 +219,121 @@ namespace AudioEngine
 		 */
 		std::shared_ptr<AudioBuffer> clone() const;
 
+		/**
+		 * @brief Create a new audio buffer
+		 *
+		 * @param numSamples Number of samples per channel
+		 * @param format Sample format (e.g., AV_SAMPLE_FMT_FLTP)
+		 * @param channelLayout Channel layout
+		 * @return std::shared_ptr<AudioBuffer> Shared pointer to the new buffer
+		 */
+		static std::shared_ptr<AudioBuffer> create(int numSamples, AVSampleFormat format, AVChannelLayout channelLayout);
+
+		/**
+		 * @brief Create a new audio buffer as a view into another buffer
+		 *
+		 * @param sourceBuffer Source buffer to create view from
+		 * @param startSample Starting sample index
+		 * @param numSamples Number of samples to include in the view
+		 * @return std::shared_ptr<AudioBuffer> Shared pointer to the new buffer view
+		 */
+		static std::shared_ptr<AudioBuffer> createView(std::shared_ptr<AudioBuffer> sourceBuffer, int startSample, int numSamples);
+
+		/**
+		 * @brief Create a new audio buffer as a copy of another buffer
+		 *
+		 * @param sourceBuffer Source buffer to copy
+		 * @param startSample Starting sample index
+		 * @param numSamples Number of samples to copy
+		 * @return std::shared_ptr<AudioBuffer> Shared pointer to the new buffer copy
+		 */
+		static std::shared_ptr<AudioBuffer> createCopy(std::shared_ptr<AudioBuffer> sourceBuffer, int startSample, int numSamples);
+
+		/**
+		 * @brief Create a new audio buffer with a different format/layout than the source
+		 *
+		 * @param sourceBuffer Source buffer to convert
+		 * @param format Target sample format
+		 * @param channelLayout Target channel layout
+		 * @return std::shared_ptr<AudioBuffer> Shared pointer to the new buffer
+		 */
+		static std::shared_ptr<AudioBuffer> createConverted(std::shared_ptr<AudioBuffer> sourceBuffer,
+															AVSampleFormat format, AVChannelLayout channelLayout);
+
+		/**
+		 * @brief Get the number of samples per channel
+		 *
+		 * @return int Number of samples
+		 */
+		int getNumSamples() const { return m_numSamples; }
+
+		/**
+		 * @brief Get the number of channels
+		 *
+		 * @return int Number of channels
+		 */
+		int getNumChannels() const { return m_numChannels; }
+
+		/**
+		 * @brief Get the sample format
+		 *
+		 * @return AVSampleFormat Sample format
+		 */
+		AVSampleFormat getFormat() const { return m_format; }
+
+		/**
+		 * @brief Get the channel layout
+		 *
+		 * @return const AVChannelLayout& Channel layout
+		 */
+		const AVChannelLayout &getChannelLayout() const { return m_channelLayout; }
+
+		/**
+		 * @brief Get a pointer to the data for a specific channel
+		 *
+		 * For planar formats, this returns a pointer to the specific channel's data.
+		 * For interleaved formats, this returns a pointer to the start of the interleaved data
+		 * (only valid for channel 0).
+		 *
+		 * @param channel Channel index
+		 * @return void* Pointer to the channel data, or nullptr if invalid channel
+		 */
+		void *getChannelData(int channel);
+
+		/**
+		 * @brief Get a const pointer to the data for a specific channel
+		 *
+		 * @param channel Channel index
+		 * @return const void* Pointer to the channel data, or nullptr if invalid channel
+		 */
+		const void *getChannelData(int channel) const;
+
+		/**
+		 * @brief Get pointers to all channel data
+		 *
+		 * @param outPointers Array to fill with pointers (must be at least getNumChannels() in size)
+		 */
+		void getChannelPointers(void **outPointers);
+
+		/**
+		 * @brief Clear the buffer (fill with zeros)
+		 */
+		void clear();
+
+		/**
+		 * @brief Check if this buffer is a view of another buffer
+		 *
+		 * @return bool True if this is a view
+		 */
+		bool isView() const { return m_isView; }
+
+		/**
+		 * @brief Get the source buffer if this is a view
+		 *
+		 * @return std::shared_ptr<AudioBuffer> Source buffer, or nullptr if this is not a view
+		 */
+		std::shared_ptr<AudioBuffer> getSourceBuffer() const { return m_sourceBuffer; }
+
 	private:
 		// Buffer properties
 		long frames;				   // Number of frames
@@ -241,6 +356,57 @@ namespace AudioEngine
 
 		// Internal version of allocate that doesn't lock
 		bool allocateInternal(long numFrames, double sRate, AVSampleFormat fmt, const AVChannelLayout &layout);
+
+		/**
+		 * @brief Constructor for creating a new buffer
+		 *
+		 * @param numSamples Number of samples per channel
+		 * @param format Sample format
+		 * @param channelLayout Channel layout
+		 */
+		AudioBuffer(int numSamples, AVSampleFormat format, AVChannelLayout channelLayout);
+
+		/**
+		 * @brief Constructor for creating a view into another buffer
+		 *
+		 * @param sourceBuffer Source buffer
+		 * @param startSample Starting sample
+		 * @param numSamples Number of samples
+		 */
+		AudioBuffer(std::shared_ptr<AudioBuffer> sourceBuffer, int startSample, int numSamples);
+
+		/**
+		 * @brief Allocate memory for the buffer
+		 */
+		void allocateMemory();
+
+		/**
+		 * @brief Calculate the offset for a channel in an interleaved buffer
+		 *
+		 * @param sample Sample index
+		 * @param channel Channel index
+		 * @return int Offset in bytes
+		 */
+		int calculateInterleavedOffset(int sample, int channel) const;
+
+		/**
+		 * @brief Get the size of a single sample in bytes
+		 *
+		 * @return int Sample size in bytes
+		 */
+		int getSampleSize() const;
+
+		int m_numSamples;							 // Number of samples per channel
+		int m_numChannels;							 // Number of channels
+		AVSampleFormat m_format;					 // Sample format
+		AVChannelLayout m_channelLayout;			 // Channel layout
+		bool m_isView;								 // Whether this is a view into another buffer
+		int m_startSample;							 // Starting sample for views
+		std::shared_ptr<AudioBuffer> m_sourceBuffer; // Source buffer for views
+
+		// Data storage - use either data pointers (planar) or a single buffer (interleaved)
+		std::vector<uint8_t *> m_dataPointers; // For planar formats, pointers to each channel
+		std::vector<uint8_t> m_data;		   // For interleaved formats, a single buffer
 	};
 
 } // namespace AudioEngine

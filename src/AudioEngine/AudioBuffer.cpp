@@ -4,6 +4,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 #include <ipp.h>
+#include <cstring>
 
 // Update to use local FFmpeg source headers
 extern "C"
@@ -577,6 +578,331 @@ namespace AudioEngine
 		}
 
 		return newBuffer;
+	}
+
+	// Static creation methods
+	std::shared_ptr<AudioBuffer> AudioBuffer::create(int numSamples, AVSampleFormat format, AVChannelLayout channelLayout)
+	{
+		return std::shared_ptr<AudioBuffer>(new AudioBuffer(numSamples, format, channelLayout));
+	}
+
+	std::shared_ptr<AudioBuffer> AudioBuffer::createView(std::shared_ptr<AudioBuffer> sourceBuffer, int startSample, int numSamples)
+	{
+		if (!sourceBuffer || startSample < 0 || numSamples <= 0 ||
+			startSample + numSamples > sourceBuffer->getNumSamples())
+		{
+			return nullptr;
+		}
+
+		return std::shared_ptr<AudioBuffer>(new AudioBuffer(sourceBuffer, startSample, numSamples));
+	}
+
+	std::shared_ptr<AudioBuffer> AudioBuffer::createCopy(std::shared_ptr<AudioBuffer> sourceBuffer, int startSample, int numSamples)
+	{
+		if (!sourceBuffer || startSample < 0 || numSamples <= 0 ||
+			startSample + numSamples > sourceBuffer->getNumSamples())
+		{
+			return nullptr;
+		}
+
+		// Create a new buffer with the same format and layout
+		auto result = create(numSamples, sourceBuffer->getFormat(), sourceBuffer->getChannelLayout());
+		if (!result)
+		{
+			return nullptr;
+		}
+
+		// Get the source buffer's data pointers
+		const int numChannels = sourceBuffer->getNumChannels();
+		std::vector<const void *> sourceData(numChannels);
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			sourceData[ch] = sourceBuffer->getChannelData(ch);
+			if (!sourceData[ch] && ch < numChannels)
+			{
+				return nullptr; // Source data missing
+			}
+		}
+
+		// Get the destination buffer's data pointers
+		std::vector<void *> destData(numChannels);
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			destData[ch] = result->getChannelData(ch);
+			if (!destData[ch] && ch < numChannels)
+			{
+				return nullptr; // Dest data missing
+			}
+		}
+
+		// Copy the data
+		const int sampleSize = result->getSampleSize();
+		const bool isPlanar = av_sample_fmt_is_planar(sourceBuffer->getFormat());
+
+		if (isPlanar)
+		{
+			// For planar format, copy each channel separately
+			for (int ch = 0; ch < numChannels; ++ch)
+			{
+				const uint8_t *src = static_cast<const uint8_t *>(sourceData[ch]) + startSample * sampleSize;
+				uint8_t *dst = static_cast<uint8_t *>(destData[ch]);
+				std::memcpy(dst, src, numSamples * sampleSize);
+			}
+		}
+		else
+		{
+			// For interleaved format, copy the interleaved data
+			const uint8_t *src = static_cast<const uint8_t *>(sourceData[0]) +
+								 sourceBuffer->calculateInterleavedOffset(startSample, 0);
+			uint8_t *dst = static_cast<uint8_t *>(destData[0]);
+			std::memcpy(dst, src, numSamples * numChannels * sampleSize);
+		}
+
+		return result;
+	}
+
+	std::shared_ptr<AudioBuffer> AudioBuffer::createConverted(std::shared_ptr<AudioBuffer> sourceBuffer,
+															  AVSampleFormat format, AVChannelLayout channelLayout)
+	{
+		// This is a placeholder implementation
+		// In a real implementation, we would use libswresample to convert the audio data
+		// from the source format/layout to the target format/layout
+
+		// For simplicity, we'll just create a new buffer and assume the conversion is done
+		auto result = create(sourceBuffer->getNumSamples(), format, channelLayout);
+
+		// TODO: Implement actual conversion using libswresample
+
+		return result;
+	}
+
+	// Constructor for new buffer
+	AudioBuffer::AudioBuffer(int numSamples, AVSampleFormat format, AVChannelLayout channelLayout)
+		: m_numSamples(numSamples),
+		  m_format(format),
+		  m_isView(false),
+		  m_startSample(0),
+		  m_sourceBuffer(nullptr)
+	{
+		// Copy the channel layout
+		av_channel_layout_copy(&m_channelLayout, &channelLayout);
+
+		// Calculate the number of channels
+		m_numChannels = m_channelLayout.nb_channels;
+
+		// Allocate memory for the buffer
+		allocateMemory();
+	}
+
+	// Constructor for view buffer
+	AudioBuffer::AudioBuffer(std::shared_ptr<AudioBuffer> sourceBuffer, int startSample, int numSamples)
+		: m_numSamples(numSamples),
+		  m_format(sourceBuffer->getFormat()),
+		  m_isView(true),
+		  m_startSample(startSample),
+		  m_sourceBuffer(sourceBuffer)
+	{
+		// Copy the channel layout
+		av_channel_layout_copy(&m_channelLayout, &sourceBuffer->getChannelLayout());
+
+		// Calculate the number of channels
+		m_numChannels = m_channelLayout.nb_channels;
+
+		// For a view, we don't allocate memory but point to the source buffer's data
+		const bool isPlanar = av_sample_fmt_is_planar(m_format);
+		const int sampleSize = getSampleSize();
+
+		if (isPlanar)
+		{
+			// For planar format, set up pointers to each channel in the source buffer
+			m_dataPointers.resize(m_numChannels);
+			for (int ch = 0; ch < m_numChannels; ++ch)
+			{
+				uint8_t *sourceData = static_cast<uint8_t *>(const_cast<void *>(sourceBuffer->getChannelData(ch)));
+				m_dataPointers[ch] = sourceData + startSample * sampleSize;
+			}
+		}
+		else
+		{
+			// For interleaved format, set up a pointer to the interleaved data in the source buffer
+			m_dataPointers.resize(1);
+			uint8_t *sourceData = static_cast<uint8_t *>(const_cast<void *>(sourceBuffer->getChannelData(0)));
+			m_dataPointers[0] = sourceData + sourceBuffer->calculateInterleavedOffset(startSample, 0);
+		}
+	}
+
+	AudioBuffer::~AudioBuffer()
+	{
+		// If this is not a view, free the allocated memory
+		if (!m_isView)
+		{
+			// Free the data
+			if (!m_data.empty())
+			{
+				m_data.clear();
+			}
+			else
+			{
+				for (auto ptr : m_dataPointers)
+				{
+					av_free(ptr);
+				}
+			}
+		}
+
+		// Uninitialize the channel layout
+		av_channel_layout_uninit(&m_channelLayout);
+	}
+
+	void AudioBuffer::allocateMemory()
+	{
+		// Check if this is a view (views don't allocate their own memory)
+		if (m_isView)
+		{
+			return;
+		}
+
+		// Determine if the format is planar or interleaved
+		const bool isPlanar = av_sample_fmt_is_planar(m_format);
+		const int sampleSize = getSampleSize();
+
+		if (isPlanar)
+		{
+			// For planar format, allocate separate buffer for each channel
+			m_dataPointers.resize(m_numChannels);
+			for (int ch = 0; ch < m_numChannels; ++ch)
+			{
+				m_dataPointers[ch] = static_cast<uint8_t *>(av_malloc(m_numSamples * sampleSize));
+				if (m_dataPointers[ch])
+				{
+					std::memset(m_dataPointers[ch], 0, m_numSamples * sampleSize);
+				}
+			}
+		}
+		else
+		{
+			// For interleaved format, allocate a single buffer
+			const size_t totalSize = m_numSamples * m_numChannels * sampleSize;
+			m_data.resize(totalSize, 0);
+
+			// Set up a pointer to the interleaved data
+			m_dataPointers.resize(1);
+			m_dataPointers[0] = m_data.data();
+		}
+	}
+
+	void *AudioBuffer::getChannelData(int channel)
+	{
+		if (channel < 0 || channel >= m_numChannels)
+		{
+			return nullptr;
+		}
+
+		const bool isPlanar = av_sample_fmt_is_planar(m_format);
+
+		if (isPlanar)
+		{
+			// For planar format, return the pointer to the specific channel
+			return m_dataPointers[channel];
+		}
+		else
+		{
+			// For interleaved format, only channel 0 is valid, and it points to the start of the interleaved data
+			if (channel == 0)
+			{
+				return m_dataPointers[0];
+			}
+			else
+			{
+				return nullptr;
+			}
+		}
+	}
+
+	const void *AudioBuffer::getChannelData(int channel) const
+	{
+		if (channel < 0 || channel >= m_numChannels)
+		{
+			return nullptr;
+		}
+
+		const bool isPlanar = av_sample_fmt_is_planar(m_format);
+
+		if (isPlanar)
+		{
+			// For planar format, return the pointer to the specific channel
+			return m_dataPointers[channel];
+		}
+		else
+		{
+			// For interleaved format, only channel 0 is valid, and it points to the start of the interleaved data
+			if (channel == 0)
+			{
+				return m_dataPointers[0];
+			}
+			else
+			{
+				return nullptr;
+			}
+		}
+	}
+
+	void AudioBuffer::getChannelPointers(void **outPointers)
+	{
+		const bool isPlanar = av_sample_fmt_is_planar(m_format);
+
+		if (isPlanar)
+		{
+			// For planar format, copy all channel pointers
+			for (int ch = 0; ch < m_numChannels; ++ch)
+			{
+				outPointers[ch] = m_dataPointers[ch];
+			}
+		}
+		else
+		{
+			// For interleaved format, set all pointers to the interleaved data
+			for (int ch = 0; ch < m_numChannels; ++ch)
+			{
+				outPointers[ch] = m_dataPointers[0] + calculateInterleavedOffset(0, ch);
+			}
+		}
+	}
+
+	int AudioBuffer::calculateInterleavedOffset(int sample, int channel) const
+	{
+		return (sample * m_numChannels + channel) * getSampleSize();
+	}
+
+	int AudioBuffer::getSampleSize() const
+	{
+		return av_get_bytes_per_sample(m_format);
+	}
+
+	void AudioBuffer::clear()
+	{
+		const bool isPlanar = av_sample_fmt_is_planar(m_format);
+		const int sampleSize = getSampleSize();
+
+		if (isPlanar)
+		{
+			// For planar format, clear each channel separately
+			for (int ch = 0; ch < m_numChannels; ++ch)
+			{
+				if (m_dataPointers[ch])
+				{
+					std::memset(m_dataPointers[ch], 0, m_numSamples * sampleSize);
+				}
+			}
+		}
+		else
+		{
+			// For interleaved format, clear the interleaved data
+			if (m_dataPointers[0])
+			{
+				std::memset(m_dataPointers[0], 0, m_numSamples * m_numChannels * sampleSize);
+			}
+		}
 	}
 
 } // namespace AudioEngine

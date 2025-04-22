@@ -1,35 +1,82 @@
 {
-  "asioDeviceName": "ASIO4ALL v2",
-  "rmeOscIp": "127.0.0.1",
-  "rmeOscPort": 8000,
+  "deviceType": "GENERIC_OSC",
+  "targetIp": "127.0.0.1",
+  "targetPort": 9000,
+  "receivePort": 8000,
+  "asioDeviceName": "ASIO Fireface UCX II",
   "sampleRate": 48000.0,
-  "bufferSize": 512,
+  "bufferSize": 256,
+  "useAsioAutoConfig": true,
+  "internalFormat": "f32",
+  "internalLayout": "stereo",
+
+  "commands": [
+    {
+      "address": "/1/volume",
+      "args": [0.8]
+    },
+    {
+      "address": "/1/input/1/gain",
+      "args": [-6.0]
+    }
+  ],
 
   "nodes": [
     {
       "name": "asio_input",
-      "type": "ASIO_SOURCE",
+      "type": "asio_source",
+      "inputPads": 0,
+      "outputPads": 1,
+      "description": "ASIO Input Channels 1-2",
       "params": {
-        "channels": "0,1",
-        "device": "ASIO4ALL v2"
+        "channels": "0,1"
       }
     },
     {
-      "name": "fir_processor",
-      "type": "FFMPEG_PROCESSOR",
+      "name": "compressor",
+      "type": "ffmpeg_processor",
+      "inputPads": 1,
+      "outputPads": 1,
+      "description": "Dynamics Processor",
+      "filterGraph": "compand=attacks=0.3:decays=0.8:points=-80/-90|-45/-45|-27/-27|0/-3|20/1:soft-knee=6dB",
       "params": {
-        "filter_description": "afir=dry=1:wet=1:gtype=1:taps=256:minp=1:hpgain=1:maxp=1:wfunc=hann",
-        "taps": "256",
-        "min_phase": "true",
-        "window_function": "hann"
+        "threshold": "-20.0",
+        "ratio": "4.0"
+      }
+    },
+    {
+      "name": "eq",
+      "type": "ffmpeg_processor",
+      "inputPads": 1,
+      "outputPads": 1,
+      "description": "Equalizer",
+      "filterGraph": "equalizer=f=1000:width_type=o:width=2:g=-10",
+      "params": {
+        "frequency": "1000",
+        "gain": "-10"
+      }
+    },
+    {
+      "name": "recorder",
+      "type": "file_sink",
+      "inputPads": 1,
+      "outputPads": 0,
+      "description": "Recording Output",
+      "filePath": "output.wav",
+      "fileFormat": "wav",
+      "params": {
+        "bitDepth": "16",
+        "codec": "pcm_s16le"
       }
     },
     {
       "name": "asio_output",
-      "type": "ASIO_SINK",
+      "type": "asio_sink",
+      "inputPads": 1,
+      "outputPads": 0,
+      "description": "ASIO Output Channels 7-8",
       "params": {
-        "channels": "0,1",
-        "device": "ASIO4ALL v2"
+        "channels": "6,7"
       }
     }
   ],
@@ -38,41 +85,31 @@
     {
       "sourceName": "asio_input",
       "sourcePad": 0,
-      "sinkName": "fir_processor",
-      "sinkPad": 0
+      "sinkName": "compressor",
+      "sinkPad": 0,
+      "formatConversion": true
     },
     {
-      "sourceName": "fir_processor",
+      "sourceName": "compressor",
+      "sourcePad": 0,
+      "sinkName": "eq",
+      "sinkPad": 0,
+      "formatConversion": true
+    },
+    {
+      "sourceName": "eq",
       "sourcePad": 0,
       "sinkName": "asio_output",
-      "sinkPad": 0
-    }
-  ],
-
-  "rmeCommands": [
-    {
-      "address": "/1/channel/1/name",
-      "args": ["Input 1"]
+      "sinkPad": 0,
+      "formatConversion": true
     },
     {
-      "address": "/1/channel/2/name",
-      "args": ["Input 2"]
-    },
-    {
-      "address": "/1/channel/1/volume",
-      "args": [0.0]
-    },
-    {
-      "address": "/1/channel/2/volume",
-      "args": [0.0]
-    },
-    {
-      "address": "/1/matrix/1/1/gain",
-      "args": [0.0]
-    },
-    {
-      "address": "/1/matrix/2/2/gain",
-      "args": [0.0]
+      "sourceName": "eq",
+      "sourcePad": 0,
+      "sinkName": "recorder",
+      "sinkPad": 0,
+      "formatConversion": true,
+      "bufferPolicy": "copy"
     }
   ]
 }

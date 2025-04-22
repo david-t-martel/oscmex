@@ -44,36 +44,133 @@ namespace AudioEngine
         {
             m_asioManager = std::make_unique<AsioManager>();
 
-            // Check if we should auto-configure ASIO
+            // Load the driver
+            if (!m_asioManager->loadDriver(m_config.getAsioDeviceName()))
+            {
+                reportStatus("Error", "Failed to load ASIO driver: " + m_config.getAsioDeviceName());
+                return false;
+            }
+
+            // Initialize with explicitly configured values or auto-configure
             if (m_config.useAsioAutoConfig())
             {
-                if (!autoConfigureAsio())
+                if (!m_asioManager->initDevice(0, 0))
                 {
-                    reportStatus("Error", "Failed to auto-configure ASIO");
+                    reportStatus("Error", "Failed to initialize ASIO device with default settings");
                     return false;
+                }
+
+                // Update configuration with actual device capabilities
+                long bufferSize;
+                double sampleRate;
+                if (m_asioManager->getDefaultDeviceConfiguration(bufferSize, sampleRate))
+                {
+                    m_config.setBufferSize(bufferSize);
+                    m_config.setSampleRate(sampleRate);
+
+                    // Set internal format and layout
+                    m_config.setInternalFormat("f32");
+                    m_config.setInternalLayout("stereo");
+
+                    reportStatus("Info", "Auto-configured with sample rate: " +
+                                             std::to_string(sampleRate) + " Hz, buffer size: " +
+                                             std::to_string(bufferSize));
                 }
             }
             else
             {
-                // Manual configuration using parameters in config
-                if (!m_asioManager->loadDriver(m_config.getAsioDeviceName()))
-                {
-                    reportStatus("Error", "Failed to load ASIO driver: " + m_config.getAsioDeviceName());
-                    return false;
-                }
-
-                // Initialize with explicitly configured values
+                // Use explicit configuration
                 if (!m_asioManager->initDevice(m_config.getSampleRate(), m_config.getBufferSize()))
                 {
-                    reportStatus("Error", "Failed to initialize ASIO device");
+                    reportStatus("Error", "Failed to initialize ASIO device with explicit settings");
                     return false;
+                }
+            }
+
+            // Auto-generate a default graph if needed
+            if (m_config.getNodes().empty())
+            {
+                ConfigurationParser::autoConfigureAsio(m_config, m_asioManager.get());
+                reportStatus("Info", "Generated default audio processing graph");
+            }
+        }
+
+        // Create and configure nodes
+        if (!createAndConfigureNodes())
+        {
+            reportStatus("Error", "Failed to create and configure nodes");
+            return false;
+        }
+
+        // Set up connections between nodes
+        if (!setupConnections())
+        {
+            reportStatus("Error", "Failed to set up connections between nodes");
+            return false;
+        }
+
+        // Calculate process order for the nodes
+        if (!calculateProcessOrder())
+        {
+            reportStatus("Error", "Failed to determine node processing order");
+            return false;
+        }
+
+        // Set up ASIO buffers if needed
+        if (m_asioManager)
+        {
+            std::vector<long> inputChannels;
+            std::vector<long> outputChannels;
+
+            // Collect channel indices from nodes
+            for (auto &node : m_nodes)
+            {
+                if (auto *source = dynamic_cast<AsioSourceNode *>(node.get()))
+                {
+                    auto indices = source->getAsioChannelIndices();
+                    inputChannels.insert(inputChannels.end(), indices.begin(), indices.end());
+                }
+                else if (auto *sink = dynamic_cast<AsioSinkNode *>(node.get()))
+                {
+                    auto indices = sink->getAsioChannelIndices();
+                    outputChannels.insert(outputChannels.end(), indices.begin(), indices.end());
+                }
+            }
+
+            // Create the ASIO buffers
+            if (!m_asioManager->createBuffers(inputChannels, outputChannels))
+            {
+                reportStatus("Error", "Failed to create ASIO buffers");
+                return false;
+            }
+
+            // Set up the ASIO callback
+            m_asioManager->setCallback([this](long doubleBufferIndex)
+                                       { this->processAsioBlock(doubleBufferIndex, true); });
+        }
+
+        // Initialize external control (OSC)
+        if (!m_config.getTargetIp().empty() && m_config.getTargetPort() > 0)
+        {
+            m_oscController = std::make_unique<OscController>();
+            if (!m_oscController->configure(m_config.getTargetIp(), m_config.getTargetPort()))
+            {
+                reportStatus("Warning", "Failed to configure OSC controller - continuing without OSC");
+            }
+            else
+            {
+                // Send initial configuration commands
+                for (const auto &cmd : m_config.getCommands())
+                {
+                    if (!m_oscController->sendCommand(cmd.address, cmd.args))
+                    {
+                        reportStatus("Warning", "Failed to send OSC command: " + cmd.address);
+                    }
                 }
             }
         }
 
-        // Rest of initialization...
-        // ...
-
+        reportStatus("Info", "Audio engine initialized successfully");
         return true;
     }
 

@@ -13,6 +13,7 @@ namespace AudioEngine
 	// Forward declaration for classes that will be referenced
 	class OscController;
 	class DeviceStateManager; // Forward declaration for DeviceStateManager
+	class AsioManager;
 
 	/**
 	 * @brief Enum for device types supported by the configuration
@@ -21,6 +22,7 @@ namespace AudioEngine
 	{
 		RME_TOTALMIX, // RME TotalMix FX
 		GENERIC_OSC,  // Generic OSC device
+		ASIO,		  // ASIO device
 					  // Add more device types as needed
 	};
 
@@ -29,14 +31,37 @@ namespace AudioEngine
 	 * @param type The device type to convert
 	 * @return std::string The string representation
 	 */
-	std::string deviceTypeToString(DeviceType type);
+	inline std::string deviceTypeToString(DeviceType type)
+	{
+		switch (type)
+		{
+		case DeviceType::RME_TOTALMIX:
+			return "RME_TOTALMIX";
+		case DeviceType::GENERIC_OSC:
+			return "GENERIC_OSC";
+		case DeviceType::ASIO:
+			return "ASIO";
+		default:
+			return "UNKNOWN";
+		}
+	}
 
 	/**
 	 * @brief Convert string to DeviceType
 	 * @param typeStr The string to convert
 	 * @return DeviceType The device type
 	 */
-	DeviceType stringToDeviceType(const std::string &typeStr);
+	inline DeviceType stringToDeviceType(const std::string &typeStr)
+	{
+		if (typeStr == "RME_TOTALMIX")
+			return DeviceType::RME_TOTALMIX;
+		else if (typeStr == "GENERIC_OSC")
+			return DeviceType::GENERIC_OSC;
+		else if (typeStr == "ASIO")
+			return DeviceType::ASIO;
+		else
+			return DeviceType::GENERIC_OSC; // Default
+	}
 
 	/**
 	 * @brief Structure to represent a single OSC command
@@ -58,8 +83,23 @@ namespace AudioEngine
 	struct NodeConfig
 	{
 		std::string name;						   // Node name (e.g., "input1")
-		std::string type;						   // Node type (e.g., "asio_in", "gain", "route")
+		std::string type;						   // Node type (e.g., "asio_source", "ffmpeg_processor")
 		std::map<std::string, std::string> params; // Node parameters
+
+		// New fields
+		int inputPads = 1;		 // Number of input pads (0 for source nodes)
+		int outputPads = 1;		 // Number of output pads (0 for sink nodes)
+		std::string description; // Human-readable description
+
+		// For FFmpeg processor nodes
+		std::string filterGraph; // FFmpeg filter graph definition
+
+		// For file nodes
+		std::string filePath;	// Path for file sources/sinks
+		std::string fileFormat; // File format specification
+
+		// For ASIO nodes
+		std::vector<long> channelIndices; // ASIO channel indices to use
 	};
 
 	/**
@@ -71,6 +111,10 @@ namespace AudioEngine
 		int sourcePad;			// Source pad index
 		std::string sinkName;	// Sink node name
 		int sinkPad;			// Sink pad index
+
+		// New fields
+		bool formatConversion = true; // Allow format conversion if needed
+		std::string bufferPolicy;	  // Buffer policy: "copy", "reference", "auto"
 	};
 
 	/**
@@ -331,6 +375,53 @@ namespace AudioEngine
 		 */
 		void setAsioDeviceName(const std::string &name) { m_asioDeviceName = name; }
 
+		/**
+		 * @brief Run auto-discovery to populate configuration based on available hardware
+		 *
+		 * @param asioManager Pointer to AsioManager for device querying
+		 * @param createDefaultGraph If true, creates a default graph based on discovered hardware
+		 * @return bool True if auto-discovery succeeded
+		 */
+		bool autoDiscover(AsioManager *asioManager, bool createDefaultGraph = true);
+
+		/**
+		 * @brief Create a default processing graph based on device capabilities
+		 *
+		 * @param inputChannels Number of input channels to use (0 = all available)
+		 * @param outputChannels Number of output channels to use (0 = all available)
+		 * @param addProcessor Whether to add a default processor node
+		 * @return bool True if graph creation succeeded
+		 */
+		bool createDefaultGraph(int inputChannels = 2, int outputChannels = 2, bool addProcessor = true);
+
+		/**
+		 * @brief Set internal processing format
+		 *
+		 * @param format Format identifier (e.g., "f32", "s16")
+		 */
+		void setInternalFormat(const std::string &format);
+
+		/**
+		 * @brief Get internal processing format
+		 *
+		 * @return std::string Format identifier
+		 */
+		std::string getInternalFormat() const { return m_internalFormat; }
+
+		/**
+		 * @brief Set internal channel layout
+		 *
+		 * @param layout Channel layout specification (e.g., "stereo", "5.1")
+		 */
+		void setInternalLayout(const std::string &layout);
+
+		/**
+		 * @brief Get internal channel layout
+		 *
+		 * @return std::string Channel layout specification
+		 */
+		std::string getInternalLayout() const { return m_internalLayout; }
+
 	private:
 		DeviceType m_deviceType;					 // Type of device for this configuration
 		std::string m_targetIp;						 // Target IP address
@@ -343,6 +434,8 @@ namespace AudioEngine
 		std::vector<NodeConfig> m_nodes;			 // Audio processing nodes
 		std::vector<ConnectionConfig> m_connections; // Connections between nodes
 		bool m_useAsioAutoConfig = false;
+		std::string m_internalFormat = "f32";	 // Default to float
+		std::string m_internalLayout = "stereo"; // Default to stereo
 	};
 
 	/**

@@ -1,5 +1,6 @@
 #include "Configuration.h"
 #include "OscController.h"
+#include "AsioManager.h"
 
 #include <fstream>
 #include <iostream>
@@ -14,17 +15,22 @@ namespace AudioEngine
 {
     // Implementation of Configuration class methods
     Configuration::Configuration()
-        : rmeOscPort(7001),  // Default RME OSC port
-          sampleRate(48000), // Default sample rate
-          bufferSize(256)    // Default buffer size
+        : m_deviceType(DeviceType::GENERIC_OSC),
+          m_targetIp("127.0.0.1"),
+          m_targetPort(9000),
+          m_receivePort(8000),
+          m_asioDeviceName(""),
+          m_sampleRate(48000.0),
+          m_bufferSize(512),
+          m_useAsioAutoConfig(true),
+          m_internalFormat("f32"),
+          m_internalLayout("stereo")
     {
-        // Set default RME IP address
-        rmeOscIp = "127.0.0.1";
     }
 
     const NodeConfig *Configuration::getNodeConfig(const std::string &name) const
     {
-        for (const auto &node : nodes)
+        for (const auto &node : m_nodes)
         {
             if (node.name == name)
             {
@@ -34,87 +40,327 @@ namespace AudioEngine
         return nullptr;
     }
 
+    void Configuration::addNodeConfig(const NodeConfig &node)
+    {
+        m_nodes.push_back(node);
+    }
+
+    void Configuration::addConnectionConfig(const ConnectionConfig &connection)
+    {
+        m_connections.push_back(connection);
+    }
+
+    void Configuration::setInternalFormat(const std::string &format)
+    {
+        // Validate format
+        if (format == "f32" || format == "s16" || format == "s32" || format == "u8" || format == "flt" || format == "dbl")
+        {
+            m_internalFormat = format;
+        }
+        else
+        {
+            std::cerr << "Warning: Invalid format '" << format << "', defaulting to 'f32'" << std::endl;
+            m_internalFormat = "f32";
+        }
+    }
+
+    void Configuration::setInternalLayout(const std::string &layout)
+    {
+        // Validate layout
+        if (layout == "mono" || layout == "stereo" || layout == "5.1" || layout == "7.1")
+        {
+            m_internalLayout = layout;
+        }
+        else
+        {
+            std::cerr << "Warning: Invalid layout '" << layout << "', defaulting to 'stereo'" << std::endl;
+            m_internalLayout = "stereo";
+        }
+    }
+
+    bool Configuration::autoDiscover(AsioManager *asioManager, bool createDefaultGraph)
+    {
+        if (!asioManager)
+            return false;
+
+        // Get device info
+        if (!asioManager->isInitialized())
+        {
+            // If no device is specified, try to use the first available device
+            if (m_asioDeviceName.empty())
+            {
+                auto devices = AsioManager::getDeviceList();
+                if (devices.empty())
+                    return false;
+
+                m_asioDeviceName = devices[0];
+            }
+
+            // Load and initialize the driver
+            if (!asioManager->loadDriver(m_asioDeviceName))
+                return false;
+
+            if (!asioManager->initDevice())
+                return false;
+        }
+
+        // Get optimal device settings
+        long bufferSize;
+        double sampleRate;
+
+        if (asioManager->getDefaultDeviceConfiguration(bufferSize, sampleRate))
+        {
+            m_bufferSize = bufferSize;
+            m_sampleRate = sampleRate;
+        }
+
+        if (createDefaultGraph)
+        {
+            return this->createDefaultGraph(2, 2, true);
+        }
+
+        return true;
+    }
+
+    bool Configuration::createDefaultGraph(int inputChannels, int outputChannels, bool addProcessor)
+    {
+        // Clear existing nodes and connections
+        m_nodes.clear();
+        m_connections.clear();
+
+        // Create source node if input channels > 0
+        if (inputChannels > 0)
+        {
+            NodeConfig sourceNode;
+            sourceNode.name = "asio_input";
+            sourceNode.type = "asio_source";
+            sourceNode.inputPads = 0; // Source has no inputs
+            sourceNode.outputPads = 1;
+            sourceNode.description = "ASIO Hardware Input";
+
+            // Add channel indices
+            for (int i = 0; i < inputChannels; i++)
+            {
+                sourceNode.channelIndices.push_back(i);
+            }
+
+            // Convert channel indices to parameter string
+            std::stringstream ss;
+            for (size_t i = 0; i < sourceNode.channelIndices.size(); i++)
+            {
+                if (i > 0)
+                    ss << ",";
+                ss << sourceNode.channelIndices[i];
+            }
+            sourceNode.params["channels"] = ss.str();
+
+            m_nodes.push_back(sourceNode);
+        }
+
+        // Create processor node if requested
+        if (addProcessor && inputChannels > 0 && outputChannels > 0)
+        {
+            NodeConfig processorNode;
+            processorNode.name = "main_processor";
+            processorNode.type = "ffmpeg_processor";
+            processorNode.inputPads = 1;
+            processorNode.outputPads = 1;
+            processorNode.description = "Main Processor";
+            processorNode.filterGraph = "volume=0dB"; // Identity filter by default
+            processorNode.params["filterGraph"] = "volume=0dB";
+
+            m_nodes.push_back(processorNode);
+        }
+
+        // Create sink node if output channels > 0
+        if (outputChannels > 0)
+        {
+            NodeConfig sinkNode;
+            sinkNode.name = "asio_output";
+            sinkNode.type = "asio_sink";
+            sinkNode.inputPads = 1;
+            sinkNode.outputPads = 0; // Sink has no outputs
+            sinkNode.description = "ASIO Hardware Output";
+
+            // Add channel indices
+            for (int i = 0; i < outputChannels; i++)
+            {
+                sinkNode.channelIndices.push_back(i);
+            }
+
+            // Convert channel indices to parameter string
+            std::stringstream ss;
+            for (size_t i = 0; i < sinkNode.channelIndices.size(); i++)
+            {
+                if (i > 0)
+                    ss << ",";
+                ss << sinkNode.channelIndices[i];
+            }
+            sinkNode.params["channels"] = ss.str();
+
+            m_nodes.push_back(sinkNode);
+        }
+
+        // Create connections
+        if (m_nodes.size() >= 2)
+        {
+            if (addProcessor && m_nodes.size() >= 3)
+            {
+                // Source -> Processor
+                ConnectionConfig conn1;
+                conn1.sourceName = "asio_input";
+                conn1.sourcePad = 0;
+                conn1.sinkName = "main_processor";
+                conn1.sinkPad = 0;
+                conn1.formatConversion = true;
+                conn1.bufferPolicy = "auto";
+                m_connections.push_back(conn1);
+
+                // Processor -> Sink
+                ConnectionConfig conn2;
+                conn2.sourceName = "main_processor";
+                conn2.sourcePad = 0;
+                conn2.sinkName = "asio_output";
+                conn2.sinkPad = 0;
+                conn2.formatConversion = true;
+                conn2.bufferPolicy = "auto";
+                m_connections.push_back(conn2);
+            }
+            else
+            {
+                // Direct Source -> Sink
+                ConnectionConfig conn;
+                conn.sourceName = m_nodes[0].name;
+                conn.sourcePad = 0;
+                conn.sinkName = m_nodes[m_nodes.size() - 1].name;
+                conn.sinkPad = 0;
+                conn.formatConversion = true;
+                conn.bufferPolicy = "auto";
+                m_connections.push_back(conn);
+            }
+        }
+
+        return true;
+    }
+
     std::string Configuration::toJsonString() const
     {
-        json j;
+        nlohmann::json j;
 
-        // Global settings
-        j["asioDeviceName"] = asioDeviceName;
-        j["rmeOscIp"] = rmeOscIp;
-        j["rmeOscPort"] = rmeOscPort;
-        j["sampleRate"] = sampleRate;
-        j["bufferSize"] = bufferSize;
+        // Basic configuration
+        j["deviceType"] = deviceTypeToString(m_deviceType);
+        j["targetIp"] = m_targetIp;
+        j["targetPort"] = m_targetPort;
+        j["receivePort"] = m_receivePort;
+        j["asioDeviceName"] = m_asioDeviceName;
+        j["sampleRate"] = m_sampleRate;
+        j["bufferSize"] = m_bufferSize;
+        j["useAsioAutoConfig"] = m_useAsioAutoConfig;
+        j["internalFormat"] = m_internalFormat;
+        j["internalLayout"] = m_internalLayout;
 
-        // Processing nodes
-        json nodesArray = json::array();
-        for (const auto &node : nodes)
+        // OSC commands
+        nlohmann::json cmds = nlohmann::json::array();
+        for (const auto &cmd : m_commands)
         {
-            json nodeObj;
-            nodeObj["name"] = node.name;
-            nodeObj["type"] = node.type;
+            nlohmann::json command;
+            command["address"] = cmd.address;
 
-            json paramsObj;
-            for (const auto &[key, value] : node.params)
-            {
-                paramsObj[key] = value;
-            }
-            nodeObj["params"] = paramsObj;
-
-            nodesArray.push_back(nodeObj);
-        }
-        j["nodes"] = nodesArray;
-
-        // Connections
-        json connectionsArray = json::array();
-        for (const auto &conn : connections)
-        {
-            json connObj;
-            connObj["sourceName"] = conn.sourceName;
-            connObj["sourcePad"] = conn.sourcePad;
-            connObj["sinkName"] = conn.sinkName;
-            connObj["sinkPad"] = conn.sinkPad;
-
-            connectionsArray.push_back(connObj);
-        }
-        j["connections"] = connectionsArray;
-
-        // RME OSC commands
-        json commandsArray = json::array();
-        for (const auto &cmd : rmeCommands)
-        {
-            json cmdObj;
-            cmdObj["address"] = cmd.address;
-
-            json argsArray = json::array();
+            // Convert args to JSON-compatible types
+            nlohmann::json args = nlohmann::json::array();
             for (const auto &arg : cmd.args)
             {
-                // Handle different argument types
                 if (arg.type() == typeid(float))
                 {
-                    argsArray.push_back(std::any_cast<float>(arg));
+                    args.push_back(std::any_cast<float>(arg));
                 }
                 else if (arg.type() == typeid(int))
                 {
-                    argsArray.push_back(std::any_cast<int>(arg));
+                    args.push_back(std::any_cast<int>(arg));
                 }
                 else if (arg.type() == typeid(bool))
                 {
-                    argsArray.push_back(std::any_cast<bool>(arg));
+                    args.push_back(std::any_cast<bool>(arg));
                 }
                 else if (arg.type() == typeid(std::string))
                 {
-                    argsArray.push_back(std::any_cast<std::string>(arg));
+                    args.push_back(std::any_cast<std::string>(arg));
                 }
-                // Add more types as needed
             }
-            cmdObj["args"] = argsArray;
-            cmdObj["argTypes"] = json::array(); // Store type information for parsing
-
-            commandsArray.push_back(cmdObj);
+            command["args"] = args;
+            cmds.push_back(command);
         }
-        j["rmeCommands"] = commandsArray;
+        j["commands"] = cmds;
 
-        return j.dump(4); // Pretty print with 4 spaces
+        // Nodes
+        nlohmann::json nodes = nlohmann::json::array();
+        for (const auto &node : m_nodes)
+        {
+            nlohmann::json n;
+            n["name"] = node.name;
+            n["type"] = node.type;
+            n["inputPads"] = node.inputPads;
+            n["outputPads"] = node.outputPads;
+            n["description"] = node.description;
+
+            // Node-specific fields
+            if (!node.filterGraph.empty())
+            {
+                n["filterGraph"] = node.filterGraph;
+            }
+            if (!node.filePath.empty())
+            {
+                n["filePath"] = node.filePath;
+            }
+            if (!node.fileFormat.empty())
+            {
+                n["fileFormat"] = node.fileFormat;
+            }
+
+            // Channel indices for ASIO nodes
+            if (!node.channelIndices.empty())
+            {
+                nlohmann::json indices = nlohmann::json::array();
+                for (auto idx : node.channelIndices)
+                {
+                    indices.push_back(idx);
+                }
+                n["channelIndices"] = indices;
+            }
+
+            // Parameters map
+            nlohmann::json params;
+            for (const auto &[key, value] : node.params)
+            {
+                params[key] = value;
+            }
+            n["params"] = params;
+
+            nodes.push_back(n);
+        }
+        j["nodes"] = nodes;
+
+        // Connections
+        nlohmann::json connections = nlohmann::json::array();
+        for (const auto &conn : m_connections)
+        {
+            nlohmann::json c;
+            c["sourceName"] = conn.sourceName;
+            c["sourcePad"] = conn.sourcePad;
+            c["sinkName"] = conn.sinkName;
+            c["sinkPad"] = conn.sinkPad;
+            c["formatConversion"] = conn.formatConversion;
+
+            if (!conn.bufferPolicy.empty())
+            {
+                c["bufferPolicy"] = conn.bufferPolicy;
+            }
+
+            connections.push_back(c);
+        }
+        j["connections"] = connections;
+
+        return j.dump(2); // Pretty print with 2-space indent
     }
 
     Configuration Configuration::fromJsonString(const std::string &jsonStr)
@@ -124,21 +370,63 @@ namespace AudioEngine
         {
             json j = json::parse(jsonStr);
 
-            // Parse global settings
+            // Parse basic configuration
+            if (j.contains("deviceType"))
+                config.setDeviceType(stringToDeviceType(j["deviceType"].get<std::string>()));
+
+            if (j.contains("targetIp") && j.contains("targetPort"))
+            {
+                int receivePort = j.contains("receivePort") ? j["receivePort"].get<int>() : 0;
+                config.setConnectionParams(
+                    j["targetIp"].get<std::string>(),
+                    j["targetPort"].get<int>(),
+                    receivePort);
+            }
+
             if (j.contains("asioDeviceName"))
-                config.asioDeviceName = j["asioDeviceName"].get<std::string>();
-
-            if (j.contains("rmeOscIp"))
-                config.rmeOscIp = j["rmeOscIp"].get<std::string>();
-
-            if (j.contains("rmeOscPort"))
-                config.rmeOscPort = j["rmeOscPort"].get<int>();
+                config.setAsioDeviceName(j["asioDeviceName"].get<std::string>());
 
             if (j.contains("sampleRate"))
-                config.sampleRate = j["sampleRate"].get<double>();
+                config.setSampleRate(j["sampleRate"].get<double>());
 
             if (j.contains("bufferSize"))
-                config.bufferSize = j["bufferSize"].get<long>();
+                config.setBufferSize(j["bufferSize"].get<long>());
+
+            if (j.contains("useAsioAutoConfig"))
+                config.setUseAsioAutoConfig(j["useAsioAutoConfig"].get<bool>());
+
+            if (j.contains("internalFormat"))
+                config.setInternalFormat(j["internalFormat"].get<std::string>());
+
+            if (j.contains("internalLayout"))
+                config.setInternalLayout(j["internalLayout"].get<std::string>());
+
+            // Parse OSC commands
+            if (j.contains("commands") && j["commands"].is_array())
+            {
+                for (const auto &cmdJson : j["commands"])
+                {
+                    if (cmdJson.contains("address") && cmdJson.contains("args"))
+                    {
+                        std::string address = cmdJson["address"].get<std::string>();
+                        std::vector<std::any> args;
+
+                        for (const auto &arg : cmdJson["args"])
+                        {
+                            if (arg.is_number_float())
+                                args.push_back(std::any(arg.get<float>()));
+                            else if (arg.is_number_integer())
+                                args.push_back(std::any(arg.get<int>()));
+                            else if (arg.is_boolean())
+                                args.push_back(std::any(arg.get<bool>()));
+                            else if (arg.is_string())
+                                args.push_back(std::any(arg.get<std::string>()));
+                        }
+
+                        config.addCommand(address, args);
+                    }
+                }
+            }
 
             // Parse nodes
             if (j.contains("nodes") && j["nodes"].is_array())
@@ -146,18 +434,50 @@ namespace AudioEngine
                 for (const auto &nodeJson : j["nodes"])
                 {
                     NodeConfig node;
-                    node.name = nodeJson["name"].get<std::string>();
-                    node.type = nodeJson["type"].get<std::string>();
 
+                    if (nodeJson.contains("name"))
+                        node.name = nodeJson["name"].get<std::string>();
+
+                    if (nodeJson.contains("type"))
+                        node.type = nodeJson["type"].get<std::string>();
+
+                    if (nodeJson.contains("inputPads"))
+                        node.inputPads = nodeJson["inputPads"].get<int>();
+
+                    if (nodeJson.contains("outputPads"))
+                        node.outputPads = nodeJson["outputPads"].get<int>();
+
+                    if (nodeJson.contains("description"))
+                        node.description = nodeJson["description"].get<std::string>();
+
+                    if (nodeJson.contains("filterGraph"))
+                        node.filterGraph = nodeJson["filterGraph"].get<std::string>();
+
+                    if (nodeJson.contains("filePath"))
+                        node.filePath = nodeJson["filePath"].get<std::string>();
+
+                    if (nodeJson.contains("fileFormat"))
+                        node.fileFormat = nodeJson["fileFormat"].get<std::string>();
+
+                    // Parse channel indices
+                    if (nodeJson.contains("channelIndices") && nodeJson["channelIndices"].is_array())
+                    {
+                        for (const auto &idx : nodeJson["channelIndices"])
+                        {
+                            node.channelIndices.push_back(idx.get<long>());
+                        }
+                    }
+
+                    // Parse parameters
                     if (nodeJson.contains("params") && nodeJson["params"].is_object())
                     {
                         for (auto it = nodeJson["params"].begin(); it != nodeJson["params"].end(); ++it)
                         {
-                            node.params[it.key()] = it.value().get<std::string>();
+                            node.params[it.key()] = it.value().is_string() ? it.value().get<std::string>() : it.value().dump();
                         }
                     }
 
-                    config.nodes.push_back(node);
+                    config.addNodeConfig(node);
                 }
             }
 
@@ -167,50 +487,26 @@ namespace AudioEngine
                 for (const auto &connJson : j["connections"])
                 {
                     ConnectionConfig conn;
-                    conn.sourceName = connJson["sourceName"].get<std::string>();
-                    conn.sourcePad = connJson["sourcePad"].get<int>();
-                    conn.sinkName = connJson["sinkName"].get<std::string>();
-                    conn.sinkPad = connJson["sinkPad"].get<int>();
 
-                    config.connections.push_back(conn);
-                }
-            }
+                    if (connJson.contains("sourceName"))
+                        conn.sourceName = connJson["sourceName"].get<std::string>();
 
-            // Parse RME OSC commands
-            if (j.contains("rmeCommands") && j["rmeCommands"].is_array())
-            {
-                for (const auto &cmdJson : j["rmeCommands"])
-                {
-                    RmeOscCommandConfig cmd;
-                    cmd.address = cmdJson["address"].get<std::string>();
+                    if (connJson.contains("sourcePad"))
+                        conn.sourcePad = connJson["sourcePad"].get<int>();
 
-                    if (cmdJson.contains("args") && cmdJson["args"].is_array())
-                    {
-                        // We need to determine the type of each argument
-                        // This can be complex as JSON doesn't preserve C++ types exactly
-                        for (const auto &argJson : cmdJson["args"])
-                        {
-                            if (argJson.is_number_float())
-                            {
-                                cmd.args.push_back(std::any(argJson.get<float>()));
-                            }
-                            else if (argJson.is_number_integer())
-                            {
-                                cmd.args.push_back(std::any(argJson.get<int>()));
-                            }
-                            else if (argJson.is_boolean())
-                            {
-                                cmd.args.push_back(std::any(argJson.get<bool>()));
-                            }
-                            else if (argJson.is_string())
-                            {
-                                cmd.args.push_back(std::any(argJson.get<std::string>()));
-                            }
-                            // Add more types as needed
-                        }
-                    }
+                    if (connJson.contains("sinkName"))
+                        conn.sinkName = connJson["sinkName"].get<std::string>();
 
-                    config.rmeCommands.push_back(cmd);
+                    if (connJson.contains("sinkPad"))
+                        conn.sinkPad = connJson["sinkPad"].get<int>();
+
+                    if (connJson.contains("formatConversion"))
+                        conn.formatConversion = connJson["formatConversion"].get<bool>();
+
+                    if (connJson.contains("bufferPolicy"))
+                        conn.bufferPolicy = connJson["bufferPolicy"].get<std::string>();
+
+                    config.addConnectionConfig(conn);
                 }
             }
         }
@@ -380,6 +676,140 @@ namespace AudioEngine
             std::cerr << "Failed to parse JSON configuration: " << e.what() << std::endl;
             return false;
         }
+    }
+
+    bool ConfigurationParser::autoConfigureAsio(Configuration &config, AsioManager *asioManager)
+    {
+        if (!asioManager || !asioManager->isInitialized())
+        {
+            return false;
+        }
+
+        // Get optimal device settings
+        long bufferSize;
+        double sampleRate;
+        if (!asioManager->getDefaultDeviceConfiguration(bufferSize, sampleRate))
+        {
+            return false;
+        }
+
+        // Update configuration with optimal settings
+        config.setBufferSize(bufferSize);
+        config.setSampleRate(sampleRate);
+
+        // Get available channels for auto-configuration
+        long inputChannels = asioManager->getInputChannelCount();
+        long outputChannels = asioManager->getOutputChannelCount();
+
+        // Create default node configurations if none exist
+        if (config.getNodes().empty())
+        {
+            // Create source node if we have inputs
+            if (inputChannels > 0)
+            {
+                NodeConfig sourceNode;
+                sourceNode.name = "asio_input";
+                sourceNode.type = "asio_source";
+                sourceNode.inputPads = 0; // Source has no inputs
+                sourceNode.outputPads = 1;
+                sourceNode.description = "ASIO Hardware Input";
+
+                // Use first 2 channels by default (or whatever is available)
+                std::string channelIndices;
+                for (long i = 0; i < std::min(2L, inputChannels); i++)
+                {
+                    if (i > 0)
+                        channelIndices += ",";
+                    channelIndices += std::to_string(i);
+                    sourceNode.channelIndices.push_back(i);
+                }
+                sourceNode.params["channels"] = channelIndices;
+
+                config.addNodeConfig(sourceNode);
+            }
+
+            // Create processor node if we have both inputs and outputs
+            if (inputChannels > 0 && outputChannels > 0)
+            {
+                NodeConfig procNode;
+                procNode.name = "main_processor";
+                procNode.type = "ffmpeg_processor";
+                procNode.inputPads = 1;
+                procNode.outputPads = 1;
+                procNode.description = "Main Processor";
+                procNode.filterGraph = "volume=0dB"; // Identity filter by default
+                procNode.params["filterGraph"] = "volume=0dB";
+
+                config.addNodeConfig(procNode);
+            }
+
+            // Create sink node if we have outputs
+            if (outputChannels > 0)
+            {
+                NodeConfig sinkNode;
+                sinkNode.name = "asio_output";
+                sinkNode.type = "asio_sink";
+                sinkNode.inputPads = 1;
+                sinkNode.outputPads = 0; // Sink has no outputs
+                sinkNode.description = "ASIO Hardware Output";
+
+                // Use first 2 channels by default (or whatever is available)
+                std::string channelIndices;
+                for (long i = 0; i < std::min(2L, outputChannels); i++)
+                {
+                    if (i > 0)
+                        channelIndices += ",";
+                    channelIndices += std::to_string(i);
+                    sinkNode.channelIndices.push_back(i);
+                }
+                sinkNode.params["channels"] = channelIndices;
+
+                config.addNodeConfig(sinkNode);
+            }
+
+            // Create connections if we have created nodes
+            const auto &nodes = config.getNodes();
+            if (nodes.size() >= 2)
+            {
+                // Simple case: connect source -> sink
+                if (nodes.size() == 2)
+                {
+                    ConnectionConfig conn;
+                    conn.sourceName = nodes[0].name;
+                    conn.sourcePad = 0;
+                    conn.sinkName = nodes[1].name;
+                    conn.sinkPad = 0;
+                    conn.formatConversion = true;
+                    conn.bufferPolicy = "auto";
+                    config.addConnectionConfig(conn);
+                }
+                // More complex case: connect source -> processor -> sink
+                else if (nodes.size() >= 3)
+                {
+                    // Source to processor
+                    ConnectionConfig conn1;
+                    conn1.sourceName = "asio_input";
+                    conn1.sourcePad = 0;
+                    conn1.sinkName = "main_processor";
+                    conn1.sinkPad = 0;
+                    conn1.formatConversion = true;
+                    conn1.bufferPolicy = "auto";
+                    config.addConnectionConfig(conn1);
+
+                    // Processor to sink
+                    ConnectionConfig conn2;
+                    conn2.sourceName = "main_processor";
+                    conn2.sourcePad = 0;
+                    conn2.sinkName = "asio_output";
+                    conn2.sinkPad = 0;
+                    conn2.formatConversion = true;
+                    conn2.bufferPolicy = "auto";
+                    config.addConnectionConfig(conn2);
+                }
+            }
+        }
+
+        return true;
     }
 
     // Implementation of DeviceStateManager class methods
@@ -1131,7 +1561,8 @@ namespace AudioEngine
     {
         m_targetIp = ip;
         m_targetPort = sendPort;
-        m_receivePort = receivePort;
+        if (receivePort > 0)
+            m_receivePort = receivePort;
     }
 
     void Configuration::setMatrixCrosspointGain(int input, int output, float gainDb)
@@ -1216,7 +1647,7 @@ namespace AudioEngine
 
     void Configuration::addCommand(const std::string &address, const std::vector<std::any> &args)
     {
-        RmeOscCommandConfig cmd;
+        OscCommandConfig cmd;
         cmd.address = address;
         cmd.args = args;
         m_commands.push_back(cmd);
