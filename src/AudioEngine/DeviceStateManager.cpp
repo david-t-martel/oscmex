@@ -18,19 +18,35 @@ namespace AudioEngine
 
     bool DeviceStateManager::queryDeviceState(std::function<void(bool, const Configuration &)> callback)
     {
-        return m_deviceInterface->queryState(m_currentDevice,
-                                             [callback, this](bool success, const DeviceState &state)
-                                             {
-                                                 if (success)
+        if (m_deviceInterface)
+        {
+            return m_deviceInterface->queryState(m_currentDevice,
+                                                 [callback](bool success, const DeviceState &state)
                                                  {
-                                                     Configuration config = DeviceStateInterface::stateToConfiguration(state);
-                                                     callback(true, config);
-                                                 }
-                                                 else
-                                                 {
-                                                     callback(false, Configuration());
-                                                 }
-                                             });
+                                                     if (success)
+                                                     {
+                                                         Configuration config = DeviceStateInterface::stateToConfiguration(state);
+                                                         callback(true, config);
+                                                     }
+                                                     else
+                                                     {
+                                                         callback(false, Configuration());
+                                                     }
+                                                 });
+        }
+        else if (m_controller)
+        {
+            // Existing implementation using m_controller...
+        }
+        else if (m_externalControl)
+        {
+            // Implementation using m_externalControl...
+        }
+        else
+        {
+            callback(false, Configuration());
+            return false;
+        }
     }
 
     bool DeviceStateManager::queryDeviceStateWithChannels(std::function<void(bool, const Configuration &)> callback, int channelCount)
@@ -387,6 +403,169 @@ namespace AudioEngine
         }
 
         return true;
+    }
+
+    bool DeviceStateManager::saveToFile(const std::string &filePath) const
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        nlohmann::json json;
+
+        // Save device states
+        nlohmann::json deviceStatesJson = nlohmann::json::object();
+        for (const auto &pair : m_deviceStates)
+        {
+            deviceStatesJson[pair.first] = pair.second->toJson();
+        }
+        json["deviceStates"] = deviceStatesJson;
+
+        // Save current state
+        json["currentState"] = m_currentState.toJson();
+
+        // Write to file
+        try
+        {
+            std::ofstream file(filePath);
+            if (!file.is_open())
+            {
+                return false;
+            }
+
+            file << json.dump(4);
+            file.close();
+            return true;
+        }
+        catch (const std::exception &e)
+        {
+            return false;
+        }
+    }
+
+    bool DeviceStateManager::queryState(const std::string &deviceName, std::function<void(bool, const DeviceState &)> callback)
+    {
+        // Store the device name for later use
+        m_currentDevice = deviceName;
+
+        if (m_controller)
+        {
+            // Using the OscController implementation
+            std::thread([this, deviceName, callback]()
+                        {
+                DeviceState state(deviceName);
+
+                // Request a refresh to ensure we get current state
+                if (m_controller->requestRefresh())
+                {
+                    // Allow time for the device to process the refresh
+                    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+                    // Query basic parameters
+                    float sampleRate = 0.0f;
+                    bool sampleRateSuccess = m_controller->querySingleValue("/main/sample_rate", sampleRate);
+                    if (sampleRateSuccess) {
+                        state.setSampleRate(static_cast<double>(sampleRate));
+                    }
+
+                    float bufferSize = 0.0f;
+                    bool bufferSizeSuccess = m_controller->querySingleValue("/main/buffer_size", bufferSize);
+                    if (bufferSizeSuccess) {
+                        state.setBufferSize(static_cast<int>(bufferSize));
+                    }
+
+                    // Add other hardware parameters...
+
+                    // If we got here, we've successfully queried the device state
+                    callback(true, state);
+                }
+                else
+                {
+                    callback(false, state);
+                } })
+                .detach();
+
+            return true;
+        }
+        else if (m_externalControl)
+        {
+            // Using the IExternalControl implementation
+            std::thread([this, deviceName, callback]()
+                        {
+                DeviceState state(deviceName);
+
+                // Query state through external control interface
+                m_externalControl->sendCommand("/query_state", {deviceName},
+                    [this, &state, callback](bool success, const std::vector<std::any>& response) {
+                        if (success && !response.empty()) {
+                            // Parse response and update state
+                            // This depends on the format returned by the external control
+
+                            // Example: If response contains JSON state data
+                            try {
+                                if (response[0].type() == typeid(std::string)) {
+                                    std::string jsonData = std::any_cast<std::string>(response[0]);
+                                    state = DeviceState::fromJson(jsonData);
+                                    callback(true, state);
+                                    return;
+                                }
+                            }
+                            catch (const std::exception& e) {
+                                // Handle parsing error
+                            }
+                        }
+
+                        callback(false, state);
+                    }); })
+                .detach();
+
+            return true;
+        }
+        else if (m_deviceInterface)
+        {
+            // This case is already handled in the queryDeviceState method
+            return true;
+        }
+
+        // No implementation available
+        DeviceState emptyState(deviceName);
+        callback(false, emptyState);
+        return false;
+    }
+
+    bool DeviceStateManager::applyConfiguration(const std::string &deviceName, const Configuration &config)
+    {
+        // Convert configuration to device state
+        DeviceState targetState = config.toDeviceState();
+
+        // Set the device name
+        m_currentDevice = deviceName;
+
+        if (m_controller)
+        {
+            // Using the OscController implementation
+            // Calculate the difference between current state and target state
+            auto changes = calculateStateChanges(config);
+
+            // Apply each change
+            for (const auto &[address, value] : changes)
+            {
+                std::vector<std::any> args;
+                args.push_back(value);
+                m_controller->sendOscMessage(address, args);
+            }
+
+            return true;
+        }
+        else if (m_externalControl)
+        {
+            // Using the IExternalControl implementation
+            std::string jsonState = targetState.toJson();
+
+            // Send the entire state to the external control interface
+            m_externalControl->sendCommand("/apply_state", {deviceName, jsonState});
+            return true;
+        }
+
+        return false;
     }
 
 } // namespace AudioEngine

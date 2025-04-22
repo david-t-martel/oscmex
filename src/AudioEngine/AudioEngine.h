@@ -26,6 +26,7 @@ namespace AudioEngine
 	class AsioManager;
 	class AudioNode;
 	class Connection;
+	class DeviceStateManager;
 
 	/**
 	 * @brief Core audio engine class
@@ -132,6 +133,37 @@ namespace AudioEngine
 		 */
 		void removeStatusCallback(int callbackId);
 
+		/**
+		 * @brief Set the device state manager
+		 *
+		 * @param manager Unique pointer to the device state manager
+		 */
+		void setDeviceStateManager(std::unique_ptr<DeviceStateManager> manager);
+
+		/**
+		 * @brief Get the device state manager
+		 *
+		 * @return DeviceStateManager* Pointer to the device state manager
+		 */
+		DeviceStateManager *getDeviceStateManager() const { return m_deviceStateManager.get(); }
+
+		/**
+		 * @brief Query the current state of the device
+		 *
+		 * @param callback Function to call with the result (success, configuration)
+		 * @return true if the query was successful
+		 */
+		bool queryCurrentState(std::function<void(bool, const Configuration &)> callback);
+
+		/**
+		 * @brief Apply a new configuration to the device
+		 *
+		 * @param config New configuration to apply
+		 * @param callback Function to call with the result (success)
+		 * @return true if the configuration was applied successfully
+		 */
+		bool applyConfiguration(const Configuration &config, std::function<void(bool)> callback);
+
 	private:
 		// Configuration
 		Configuration m_config;
@@ -185,5 +217,8 @@ namespace AudioEngine
 		 * @return true if command was sent successfully or if no external control is available
 		 */
 		bool sendExternalCommand(const std::string &address, const std::vector<std::any> &args);
+
+		// Device state manager
+		std::unique_ptr<DeviceStateManager> m_deviceStateManager;
 	};
 }

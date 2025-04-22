@@ -1,19 +1,14 @@
 #include "DeviceState.h"
 #include <stdexcept>
 #include <algorithm>
+#include <nlohmann/json.hpp>
+#include <iostream>
 
 namespace AudioEngine
 {
-
-    DeviceState::DeviceState(const std::string &id) : m_id(id)
+    DeviceState::DeviceState(const std::string &name, DeviceType type)
+        : m_name(name), m_type(type)
     {
-        // Initialize with default values
-    }
-
-    DeviceState::DeviceState(const std::string &deviceId, const std::string &deviceName)
-        : m_deviceId(deviceId), m_deviceName(deviceName)
-    {
-        // Initialize with default values
     }
 
     DeviceState::~DeviceState()
@@ -21,252 +16,441 @@ namespace AudioEngine
         // Clean up any resources if needed
     }
 
-    const std::string &DeviceState::getId() const
+    void DeviceState::setProperty(const std::string &key, const std::string &value)
     {
-        return m_id;
+        m_properties[key] = value;
+        notifyStateChanged(key, std::any(value));
     }
 
-    const std::string &DeviceState::getDeviceId() const
+    std::string DeviceState::getProperty(const std::string &key, const std::string &defaultValue) const
     {
-        return m_deviceId;
+        auto it = m_properties.find(key);
+        return (it != m_properties.end()) ? it->second : defaultValue;
     }
 
-    bool DeviceState::hasParameter(const std::string &address) const
+    bool DeviceState::hasProperty(const std::string &key) const
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        return m_parameters.find(address) != m_parameters.end();
+        return m_properties.find(key) != m_properties.end();
     }
 
-    bool DeviceState::removeParameter(const std::string &address)
+    void DeviceState::setParameter(const std::string &key, const std::any &value, const std::string &paramType)
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
-
-        auto it = m_parameters.find(address);
-        if (it != m_parameters.end())
+        m_parameters[key] = value;
+        if (!paramType.empty())
         {
-            m_parameters.erase(it);
-            m_parameterTypes.erase(address);
+            m_parameterTypes[key] = paramType;
+        }
+        notifyStateChanged(key, value);
+    }
+
+    std::any DeviceState::getParameter(const std::string &key, const std::any &defaultValue) const
+    {
+        auto it = m_parameters.find(key);
+        return (it != m_parameters.end()) ? it->second : defaultValue;
+    }
+
+    bool DeviceState::hasParameter(const std::string &key) const
+    {
+        return m_parameters.find(key) != m_parameters.end();
+    }
+
+    std::string DeviceState::getParameterType(const std::string &key) const
+    {
+        auto it = m_parameterTypes.find(key);
+        return (it != m_parameterTypes.end()) ? it->second : "";
+    }
+
+    int DeviceState::addStateChangedCallback(std::function<void(const std::string &, const std::any &)> callback)
+    {
+        std::lock_guard<std::mutex> lock(m_callbackMutex);
+        int id = m_nextCallbackId++;
+        m_callbacks[id] = callback;
+        return id;
+    }
+
+    bool DeviceState::removeStateChangedCallback(int callbackId)
+    {
+        std::lock_guard<std::mutex> lock(m_callbackMutex);
+        auto it = m_callbacks.find(callbackId);
+        if (it != m_callbacks.end())
+        {
+            m_callbacks.erase(it);
             return true;
         }
-
         return false;
     }
 
-    std::vector<std::string> DeviceState::getParameterAddresses() const
+    void DeviceState::notifyStateChanged(const std::string &param, const std::any &value)
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
-
-        std::vector<std::string> addresses;
-        addresses.reserve(m_parameters.size());
-
-        for (const auto &pair : m_parameters)
+        std::lock_guard<std::mutex> lock(m_callbackMutex);
+        for (const auto &[id, callback] : m_callbacks)
         {
-            addresses.push_back(pair.first);
-        }
-
-        return addresses;
-    }
-
-    nlohmann::json DeviceState::toJson() const
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-
-        nlohmann::json json;
-        json["id"] = m_id;
-        json["deviceId"] = m_deviceId;
-        json["deviceName"] = m_deviceName;
-        json["active"] = m_active;
-        json["inputChannelCount"] = m_inputChannelCount;
-        json["outputChannelCount"] = m_outputChannelCount;
-        json["sampleRate"] = m_sampleRate;
-        json["bufferSize"] = m_bufferSize;
-
-        // Convert parameters to JSON
-        nlohmann::json parametersJson = nlohmann::json::object();
-        for (const auto &pair : m_parameters)
-        {
-            auto typeIt = m_parameterTypes.find(pair.first);
-            if (typeIt != m_parameterTypes.end())
+            try
             {
-                parametersJson[pair.first] = anyToJson(pair.second, typeIt->second);
+                callback(param, value);
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Exception in state change callback: " << e.what() << std::endl;
             }
         }
-        json["parameters"] = parametersJson;
-
-        // Convert properties to JSON
-        nlohmann::json propertiesJson = nlohmann::json::object();
-        for (const auto &pair : m_properties)
-        {
-            propertiesJson[pair.first] = pair.second;
-        }
-        json["properties"] = propertiesJson;
-
-        return json;
     }
 
-    bool DeviceState::fromJson(const nlohmann::json &json)
+    std::map<std::string, std::any> DeviceState::diffFrom(const DeviceState &other) const
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        std::map<std::string, std::any> differences;
 
+        // Compare basic properties
+        if (m_type != other.m_type)
+        {
+            differences["type"] = std::any(static_cast<int>(other.m_type));
+        }
+        if (m_status != other.m_status)
+        {
+            differences["status"] = std::any(static_cast<int>(other.m_status));
+        }
+        if (m_inputChannelCount != other.m_inputChannelCount)
+        {
+            differences["inputChannelCount"] = std::any(other.m_inputChannelCount);
+        }
+        if (m_outputChannelCount != other.m_outputChannelCount)
+        {
+            differences["outputChannelCount"] = std::any(other.m_outputChannelCount);
+        }
+        if (m_sampleRate != other.m_sampleRate)
+        {
+            differences["sampleRate"] = std::any(other.m_sampleRate);
+        }
+        if (m_bufferSize != other.m_bufferSize)
+        {
+            differences["bufferSize"] = std::any(other.m_bufferSize);
+        }
+
+        // Compare properties
+        for (const auto &[key, value] : other.m_properties)
+        {
+            auto it = m_properties.find(key);
+            if (it == m_properties.end() || it->second != value)
+            {
+                differences["property." + key] = std::any(value);
+            }
+        }
+
+        // Compare parameters
+        for (const auto &[key, value] : other.m_parameters)
+        {
+            auto it = m_parameters.find(key);
+            if (it == m_parameters.end())
+            {
+                differences["parameter." + key] = value;
+            }
+            else
+            {
+                // For simplicity, always add parameter differences
+                // A more sophisticated implementation would compare based on types
+                differences["parameter." + key] = value;
+            }
+        }
+
+        return differences;
+    }
+
+    bool DeviceState::isCompatibleWith(const DeviceState &other) const
+    {
+        // Devices are compatible if they are the same type
+        if (m_type != other.m_type)
+        {
+            return false;
+        }
+
+        // Names should match
+        if (m_name != other.m_name)
+        {
+            return false;
+        }
+
+        // Other compatibility checks can be added here
+        return true;
+    }
+
+    void DeviceState::updateFromConfiguration(const Configuration &config)
+    {
+        // Update device properties from configuration
+        if (config.getSampleRate() > 0)
+        {
+            m_sampleRate = config.getSampleRate();
+        }
+
+        if (config.getBufferSize() > 0)
+        {
+            m_bufferSize = static_cast<int>(config.getBufferSize());
+        }
+
+        // Map Configuration DeviceType to internal DeviceType
+        switch (config.getDeviceType())
+        {
+        case Configuration::DeviceType::ASIO:
+            m_type = DeviceType::ASIO;
+            break;
+        // Map other device types as needed
+        default:
+            // Leave type unchanged if not recognized
+            break;
+        }
+
+        // Store connection parameters as properties
+        setProperty("target_ip", config.getTargetIp());
+        setProperty("target_port", std::to_string(config.getTargetPort()));
+        setProperty("receive_port", std::to_string(config.getReceivePort()));
+
+        // Store ASIO device name
+        if (!config.getAsioDeviceName().empty())
+        {
+            setProperty("asio_device_name", config.getAsioDeviceName());
+        }
+
+        // Store additional node and connection configuration details
+        // These could be useful for debugging or for creating derived configurations
+        if (!config.getNodes().empty())
+        {
+            setProperty("has_node_config", "true");
+            setProperty("node_count", std::to_string(config.getNodes().size()));
+        }
+
+        if (!config.getConnections().empty())
+        {
+            setProperty("has_connection_config", "true");
+            setProperty("connection_count", std::to_string(config.getConnections().size()));
+        }
+    }
+
+    Configuration DeviceState::toConfiguration() const
+    {
+        Configuration config;
+
+        // Set basic parameters
+        config.setSampleRate(m_sampleRate);
+        config.setBufferSize(m_bufferSize);
+
+        // Map internal DeviceType to Configuration DeviceType
+        switch (m_type)
+        {
+        case DeviceType::ASIO:
+            config.setDeviceType(Configuration::DeviceType::ASIO);
+            break;
+        // Map other device types as needed
+        default:
+            config.setDeviceType(Configuration::DeviceType::GENERIC_OSC);
+            break;
+        }
+
+        // Set connection parameters from properties
+        std::string ip = getProperty("target_ip", "127.0.0.1");
+        int targetPort = std::stoi(getProperty("target_port", "9000"));
+        int receivePort = std::stoi(getProperty("receive_port", "8000"));
+        config.setConnectionParams(ip, targetPort, receivePort);
+
+        // Set ASIO device name
+        std::string asioDeviceName = getProperty("asio_device_name", "");
+        if (!asioDeviceName.empty())
+        {
+            config.setAsioDeviceName(asioDeviceName);
+        }
+
+        // Note: This doesn't preserve node and connection configurations
+        // Those would typically be retrieved from a saved configuration file or template
+
+        return config;
+    }
+
+    std::string DeviceState::toJson() const
+    {
+        nlohmann::json j;
+
+        // Basic device information
+        j["name"] = m_name;
+        j["type"] = static_cast<int>(m_type);
+        j["status"] = static_cast<int>(m_status);
+        j["inputChannelCount"] = m_inputChannelCount;
+        j["outputChannelCount"] = m_outputChannelCount;
+        j["sampleRate"] = m_sampleRate;
+        j["bufferSize"] = m_bufferSize;
+
+        // Properties
+        nlohmann::json props = nlohmann::json::object();
+        for (const auto &[key, value] : m_properties)
+        {
+            props[key] = value;
+        }
+        j["properties"] = props;
+
+        // Parameters - only include simple types that can be serialized
+        nlohmann::json params = nlohmann::json::object();
+        for (const auto &[key, value] : m_parameters)
+        {
+            try
+            {
+                if (value.type() == typeid(int))
+                {
+                    params[key] = std::any_cast<int>(value);
+                }
+                else if (value.type() == typeid(float))
+                {
+                    params[key] = std::any_cast<float>(value);
+                }
+                else if (value.type() == typeid(double))
+                {
+                    params[key] = std::any_cast<double>(value);
+                }
+                else if (value.type() == typeid(bool))
+                {
+                    params[key] = std::any_cast<bool>(value);
+                }
+                else if (value.type() == typeid(std::string))
+                {
+                    params[key] = std::any_cast<std::string>(value);
+                }
+                // Skip other types that can't be easily serialized
+            }
+            catch (const std::exception &)
+            {
+                // Skip values that can't be cast
+            }
+        }
+        j["parameters"] = params;
+
+        // Parameter types
+        nlohmann::json paramTypes = nlohmann::json::object();
+        for (const auto &[key, type] : m_parameterTypes)
+        {
+            paramTypes[key] = type;
+        }
+        j["parameterTypes"] = paramTypes;
+
+        return j.dump(2); // Pretty print with 2-space indent
+    }
+
+    DeviceState DeviceState::fromJson(const std::string &json)
+    {
         try
         {
-            // Basic properties
-            if (json.contains("id"))
-                m_id = json["id"].get<std::string>();
-            if (json.contains("deviceId"))
-                m_deviceId = json["deviceId"].get<std::string>();
-            if (json.contains("deviceName"))
-                m_deviceName = json["deviceName"].get<std::string>();
-            if (json.contains("active"))
-                m_active = json["active"].get<bool>();
-            if (json.contains("inputChannelCount"))
-                m_inputChannelCount = json["inputChannelCount"].get<int>();
-            if (json.contains("outputChannelCount"))
-                m_outputChannelCount = json["outputChannelCount"].get<int>();
-            if (json.contains("sampleRate"))
-                m_sampleRate = json["sampleRate"].get<double>();
-            if (json.contains("bufferSize"))
-                m_bufferSize = json["bufferSize"].get<int>();
+            nlohmann::json j = nlohmann::json::parse(json);
 
-            // Load parameters
-            if (json.contains("parameters") && json["parameters"].is_object())
+            // Extract basic device information
+            std::string name = j.contains("name") ? j["name"].get<std::string>() : "Unknown Device";
+            DeviceType type = j.contains("type") ? static_cast<DeviceType>(j["type"].get<int>()) : DeviceType::Unknown;
+
+            DeviceState state(name, type);
+
+            if (j.contains("status"))
             {
-                const auto &parametersJson = json["parameters"];
-                for (auto it = parametersJson.begin(); it != parametersJson.end(); ++it)
-                {
-                    std::any value;
-                    std::type_index type(typeid(void));
-                    jsonToAny(it.value(), value, type);
+                state.setStatus(static_cast<Status>(j["status"].get<int>()));
+            }
+            if (j.contains("inputChannelCount"))
+            {
+                state.setInputChannelCount(j["inputChannelCount"].get<int>());
+            }
+            if (j.contains("outputChannelCount"))
+            {
+                state.setOutputChannelCount(j["outputChannelCount"].get<int>());
+            }
+            if (j.contains("sampleRate"))
+            {
+                state.setSampleRate(j["sampleRate"].get<double>());
+            }
+            if (j.contains("bufferSize"))
+            {
+                state.setBufferSize(j["bufferSize"].get<int>());
+            }
 
-                    m_parameters[it.key()] = value;
-                    m_parameterTypes[it.key()] = type;
+            // Extract properties
+            if (j.contains("properties") && j["properties"].is_object())
+            {
+                for (auto it = j["properties"].begin(); it != j["properties"].end(); ++it)
+                {
+                    state.setProperty(it.key(), it.value().get<std::string>());
                 }
             }
 
-            // Load properties
-            if (json.contains("properties") && json["properties"].is_object())
+            // Extract parameters
+            if (j.contains("parameters") && j["parameters"].is_object())
             {
-                const auto &propertiesJson = json["properties"];
-                for (auto it = propertiesJson.begin(); it != propertiesJson.end(); ++it)
+                for (auto it = j["parameters"].begin(); it != j["parameters"].end(); ++it)
                 {
-                    m_properties[it.key()] = it.value().get<std::string>();
+                    std::string key = it.key();
+
+                    // Determine parameter type
+                    std::string paramType;
+                    if (j.contains("parameterTypes") &&
+                        j["parameterTypes"].is_object() &&
+                        j["parameterTypes"].contains(key))
+                    {
+                        paramType = j["parameterTypes"][key].get<std::string>();
+                    }
+
+                    // Set parameter based on JSON type
+                    if (it.value().is_number_integer())
+                    {
+                        state.setParameter(key, std::any(it.value().get<int>()), paramType);
+                    }
+                    else if (it.value().is_number_float())
+                    {
+                        state.setParameter(key, std::any(it.value().get<double>()), paramType);
+                    }
+                    else if (it.value().is_boolean())
+                    {
+                        state.setParameter(key, std::any(it.value().get<bool>()), paramType);
+                    }
+                    else if (it.value().is_string())
+                    {
+                        state.setParameter(key, std::any(it.value().get<std::string>()), paramType);
+                    }
                 }
             }
 
-            return true;
+            return state;
         }
         catch (const std::exception &e)
         {
-            // Log error
+            std::cerr << "Error parsing device state JSON: " << e.what() << std::endl;
+            return DeviceState("Invalid Device", DeviceType::Unknown);
+        }
+    }
+
+    bool DeviceState::isHealthy() const
+    {
+        // Check if device is in an operational state
+        if (m_status == Status::Error)
+        {
             return false;
         }
+
+        // Check for valid sample rate and buffer size
+        if (m_sampleRate <= 0 || m_bufferSize <= 0)
+        {
+            return false;
+        }
+
+        // For ASIO devices, check if channels are valid
+        if (m_type == DeviceType::ASIO && (m_inputChannelCount <= 0 && m_outputChannelCount <= 0))
+        {
+            return false;
+        }
+
+        // Additional health checks can be added here
+
+        return true;
     }
 
-    void DeviceState::jsonToAny(const nlohmann::json &json, std::any &value, std::type_index &type)
+    bool DeviceState::attemptRecovery()
     {
-        if (json.is_null())
+        // Simple recovery logic - reset status to allow reconnection
+        if (m_status == Status::Error)
         {
-            value = std::any();
-            type = std::type_index(typeid(void));
-        }
-        else if (json.is_boolean())
-        {
-            value = json.get<bool>();
-            type = std::type_index(typeid(bool));
-        }
-        else if (json.is_number_integer())
-        {
-            value = json.get<int64_t>();
-            type = std::type_index(typeid(int64_t));
-        }
-        else if (json.is_number_float())
-        {
-            value = json.get<double>();
-            type = std::type_index(typeid(double));
-        }
-        else if (json.is_string())
-        {
-            value = json.get<std::string>();
-            type = std::type_index(typeid(std::string));
-        }
-        else if (json.is_array())
-        {
-            // Handle arrays as needed
-            value = std::any();
-            type = std::type_index(typeid(void));
-        }
-        else if (json.is_object())
-        {
-            // Handle objects as needed
-            value = std::any();
-            type = std::type_index(typeid(void));
-        }
-    }
-
-    nlohmann::json DeviceState::anyToJson(const std::any &value, const std::type_index &type) const
-    {
-        if (type == std::type_index(typeid(bool)))
-        {
-            return std::any_cast<bool>(value);
-        }
-        else if (type == std::type_index(typeid(int)) || type == std::type_index(typeid(int32_t)))
-        {
-            return std::any_cast<int>(value);
-        }
-        else if (type == std::type_index(typeid(int64_t)))
-        {
-            return std::any_cast<int64_t>(value);
-        }
-        else if (type == std::type_index(typeid(float)))
-        {
-            return std::any_cast<float>(value);
-        }
-        else if (type == std::type_index(typeid(double)))
-        {
-            return std::any_cast<double>(value);
-        }
-        else if (type == std::type_index(typeid(std::string)))
-        {
-            return std::any_cast<std::string>(value);
-        }
-
-        // Default case
-        return nullptr;
-    }
-
-    bool DeviceState::setSampleRate(double sampleRate)
-    {
-        if (sampleRate >= m_minSampleRate && sampleRate <= m_maxSampleRate)
-        {
-            m_sampleRate = sampleRate;
+            m_status = Status::Disconnected;
             return true;
         }
-        return false;
-    }
-
-    bool DeviceState::setBufferSize(int bufferSize)
-    {
-        if (bufferSize >= m_minBufferSize && bufferSize <= m_maxBufferSize)
-        {
-            m_bufferSize = bufferSize;
-            return true;
-        }
-        return false;
-    }
-
-    void DeviceState::setProperty(const std::string &name, const std::string &value)
-    {
-        m_properties[name] = value;
-    }
-
-    std::string DeviceState::getProperty(const std::string &name, const std::string &defaultValue) const
-    {
-        auto it = m_properties.find(name);
-        if (it != m_properties.end())
-        {
-            return it->second;
-        }
-        return defaultValue;
+        return false; // No recovery needed or unable to recover
     }
 
 } // namespace AudioEngine

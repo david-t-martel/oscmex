@@ -38,3 +38,13 @@ public:
 
     static Configuration getOptimalConfiguration(const std::string &deviceName);
 };
+
+// HardwareAbstraction.h
+class HardwareAbstractionFactory
+{
+public:
+    static std::unique_ptr<DeviceStateInterface> createInterface(
+        const std::string &deviceType,
+        AsioManager *asioManager,
+        OscController *oscController);
+};

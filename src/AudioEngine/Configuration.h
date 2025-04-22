@@ -474,6 +474,13 @@ namespace AudioEngine
 											   const std::string &filePath,
 											   const std::string &format = "");
 
+		// Convert to/from DeviceState
+		DeviceState toDeviceState() const;
+		static Configuration fromDeviceState(const DeviceState &state);
+
+		// Apply configuration to a device via DeviceStateManager
+		bool applyToDevice(DeviceStateManager &manager, std::function<void(bool)> callback);
+
 	private:
 		DeviceType m_deviceType;					 // Type of device for this configuration
 		std::string m_targetIp;						 // Target IP address

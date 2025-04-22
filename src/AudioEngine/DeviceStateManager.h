@@ -4,6 +4,7 @@
 #include "OscController.h"
 #include "IExternalControl.h"
 #include "DeviceState.h"
+#include "DeviceStateInterface.h"
 
 #include <functional>
 #include <map>
@@ -46,6 +47,9 @@ namespace AudioEngine
     {
     public:
         using StateChangedCallback = std::function<void(const std::string &, const std::string &, const std::any &)>;
+
+        // New constructor taking DeviceStateInterface
+        DeviceStateManager(std::unique_ptr<DeviceStateInterface> deviceInterface);
 
         /**
          * @brief Constructor with OscController
@@ -281,6 +285,7 @@ namespace AudioEngine
         bool loadFromFile(const std::string &filePath);
 
     private:
+        std::unique_ptr<DeviceStateInterface> m_deviceInterface;
         OscController *m_controller;                                        ///< OSC controller for device communication (legacy interface)
         std::shared_ptr<IExternalControl> m_externalControl;                ///< External control interface (new interface)
         std::map<std::string, QueryCallback> m_callbacks;                   ///< Map of pending query callbacks

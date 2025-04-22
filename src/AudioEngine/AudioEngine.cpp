@@ -39,6 +39,52 @@ namespace AudioEngine
     {
         m_config = std::move(config);
 
+        // Create appropriate hardware interfaces
+        if (!m_config.getAsioDeviceName().empty())
+        {
+            m_asioManager = std::make_unique<AsioManager>();
+
+            // Create the device interface
+            auto deviceInterface = std::make_unique<AsioDeviceInterface>(*m_asioManager);
+            m_deviceStateManager = std::make_unique<DeviceStateManager>(std::move(deviceInterface));
+        }
+
+        if (!m_config.getTargetIp().empty())
+        {
+            m_oscController = std::make_unique<OscController>();
+            if (!m_oscController->configure(m_config.getTargetIp(), m_config.getTargetPort()))
+            {
+                reportStatus("Error", "Failed to configure OSC controller");
+                return false;
+            }
+
+            // Create device state manager if not already created with ASIO interface
+            if (!m_deviceStateManager)
+            {
+                m_deviceStateManager = std::make_unique<DeviceStateManager>(m_oscController.get());
+            }
+        }
+
+        // Apply configuration via device state manager
+        if (m_deviceStateManager)
+        {
+            bool configSuccess = m_deviceStateManager->applyConfiguration(m_config,
+                                                                          [this](bool success, const std::string &message)
+                                                                          {
+                                                                              if (!success)
+                                                                              {
+                                                                                  reportStatus("Warning", "Some device settings could not be applied: " + message);
+                                                                              }
+                                                                          });
+
+            if (!configSuccess)
+            {
+                reportStatus("Error", "Failed to start device configuration");
+                return false;
+            }
+        }
+
+        // Continue with node creation and connection setup
         // Initialize the ASIO manager if we're using ASIO
         if (!m_config.getAsioDeviceName().empty())
         {
@@ -1180,6 +1226,48 @@ namespace AudioEngine
 
         // Initialize the engine with the loaded configuration
         return initialize(std::move(config), externalControl);
+    }
+
+    void AudioEngine::initialize()
+    {
+        // After creating DeviceStateManager...
+
+        m_deviceStateManager->addStateChangedCallback(
+            [this](const std::string &deviceId, const std::string &param, const std::any &value)
+            {
+                // Notify UI or other components about the change
+                reportStatus("DeviceState",
+                             "Parameter changed: " + deviceId + "::" + param);
+
+                // Update internal state as needed
+                updateInternalState(deviceId, param, value);
+            });
+    }
+
+    bool AudioEngine::queryCurrentState(std::function<void(bool, const Configuration &)> callback)
+    {
+        if (!m_deviceStateManager)
+        {
+            callback(false, Configuration());
+            return false;
+        }
+        return m_deviceStateManager->queryDeviceState(callback);
+    }
+
+    bool AudioEngine::applyConfiguration(const Configuration &config,
+                                         std::function<void(bool)> callback)
+    {
+        if (!m_deviceStateManager)
+        {
+            callback(false);
+            return false;
+        }
+
+        return m_deviceStateManager->applyConfiguration(config,
+                                                        [callback](bool success, const std::string &message)
+                                                        {
+                                                            callback(success);
+                                                        });
     }
 
 } // namespace AudioEngine

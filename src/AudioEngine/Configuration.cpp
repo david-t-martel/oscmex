@@ -1,6 +1,8 @@
 #include "Configuration.h"
 #include "OscController.h"
 #include "AsioManager.h"
+#include "DeviceState.h"
+#include "DeviceStateInterface.h"
 
 #include <fstream>
 #include <iostream>
@@ -116,7 +118,10 @@ namespace AudioEngine
 
         if (createDefaultGraph)
         {
-            return this->createDefaultGraph(2, 2, true);
+            return this->createDefaultGraph(
+                asioManager->getInputChannelCount(),
+                asioManager->getOutputChannelCount(),
+                true); // Add processor node by default
         }
 
         return true;
@@ -1836,6 +1841,110 @@ namespace AudioEngine
         node.params["channels"] = channelStr;
 
         return node;
+    }
+
+    bool Configuration::applyToDevice(DeviceStateManager &manager,
+                                      std::function<void(bool)> callback)
+    {
+        return manager.applyConfiguration(*this,
+                                          [callback](bool success, const std::string &message)
+                                          {
+                                              callback(success);
+                                          });
+    }
+
+    DeviceState Configuration::toDeviceState() const
+    {
+        DeviceState state("Unknown", DeviceState::DeviceType::Unknown);
+
+        // Set basic device information
+        state.setProperty("device_name", m_asioDeviceName);
+
+        // Set connection parameters
+        state.setProperty("target_ip", m_targetIp);
+        state.setProperty("target_port", std::to_string(m_targetPort));
+        state.setProperty("receive_port", std::to_string(m_receivePort));
+
+        // Map DeviceType enum
+        DeviceState::DeviceType stateDeviceType;
+        switch (m_deviceType)
+        {
+        case DeviceType::ASIO:
+            stateDeviceType = DeviceState::DeviceType::ASIO;
+            break;
+        case DeviceType::RME_TOTALMIX:
+            stateDeviceType = DeviceState::DeviceType::Unknown; // Set appropriate type
+            break;
+        case DeviceType::GENERIC_OSC:
+            stateDeviceType = DeviceState::DeviceType::Unknown; // Set appropriate type
+            break;
+        default:
+            stateDeviceType = DeviceState::DeviceType::Unknown;
+            break;
+        }
+        state.setType(stateDeviceType);
+
+        // Set audio configuration parameters
+        state.setSampleRate(m_sampleRate);
+        state.setBufferSize(m_bufferSize);
+
+        // Set status as connected by default
+        state.setStatus(DeviceState::Status::Connected);
+
+        // Convert all commands to parameters
+        for (const auto &cmd : m_commands)
+        {
+            if (!cmd.args.empty())
+            {
+                state.setParameter(cmd.address, cmd.args[0]);
+            }
+        }
+
+        return state;
+    }
+
+    Configuration Configuration::fromDeviceState(const DeviceState &state)
+    {
+        Configuration config;
+
+        // Get basic device information
+        config.setAsioDeviceName(state.getProperty("device_name", ""));
+
+        // Get connection parameters
+        config.setConnectionParams(
+            state.getProperty("target_ip", "127.0.0.1"),
+            std::stoi(state.getProperty("target_port", "9000")),
+            std::stoi(state.getProperty("receive_port", "8000")));
+
+        // Map DeviceType enum
+        DeviceType configDeviceType;
+        switch (state.getType())
+        {
+        case DeviceState::DeviceType::ASIO:
+            configDeviceType = DeviceType::ASIO;
+            break;
+        case DeviceState::DeviceType::CoreAudio:
+        case DeviceState::DeviceType::WASAPI:
+        case DeviceState::DeviceType::ALSA:
+        case DeviceState::DeviceType::JACK:
+            // Map as needed
+            configDeviceType = DeviceType::GENERIC_OSC;
+            break;
+        default:
+            configDeviceType = DeviceType::GENERIC_OSC;
+            break;
+        }
+        config.setDeviceType(configDeviceType);
+
+        // Set audio configuration parameters
+        config.setSampleRate(state.getSampleRate());
+        config.setBufferSize(state.getBufferSize());
+
+        // Get individual parameters and convert to commands
+        // This would need to scan through all parameters in the DeviceState
+        // and convert them to Configuration commands
+
+        return config;
     }
 
 } // namespace AudioEngine
