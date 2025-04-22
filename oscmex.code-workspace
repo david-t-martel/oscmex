@@ -3,9 +3,6 @@
 		{
 			"path": "."
 		},
-		{
-			"path": "../json"
-		}
 	],
 	"settings": {
 		"files.associations": {
@@ -23,6 +20,25 @@
 			"list": "cpp",
 			"xstring": "cpp"
 		},
-		"terminal.integrated.defaultProfile.windows": "Command Prompt"
+		"terminal.integrated.defaultProfile.windows": "Intel oneAPI",
+		"terminal.integrated.profiles.windows": {
+			"Intel oneAPI": {
+				"path": "cmd.exe",
+				"args": [
+					"/k",
+					"\"C:\\Program Files (x86)\\Intel\\oneAPI\\setvars.bat\"",
+					"intel64"
+				],
+				"icon": "terminal-cmd"
+			},
+			"Command Prompt": {
+				"path": [
+					"${env:windir}\\Sysnative\\cmd.exe",
+					"${env:windir}\\System32\\cmd.exe"
+				],
+				"args": [],
+				"icon": "terminal-cmd"
+			}
+		}
 	}
 }

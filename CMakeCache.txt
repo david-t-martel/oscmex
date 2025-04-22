@@ -172,7 +172,7 @@ CMAKE_PROJECT_DESCRIPTION:STATIC=
 CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
 
 //Value Computed by CMake
-CMAKE_PROJECT_NAME:STATIC=AudioEngine
+CMAKE_PROJECT_NAME:STATIC=OscMex
 
 //Value Computed by CMake
 CMAKE_PROJECT_VERSION:STATIC=1.0.0
@@ -299,6 +299,42 @@ ENABLE_SCALAPACK:BOOL=OFF
 //Enables compiling a oneMKL DPC++ test program
 ENABLE_TRY_SYCL_COMPILE:BOOL=OFF
 
+//Path to a file.
+FFMPEG_avcodec_INCLUDE_DIR:PATH=FFMPEG_avcodec_INCLUDE_DIR-NOTFOUND
+
+//Path to a library.
+FFMPEG_avcodec_LIBRARY:FILEPATH=FFMPEG_avcodec_LIBRARY-NOTFOUND
+
+//Path to a file.
+FFMPEG_avfilter_INCLUDE_DIR:PATH=FFMPEG_avfilter_INCLUDE_DIR-NOTFOUND
+
+//Path to a library.
+FFMPEG_avfilter_LIBRARY:FILEPATH=FFMPEG_avfilter_LIBRARY-NOTFOUND
+
+//Path to a file.
+FFMPEG_avformat_INCLUDE_DIR:PATH=FFMPEG_avformat_INCLUDE_DIR-NOTFOUND
+
+//Path to a library.
+FFMPEG_avformat_LIBRARY:FILEPATH=FFMPEG_avformat_LIBRARY-NOTFOUND
+
+//Path to a file.
+FFMPEG_avutil_INCLUDE_DIR:PATH=FFMPEG_avutil_INCLUDE_DIR-NOTFOUND
+
+//Path to a library.
+FFMPEG_avutil_LIBRARY:FILEPATH=FFMPEG_avutil_LIBRARY-NOTFOUND
+
+//Path to a file.
+FFMPEG_swresample_INCLUDE_DIR:PATH=FFMPEG_swresample_INCLUDE_DIR-NOTFOUND
+
+//Path to a library.
+FFMPEG_swresample_LIBRARY:FILEPATH=FFMPEG_swresample_LIBRARY-NOTFOUND
+
+//Path to a file.
+FFMPEG_swscale_INCLUDE_DIR:PATH=FFMPEG_swscale_INCLUDE_DIR-NOTFOUND
+
+//Path to a library.
+FFMPEG_swscale_LIBRARY:FILEPATH=FFMPEG_swscale_LIBRARY-NOTFOUND
+
 //The directory containing a CMake configuration file for IPP.
 IPP_DIR:PATH=C:/Program Files (x86)/Intel/oneAPI/ipp/2022.0/lib/cmake/ipp
 
@@ -328,6 +364,21 @@ OMP_DLL_DIR:PATH=C:/Program Files (x86)/Intel/oneAPI/mkl/2025.0/../../compiler/l
 
 //Path to a library.
 OMP_LIBRARY:FILEPATH=C:/Program Files (x86)/Intel/oneAPI/compiler/latest/lib/libiomp5md.lib
+
+//Value Computed by CMake
+OscMex_BINARY_DIR:STATIC=C:/codedev/auricleinc/oscmex
+
+//Value Computed by CMake
+OscMex_IS_TOP_LEVEL:STATIC=ON
+
+//Value Computed by CMake
+OscMex_SOURCE_DIR:STATIC=C:/codedev/auricleinc/oscmex
+
+//Arguments to supply to pkg-config
+PKG_CONFIG_ARGN:STRING=
+
+//pkg-config executable
+PKG_CONFIG_EXECUTABLE:FILEPATH=C:/codedev/msys64/mingw64/bin/pkg-config.exe
 
 //The directory containing a CMake configuration file for TBB.
 TBB_DIR:PATH=C:/Program Files (x86)/Intel/oneAPI/tbb/2022.0/lib/cmake/tbb
@@ -545,4 +596,8 @@ HAVE_INET_PTON:INTERNAL=
 HAVE_POLL:INTERNAL=
 //Have symbol select
 HAVE_SELECT:INTERNAL=
+//ADVANCED property for variable: PKG_CONFIG_ARGN
+PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
+PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
 

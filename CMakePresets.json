@@ -26,9 +26,6 @@
         "INTELONEAPI_ENABLE_TBB": "ON",
         "INTELONEAPI_ENABLE_IPP": "ON",
         "INTELONEAPI_ENABLE_MKL": "ON"
-      },
-      "environment": {
-        "PATH": "$env{PATH}"
       }
     },
     {
@@ -45,9 +42,6 @@
         "INTELONEAPI_ENABLE_TBB": "ON",
         "INTELONEAPI_ENABLE_IPP": "ON",
         "INTELONEAPI_ENABLE_MKL": "ON"
-      },
-      "environment": {
-        "PATH": "$env{PATH}"
       }
     },
     {
@@ -62,9 +56,6 @@
         "CMAKE_CXX_COMPILER": "icpx",
         "VENDOR_DIR": "${sourceDir}/vendor",
         "INTELONEAPI_VECTORIZATION_REPORT": "ON"
-      },
-      "environment": {
-        "PATH": "$env{PATH}"
       }
     },
     {
