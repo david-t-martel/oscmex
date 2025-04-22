@@ -41,45 +41,45 @@ The project follows a modular architecture detailed in [`AudioEngine_ARCHITECTUR
 
 ## Project Structure
 
-* `./CMakeLists.txt`: Main CMake build script with FFmpeg and nlohmann/json integration
-* `./CMakePresets.json`: Predefined configurations for CMake
-* `./AudioEngine_ARCHITECTURE.md`: Detailed architecture documentation
-* `./build/`: Build output directory
-* `./src/`: Source code
-  * `./src/AudioEngine/`: Core engine components
-    * `AudioBuffer.h/cpp`: Audio data container with reference counting
-    * `AudioNode.h/cpp`: Base class for processing nodes
-    * `AsioManager.h/cpp`: ASIO hardware interface
-    * `OscController.h/cpp`: OSC communication with RME devices
-    * `Configuration.h/cpp`: Configuration management
-    * `Connection.h/cpp`: Audio signal routing
-    * `DeviceStateManager.h/cpp`: Device state querying
-    * Node implementations: ASIO I/O, file I/O, FFmpeg processing
-    * `MERMAID.md`: Architectural diagrams
-  * `./src/ffmpeg-master/`: Integrated FFmpeg source code
-  * `./src/lo/`: liblo OSC implementation
-  * `./src/tools/`: Command-line utilities
-    * `./src/tools/osc/`: OSC tools and scripts
-    * `./src/tools/matlab/`: MATLAB integration tools
-  * `./src/web/`: Web-based interface components
-  * `./src/oscmix/`: Device-specific implementations
-* `./include/`: External library headers
-  * `./include/nlohmann/`: nlohmann/json headers (auto-downloaded)
-* `./examples/`: Example configurations and usage patterns
-* `./TODO.md`: Development task tracking
+- `./CMakeLists.txt`: Main CMake build script with FFmpeg and nlohmann/json integration
+- `./CMakePresets.json`: Predefined configurations for CMake
+- `./AudioEngine_ARCHITECTURE.md`: Detailed architecture documentation
+- `./build/`: Build output directory
+- `./src/`: Source code
+  - `./src/AudioEngine/`: Core engine components
+    - `AudioBuffer.h/cpp`: Audio data container with reference counting
+    - `AudioNode.h/cpp`: Base class for processing nodes
+    - `AsioManager.h/cpp`: ASIO hardware interface
+    - `OscController.h/cpp`: OSC communication with RME devices
+    - `Configuration.h/cpp`: Configuration management
+    - `Connection.h/cpp`: Audio signal routing
+    - `DeviceStateManager.h/cpp`: Device state querying
+    - Node implementations: ASIO I/O, file I/O, FFmpeg processing
+    - `MERMAID.md`: Architectural diagrams
+  - `./src/ffmpeg-master/`: Integrated FFmpeg source code
+  - `./src/lo/`: liblo OSC implementation
+  - `./src/tools/`: Command-line utilities
+    - `./src/tools/osc/`: OSC tools and scripts
+    - `./src/tools/matlab/`: MATLAB integration tools
+  - `./src/web/`: Web-based interface components
+  - `./src/oscmix/`: Device-specific implementations
+- `./include/`: External library headers
+  - `./include/nlohmann/`: nlohmann/json headers (auto-downloaded)
+- `./examples/`: Example configurations and usage patterns
+- `./TODO.md`: Development task tracking
 
 ## Dependencies
 
-* **CMake:** Version 3.15+ (for building)
-* **C++ Compiler:** C++17 compliant (GCC, Clang, MSVC, Intel icpx)
-* **ASIO SDK:** For hardware audio I/O (included)
-* **FFmpeg:** Integrated source code (no external dependency)
-* **nlohmann/json:** Automatically downloaded during the build process
-* **Intel oneAPI (Optional but Recommended):**
-  * Threading Building Blocks (TBB) for parallelism
-  * Integrated Performance Primitives (IPP) for signal processing
-  * Math Kernel Library (MKL) for optimized math operations
-* **Doxygen (Optional):** For building documentation
+- **CMake:** Version 3.15+ (for building)
+- **C++ Compiler:** C++17 compliant (GCC, Clang, MSVC, Intel icpx)
+- **ASIO SDK:** For hardware audio I/O (included)
+- **FFmpeg:** Integrated source code (no external dependency)
+- **nlohmann/json:** Automatically downloaded during the build process
+- **Intel oneAPI (Optional but Recommended):**
+  - Threading Building Blocks (TBB) for parallelism
+  - Integrated Performance Primitives (IPP) for signal processing
+  - Math Kernel Library (MKL) for optimized math operations
+- **Doxygen (Optional):** For building documentation
 
 ## Building
 
@@ -128,12 +128,14 @@ Windows users can use the provided `build/build_script_oneapi.bat` script for In
 ### JSON Configuration
 
 The system uses JSON configuration files to define:
+
 - Audio processing graph (nodes and connections)
 - Device settings (ASIO, sample rate, buffer size)
 - OSC communication parameters
 - RME device-specific settings
 
 Example JSON configuration:
+
 ```json
 {
   "asioDeviceName": "RME Fireface UCX II",
@@ -165,11 +167,13 @@ Example JSON configuration:
 ### Device State Management
 
 The system can:
+
 1. Query the current state of connected RME devices
 2. Save device configurations to JSON files
 3. Apply saved configurations to devices
 
 This allows for:
+
 - Creating device presets
 - Backup and restore of device settings
 - Programmatic control of device parameters
@@ -177,6 +181,7 @@ This allows for:
 ## Future Development
 
 Key areas for future development include:
+
 - GUI integration for configuration and monitoring
 - Additional processing node types
 - Enhanced device control capabilities
@@ -187,6 +192,7 @@ See [`TODO.md`](TODO.md) for specific development tasks.
 ## License
 
 This project uses multiple components with different licenses:
+
 - liblo: LGPL v2.1 or later
 - FFmpeg: LGPL v2.1 or later
 - nlohmann/json: MIT
