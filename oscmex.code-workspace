@@ -1,0 +1,33 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			".fantomasignore": "ignore",
+			"*.rmd": "markdown",
+			"socket.h": "c",
+			"stdbool.h": "c",
+			"*.cpp": "cpp",
+			"*.h": "cpp",
+			"*.hpp": "cpp",
+			"*.c": "c",
+			"CMakeLists.txt": "cmake",
+			"*.cmake": "cmake"
+		},
+		"terminal.integrated.defaultProfile.windows": "Command Prompt",
+		"terminal.integrated.profiles.windows": {
+			"Intel oneAPI": {
+				"path": "cmd.exe",
+				"args": [
+					"/k",
+					"C:\\Program Files (x86)\\Intel\\oneAPI\\setvars.bat",
+					"intel64",
+					"vs2022"
+				]
+			}
+		}
+	}
+}
