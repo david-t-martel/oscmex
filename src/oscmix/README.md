@@ -29,6 +29,8 @@ The application follows a message-based architecture:
 +--------+           +--------+                  +-------------+
 ```
 
+For a detailed description of the code structure, component interactions, and implementation details, see the [ARCHITECTURE.md](ARCHITECTURE.md) document.
+
 ## Dependencies
 
 - **POSIX-compatible OS** or **Windows**
@@ -62,10 +64,25 @@ REM Compile
 cl.exe /Fe:oscmix.exe ..\src\oscmix\main_old.c ..\src\oscmix\oscmix.c ..\src\oscmix\osc.c ..\src\oscmix\socket.c ..\src\oscmix\sysex.c ..\src\oscmix\intpack.c ..\src\oscmix\device.c ..\src\oscmix\util.c /link ws2_32.lib winmm.lib
 ```
 
-## Usage
+### Using CMake (Cross-Platform)
+
+```bash
+# Create build directory
+mkdir build
+cd build
+
+# Configure and build
+cmake ..
+cmake --build .
+
+# Install (optional)
+cmake --install .
+```
+
+## Command Syntax
 
 ```
-Usage: oscmix [-dlm] [-r addr] [-s addr] [-R port] [-S port] [-p device]
+Usage: oscmix [-dlmh?] [-r addr] [-s addr] [-R port] [-S port] [-p device]
 
 Options:
   -d           Enable debug output
@@ -76,13 +93,43 @@ Options:
   -R port      Set UDP receive port (default: 7222)
   -S port      Set UDP send port (default: 8222)
   -p device    Specify RME device name/ID
+  -h, -?       Display this help message
 ```
 
-### Example
+### Parameter Details
+
+- **-d** (Debug): Enables debug output to standard error. Useful for troubleshooting.
+- **-l** (Level meters): Disables level meter monitoring. By default, oscmix will monitor and transmit level meters.
+- **-m** (Multicast): Uses multicast address 224.0.0.1 for sending OSC messages, allowing multiple clients to receive updates.
+- **-r addr** (Receive address): Specifies the IP address to bind for receiving OSC messages. Use "0.0.0.0" to listen on all interfaces.
+- **-s addr** (Send address): Specifies the destination IP address for OSC messages sent from oscmix.
+- **-R port** (Receive port): Specifies the UDP port to listen on for incoming OSC messages (default: 7222).
+- **-S port** (Send port): Specifies the UDP port to send OSC messages to (default: 8222).
+- **-p device** (MIDI device): Specifies the RME device name or ID to connect to. This is required unless the MIDIPORT environment variable is set.
+- **-h, -?** (Help): Displays the help message with command usage information.
+
+### Environment Variables
+
+- **MIDIPORT**: Alternative way to specify the MIDI device name/ID. Used if the `-p` option is not provided.
+
+### Examples
 
 ```bash
 # Start oscmix listening on all interfaces, port 7222, sending to 127.0.0.1:8222
 oscmix -r 0.0.0.0 -p "Fireface UCX II"
+
+# Start oscmix with debug output enabled
+oscmix -d -p "Fireface UCX II"
+
+# Start oscmix using non-standard ports
+oscmix -R 9000 -S 9001 -p "Fireface UCX II"
+
+# Start oscmix with multicast output for multiple clients
+oscmix -m -p "Fireface UCX II"
+
+# Start oscmix specifying device through the environment variable
+export MIDIPORT="Fireface UCX II"
+oscmix
 ```
 
 ## OSC Message Format

@@ -17,6 +17,12 @@
 #include <ws2tcpip.h>
 #include <mmsystem.h>
 #include <process.h>
+/* Fix for ssize_t not defined in Windows */
+#ifdef _WIN64
+typedef __int64 ssize_t;
+#else
+typedef int ssize_t;
+#endif
 typedef HANDLE thread_t;
 #define thread_create(t, f, a) ((*t = (HANDLE)_beginthreadex(NULL, 0, f, a, 0, NULL)) == 0)
 #define thread_join(t) WaitForSingleObject(t, INFINITE)
@@ -26,6 +32,9 @@ typedef SOCKET socket_t;
 #pragma comment(lib, "winmm.lib")
 static HMIDIIN hMidiIn;
 static HMIDIOUT hMidiOut;
+#ifndef min
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 #else
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
@@ -59,9 +68,32 @@ static socket_t rfd, wfd;
     if (dflag > 1)          \
     fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__)
 
+static void print_help(void)
+{
+    printf("\nOSCMix: Open Sound Control Interface for RME Audio Devices\n");
+    printf("-------------------------------------------------------\n\n");
+    printf("Usage: oscmix [-dlmh?] [-r addr] [-s addr] [-R port] [-S port] [-p device]\n\n");
+    printf("Options:\n");
+    printf("  -d           Enable debug output\n");
+    printf("  -l           Disable level meter monitoring\n");
+    printf("  -m           Use multicast for sending (224.0.0.1)\n");
+    printf("  -r addr      Set UDP receive address (default: 127.0.0.1)\n");
+    printf("  -s addr      Set UDP send address (default: 127.0.0.1)\n");
+    printf("  -R port      Set UDP receive port (default: 7222)\n");
+    printf("  -S port      Set UDP send port (default: 8222)\n");
+    printf("  -p device    Specify RME device name/ID\n");
+    printf("  -h, -?       Display this help message\n\n");
+    printf("Example:\n");
+    printf("  oscmix -r 0.0.0.0 -p \"Fireface UCX II\"\n\n");
+    printf("Environment Variables:\n");
+    printf("  MIDIPORT     Alternative way to specify the MIDI device name/ID\n\n");
+    exit(0);
+}
+
 static void usage(void)
 {
-    fprintf(stderr, "usage: oscmix [-dlm] [-r addr] [-s addr] [-R port] [-S port] [-p device]\n");
+    fprintf(stderr, "usage: oscmix [-dlmh?] [-r addr] [-s addr] [-R port] [-S port] [-p device]\n");
+    fprintf(stderr, "Try 'oscmix -h' for more information.\n");
     exit(1);
 }
 
@@ -465,6 +497,13 @@ int main(int argc, char *argv[])
     char *recvaddr, *sendaddr;
     thread_t midireader, oscreader;
     const char *port = NULL;
+#ifdef _WIN32
+    char recvport[6] = "7222";
+    char sendport[6] = "8222";
+    char recvaddr_with_port[256];
+    char sendaddr_with_port[256];
+    char *addr_part;
+#endif
 
     // Initialize networking
     if (init_networking() != 0)
@@ -480,8 +519,14 @@ int main(int argc, char *argv[])
     signal(SIGTERM, handle_signal);
 #endif
 
+#ifdef _WIN32
+    addr_part = "127.0.0.1"; // Default IP without the protocol and port
+    recvaddr = addr_part;
+    sendaddr = addr_part;
+#else
     recvaddr = defrecvaddr;
     sendaddr = defsendaddr;
+#endif
 
     ARGBEGIN
     {
@@ -498,10 +543,28 @@ int main(int argc, char *argv[])
         sendaddr = EARGF(usage());
         break;
     case 'm':
+#ifdef _WIN32
+        sendaddr = "224.0.0.1";
+#else
         sendaddr = mcastaddr;
+#endif
         break;
+#ifdef _WIN32
+    case 'R':
+        strncpy(recvport, EARGF(usage()), sizeof(recvport) - 1);
+        recvport[sizeof(recvport) - 1] = '\0';
+        break;
+    case 'S':
+        strncpy(sendport, EARGF(usage()), sizeof(sendport) - 1);
+        sendport[sizeof(sendport) - 1] = '\0';
+        break;
+#endif
     case 'p':
         port = EARGF(usage());
+        break;
+    case 'h':
+    case '?':
+        print_help();
         break;
     default:
         usage();
@@ -510,8 +573,15 @@ int main(int argc, char *argv[])
     ARGEND
 
     // Open sockets
+#ifdef _WIN32
+    snprintf(recvaddr_with_port, sizeof(recvaddr_with_port), "udp!%s!%s", recvaddr, recvport);
+    snprintf(sendaddr_with_port, sizeof(sendaddr_with_port), "udp!%s!%s", sendaddr, sendport);
+    rfd = sockopen(recvaddr_with_port, 1);
+    wfd = sockopen(sendaddr_with_port, 0);
+#else
     rfd = sockopen(recvaddr, 1);
     wfd = sockopen(sendaddr, 0);
+#endif
 
     // Check for MIDI device name
     if (!port)
