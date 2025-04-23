@@ -1,146 +1,111 @@
 /**
- * OSCMix - Cross-platform implementation
- * Unified main file for Windows, macOS and Linux
+ * @file main.c
+ * @brief Cross-platform main entry point for the OSCMix application
+ *
+ * This file implements the unified main application logic and platform-specific code
+ * for running OSCMix across Windows, macOS, and Linux systems. It provides:
+ * - Command line argument parsing
+ * - Socket initialization for OSC communication
+ * - Platform-specific MIDI device connection
+ * - Threading for MIDI and OSC message handling
+ * - Event and signal handling
+ * - Graceful cleanup on exit
+ *
+ * The code uses conditional compilation to support multiple platforms while
+ * maintaining a consistent interface to the core OSCMix logic.
  */
 
-#include <assert.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
+/* Platform-specific includes */
+#if defined(_WIN32)
+#define _WIN32_WINNT 0x0601 /* Windows 7 or later */
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <mmsystem.h>
 #include <process.h>
-/* Fix for ssize_t not defined in Windows */
-#ifdef _WIN64
-typedef __int64 ssize_t;
-#else
-typedef int ssize_t;
-#endif
 typedef HANDLE thread_t;
-#define thread_create(t, f, a) ((*t = (HANDLE)_beginthreadex(NULL, 0, f, a, 0, NULL)) == 0)
+typedef SOCKET socket_t;
+#define thread_create(t, f, a) ((*t = _beginthreadex(NULL, 0, f, a, 0, NULL)) == 0)
 #define thread_join(t) WaitForSingleObject(t, INFINITE)
 #define sleep_ms(ms) Sleep(ms)
-typedef SOCKET socket_t;
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "winmm.lib")
-static HMIDIIN hMidiIn;
-static HMIDIOUT hMidiOut;
-#ifndef min
-#define min(a, b) (((a) < (b)) ? (a) : (b))
-#endif
 #else
 #define _POSIX_C_SOURCE 200809L
-#include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
 #include <sys/time.h>
 #include <unistd.h>
 typedef pthread_t thread_t;
+typedef int socket_t;
 #define thread_create(t, f, a) pthread_create(t, NULL, f, a)
 #define thread_join(t) pthread_join(t, NULL)
 #define sleep_ms(ms) usleep((ms) * 1000)
-typedef int socket_t;
 #endif
 
+/* Common includes */
+#include <assert.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* Project includes */
 #include "socket.h"
 #include "oscmix.h"
 #include "arg.h"
 #include "util.h"
 
-extern int dflag;
-static int lflag;
-static socket_t rfd, wfd;
+/* Global variables */
+extern int dflag;    /**< Debug flag: enables verbose logging when set */
+static int lflag;    /**< Level meters flag: disables level meters when set */
+static socket_t rfd; /**< Socket file descriptor for receiving OSC messages */
+static socket_t wfd; /**< Socket file descriptor for sending OSC messages */
 
-// Logging macros
-#define LOG_ERROR(fmt, ...) fprintf(stderr, "ERROR: " fmt "\n", ##__VA_ARGS__)
-#define LOG_INFO(fmt, ...) \
-    if (dflag)             \
-    fprintf(stderr, "INFO: " fmt "\n", ##__VA_ARGS__)
-#define LOG_DEBUG(fmt, ...) \
-    if (dflag > 1)          \
-    fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__)
+#ifdef _WIN32
+static HMIDIIN hMidiIn;          /**< Windows MIDI input device handle */
+static HMIDIOUT hMidiOut;        /**< Windows MIDI output device handle */
+static HANDLE hEvent;            /**< Windows event handle for MIDI notification */
+static volatile int running = 1; /**< Flag to control thread execution */
+#endif
 
-static void print_help(void)
+/* Default addresses for OSC communication */
+static char defrecvaddr[] = "udp!127.0.0.1!7222";                    /**< Default address for receiving OSC messages */
+static char defsendaddr[] = "udp!127.0.0.1!8222";                    /**< Default address for sending OSC messages */
+static char mcastaddr[] = "udp!224.0.0.1!8222";                      /**< Multicast address for sending OSC messages */
+static const unsigned char refreshosc[] = "/refresh\0\0\0\0,\0\0\0"; /**< OSC message for triggering a refresh */
+
+/**
+ * @brief Prints usage information and exits
+ */
+static void
+usage(void)
 {
-    printf("\nOSCMix: Open Sound Control Interface for RME Audio Devices\n");
-    printf("-------------------------------------------------------\n\n");
-    printf("Usage: oscmix [-dlmh?] [-r addr] [-s addr] [-R port] [-S port] [-p device]\n\n");
-    printf("Options:\n");
-    printf("  -d           Enable debug output\n");
-    printf("  -l           Disable level meter monitoring\n");
-    printf("  -m           Use multicast for sending (224.0.0.1)\n");
-    printf("  -r addr      Set UDP receive address (default: 127.0.0.1)\n");
-    printf("  -s addr      Set UDP send address (default: 127.0.0.1)\n");
-    printf("  -R port      Set UDP receive port (default: 7222)\n");
-    printf("  -S port      Set UDP send port (default: 8222)\n");
-    printf("  -p device    Specify RME device name/ID\n");
-    printf("  -h, -?       Display this help message\n\n");
-    printf("Example:\n");
-    printf("  oscmix -r 0.0.0.0 -p \"Fireface UCX II\"\n\n");
-    printf("Environment Variables:\n");
-    printf("  MIDIPORT     Alternative way to specify the MIDI device name/ID\n\n");
-    exit(0);
-}
-
-static void usage(void)
-{
-    fprintf(stderr, "usage: oscmix [-dlmh?] [-r addr] [-s addr] [-R port] [-S port] [-p device]\n");
-    fprintf(stderr, "Try 'oscmix -h' for more information.\n");
+#ifdef _WIN32
+    fprintf(stderr, "usage: oscmix [-dlm] [-r addr] [-s addr] [-R port] [-S port] [-p midiport]\n");
+#else
+    fprintf(stderr, "usage: oscmix [-dlm] [-r addr] [-s addr] [-p midiport]\n");
+#endif
     exit(1);
 }
 
-// Initialize networking based on platform
-int init_networking(void)
-{
 #ifdef _WIN32
-    WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-    {
-        LOG_ERROR("WSAStartup failed");
-        return -1;
-    }
-#endif
-    return 0;
-}
-
-void cleanup_networking(void)
-{
-#ifdef _WIN32
-    WSACleanup();
-#endif
-}
-
-// Handle signals for clean shutdown
-void handle_signal(int sig)
-{
-    LOG_INFO("Received signal %d, cleaning up...", sig);
-
-#ifdef _WIN32
-    if (hMidiIn)
-    {
-        midiInStop(hMidiIn);
-        midiInClose(hMidiIn);
-    }
-    if (hMidiOut)
-    {
-        midiOutClose(hMidiOut);
-    }
-#endif
-
-    cleanup_networking();
-    exit(0);
-}
-
-#ifdef _WIN32
-// MIDI callback function for Windows
+/**
+ * @brief MIDI callback function for Windows
+ *
+ * This function is called by the Windows Multimedia API when MIDI data is received.
+ * It processes both short MIDI messages and SysEx messages, and dispatches them
+ * to the appropriate handlers.
+ *
+ * @param hMidiIn MIDI input device handle
+ * @param wMsg Type of MIDI message (MIM_DATA or MIM_LONGDATA)
+ * @param dwInstance Instance data passed to midiInOpen
+ * @param dwParam1 First parameter (depends on wMsg)
+ * @param dwParam2 Second parameter (depends on wMsg)
+ */
 static void CALLBACK midiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance,
                                 DWORD_PTR dwParam1, DWORD_PTR dwParam2)
 {
@@ -150,21 +115,19 @@ static void CALLBACK midiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance
 
     if (wMsg == MIM_DATA)
     {
-        // Handle short MIDI messages (if needed)
-        DWORD dwMidiMessage = (DWORD)dwParam1;
-        // Process if needed
+        // Handle short MIDI messages if needed
     }
     else if (wMsg == MIM_LONGDATA)
     {
-        // Handle SysEx messages
+        /* Handle SysEx messages */
         MIDIHDR *pMidiHdr = (MIDIHDR *)dwParam1;
 
         if (pMidiHdr->dwBytesRecorded > 0)
         {
-            // Process SysEx data
+            /* Process SysEx data */
             handlesysex(pMidiHdr->lpData, pMidiHdr->dwBytesRecorded, payload);
 
-            // Prepare the buffer for reuse
+            /* Prepare the buffer for reuse */
             pMidiHdr->dwBytesRecorded = 0;
             midiInPrepareHeader(hMidiIn, pMidiHdr, sizeof(MIDIHDR));
             midiInAddBuffer(hMidiIn, pMidiHdr, sizeof(MIDIHDR));
@@ -172,44 +135,22 @@ static void CALLBACK midiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance
     }
 }
 
-// Open a MIDI device by name on Windows
-static MMRESULT openMidiDevice(const char *name, UINT *deviceId)
-{
-    UINT numDevs = midiInGetNumDevs();
-    MIDIINCAPS caps;
-    *deviceId = MIDI_MAPPER; // Default
-
-    for (UINT i = 0; i < numDevs; i++)
-    {
-        if (midiInGetDevCaps(i, &caps, sizeof(MIDIINCAPS)) == MMSYSERR_NOERROR)
-        {
-            if (strstr(caps.szPname, name) != NULL)
-            {
-                *deviceId = i;
-                return MMSYSERR_NOERROR;
-            }
-        }
-    }
-
-    // Not found, try as a device ID number
-    char *endptr;
-    long num = strtol(name, &endptr, 10);
-    if (*name != '\0' && *endptr == '\0' && num >= 0 && num < numDevs)
-    {
-        *deviceId = (UINT)num;
-        return MMSYSERR_NOERROR;
-    }
-
-    return MMSYSERR_ERROR;
-}
-
+/**
+ * @brief Thread function for reading MIDI messages from the RME device (Windows)
+ *
+ * Sets up MIDI input buffers and continuously processes MIDI data using
+ * the Windows Multimedia API. The actual processing is done in the midiInProc callback.
+ *
+ * @param arg Thread argument (unused)
+ * @return Thread return value (unused)
+ */
 static unsigned __stdcall midiread(void *arg)
 {
     unsigned char data[8192];
     MIDIHDR midiHdr;
     MMRESULT mmResult;
 
-    // Set up the MIDI input header
+    /* Set up the MIDI input header */
     ZeroMemory(&midiHdr, sizeof(MIDIHDR));
     midiHdr.lpData = data;
     midiHdr.dwBufferLength = sizeof(data);
@@ -229,15 +170,24 @@ static unsigned __stdcall midiread(void *arg)
         return 1;
     }
 
-    // Main loop to wait for messages
-    for (;;)
+    /* Main loop to wait for messages */
+    while (running)
     {
-        Sleep(10); // Short sleep to reduce CPU usage
+        Sleep(10); /* Short sleep to reduce CPU usage */
     }
 
     return 0;
 }
 #else
+/**
+ * @brief Thread function for reading MIDI messages from the RME device (POSIX)
+ *
+ * Continuously reads MIDI SysEx messages from the device via file descriptor 6,
+ * processes them using handlesysex(), and updates application state.
+ *
+ * @param arg Thread argument (unused)
+ * @return Thread return value (unused)
+ */
 static void *midiread(void *arg)
 {
     unsigned char data[8192], *datapos, *dataend, *nextpos;
@@ -281,34 +231,29 @@ static void *midiread(void *arg)
             datapos = nextpos;
         }
     }
-    return 0;
+    return NULL;
 }
 #endif
 
 #ifdef _WIN32
+/**
+ * @brief Thread function for reading OSC messages from the network (Windows)
+ *
+ * @param arg Pointer to the socket file descriptor
+ * @return Thread return value (unused)
+ */
 static unsigned __stdcall oscread(void *arg)
-#else
-static void *oscread(void *arg)
-#endif
 {
     socket_t fd = *(socket_t *)arg;
     ssize_t ret;
     unsigned char buf[8192];
 
-    for (;;)
+    while (running)
     {
-#ifdef _WIN32
         ret = recv(fd, buf, sizeof buf, 0);
-#else
-        ret = read(fd, buf, sizeof buf);
-#endif
         if (ret < 0)
         {
-#ifdef _WIN32
-            if (WSAGetLastError() != WSAECONNREFUSED)
-#else
-            if (errno != ECONNREFUSED)
-#endif
+            if (WSAGetLastError() != WSAECONNRESET)
                 perror("recv");
             continue;
         }
@@ -316,7 +261,45 @@ static void *oscread(void *arg)
     }
     return 0;
 }
+#else
+/**
+ * @brief Thread function for reading OSC messages from the network (POSIX)
+ *
+ * Continuously reads OSC messages from the network socket,
+ * and dispatches them to handleosc() for processing.
+ *
+ * @param arg Pointer to the socket file descriptor
+ * @return Thread return value (unused)
+ */
+static void *oscread(void *arg)
+{
+    socket_t fd = *(int *)arg;
+    ssize_t ret;
+    unsigned char buf[8192];
 
+    for (;;)
+    {
+        ret = read(fd, buf, sizeof buf);
+        if (ret < 0)
+        {
+            perror("recv");
+            continue;
+        }
+        handleosc(buf, ret);
+    }
+    return NULL;
+}
+#endif
+
+/**
+ * @brief Sends MIDI data to the RME device
+ *
+ * Platform-specific implementation to send MIDI data to the connected device.
+ * On Windows, uses the Multimedia API. On POSIX systems, writes to file descriptor 7.
+ *
+ * @param buf Pointer to the MIDI data to send
+ * @param len Length of the MIDI data in bytes
+ */
 void writemidi(const void *buf, size_t len)
 {
 #ifdef _WIN32
@@ -328,12 +311,12 @@ void writemidi(const void *buf, size_t len)
         return;
     }
 
-    // If it's a SysEx message (starts with 0xF0)
+    /* If it's a SysEx message (starts with 0xF0) */
     if (pos[0] == 0xF0)
     {
         MIDIHDR midiHdr;
 
-        // Set up the MIDI output header
+        /* Set up the MIDI output header */
         ZeroMemory(&midiHdr, sizeof(MIDIHDR));
         midiHdr.lpData = (LPSTR)buf;
         midiHdr.dwBufferLength = len;
@@ -352,7 +335,7 @@ void writemidi(const void *buf, size_t len)
             fprintf(stderr, "midiOutLongMsg failed: %d\n", mmResult);
         }
 
-        // Wait for the message to be sent
+        /* Wait for the message to be sent */
         while (!(midiHdr.dwFlags & MHDR_DONE))
         {
             Sleep(1);
@@ -366,9 +349,9 @@ void writemidi(const void *buf, size_t len)
     }
     else
     {
-        // Short MIDI message
+        /* Short MIDI message */
         DWORD message = 0;
-        memcpy(&message, pos, len < 4 ? len : 4); // Copy up to 4 bytes
+        memcpy(&message, pos, min(len, 4)); /* Copy up to 4 bytes */
 
         mmResult = midiOutShortMsg(hMidiOut, message);
         if (mmResult != MMSYSERR_NOERROR)
@@ -392,11 +375,19 @@ void writemidi(const void *buf, size_t len)
 #endif
 }
 
+/**
+ * @brief Sends OSC data to the network
+ *
+ * Writes OSC data to the network socket. This function is called by the oscmix
+ * core logic to send OSC responses and notifications to clients.
+ *
+ * @param buf Pointer to the OSC data to send
+ * @param len Length of the OSC data in bytes
+ */
 void writeosc(const void *buf, size_t len)
 {
-    ssize_t ret;
-
 #ifdef _WIN32
+    ssize_t ret;
     ret = send(wfd, buf, len, 0);
     if (ret < 0)
     {
@@ -408,6 +399,8 @@ void writeosc(const void *buf, size_t len)
         fprintf(stderr, "send: %zd != %zu", ret, len);
     }
 #else
+    ssize_t ret;
+
     ret = write(wfd, buf, len);
     if (ret < 0)
     {
@@ -421,113 +414,171 @@ void writeosc(const void *buf, size_t len)
 #endif
 }
 
-int init_midi(const char *device_name)
-{
 #ifdef _WIN32
-    UINT midiDeviceId;
-    MMRESULT mmResult;
+/**
+ * @brief Find and open a MIDI device by name
+ *
+ * Searches for a MIDI device with a name containing the specified string,
+ * or tries to interpret the string as a device ID number.
+ *
+ * @param name Name or ID of the MIDI device to open
+ * @param deviceId Pointer to store the found device ID
+ * @return MMSYSERR_NOERROR on success, MMSYSERR_ERROR on failure
+ */
+static MMRESULT openMidiDevice(const char *name, UINT *deviceId)
+{
+    UINT numDevs = midiInGetNumDevs();
+    MIDIINCAPS caps;
+    *deviceId = MIDI_MAPPER; /* Default */
 
-    // Open MIDI devices
-    if (openMidiDevice(device_name, &midiDeviceId) != MMSYSERR_NOERROR)
+    /* First try to find device by name substring */
+    for (UINT i = 0; i < numDevs; i++)
     {
-        fprintf(stderr, "Could not find MIDI device: %s\n", device_name);
-        return -1;
+        if (midiInGetDevCaps(i, &caps, sizeof(MIDIINCAPS)) == MMSYSERR_NOERROR)
+        {
+            if (strstr(caps.szPname, name) != NULL)
+            {
+                *deviceId = i;
+                return MMSYSERR_NOERROR;
+            }
+        }
     }
 
-    // Open MIDI input device
-    mmResult = midiInOpen(&hMidiIn, midiDeviceId, (DWORD_PTR)midiInProc, 0, CALLBACK_FUNCTION);
-    if (mmResult != MMSYSERR_NOERROR)
+    /* Not found by name, try as a device ID number */
+    char *endptr;
+    long num = strtol(name, &endptr, 10);
+    if (*name != '\0' && *endptr == '\0' && num >= 0 && num < numDevs)
     {
-        fprintf(stderr, "midiInOpen failed: %d\n", mmResult);
-        return -1;
+        *deviceId = (UINT)num;
+        return MMSYSERR_NOERROR;
     }
 
-    // Open MIDI output device
-    mmResult = midiOutOpen(&hMidiOut, midiDeviceId, 0, 0, 0);
-    if (mmResult != MMSYSERR_NOERROR)
+    return MMSYSERR_ERROR;
+}
+
+/**
+ * @brief Windows control handler for clean shutdown
+ *
+ * Handles Ctrl+C and Windows service stop events.
+ *
+ * @param ctrlType The type of control signal received
+ * @return TRUE if the event was handled, FALSE otherwise
+ */
+static BOOL WINAPI controlHandler(DWORD ctrlType)
+{
+    switch (ctrlType)
     {
-        fprintf(stderr, "midiOutOpen failed: %d\n", mmResult);
-        midiInClose(hMidiIn);
-        return -1;
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        /* Set running flag to false to stop threads */
+        running = 0;
+
+        /* Clean up MIDI resources */
+        if (hMidiIn != NULL)
+        {
+            midiInStop(hMidiIn);
+            midiInClose(hMidiIn);
+        }
+
+        if (hMidiOut != NULL)
+        {
+            midiOutClose(hMidiOut);
+        }
+
+        /* Clean up network resources */
+        if (rfd != INVALID_SOCKET)
+        {
+            closesocket(rfd);
+        }
+
+        if (wfd != INVALID_SOCKET)
+        {
+            closesocket(wfd);
+        }
+
+        WSACleanup();
+        exit(0);
+        return TRUE;
     }
 
-    // Start MIDI input
-    mmResult = midiInStart(hMidiIn);
-    if (mmResult != MMSYSERR_NOERROR)
-    {
-        fprintf(stderr, "midiInStart failed: %d\n", mmResult);
-        midiOutClose(hMidiOut);
-        midiInClose(hMidiIn);
-        return -1;
-    }
+    return FALSE;
+}
 #else
-    // For POSIX systems, MIDI devices are typically handled through file descriptors
-    // which are assumed to be already set up (fd 6 and 7)
+/**
+ * @brief Signal handler for clean shutdown (POSIX)
+ *
+ * Handles SIGINT, SIGTERM, etc. for clean application shutdown
+ *
+ * @param sig The signal number that was received
+ */
+static void signalHandler(int sig)
+{
+    /* Clean up resources here */
+    close(rfd);
+    close(wfd);
+
+    fprintf(stderr, "\nReceived signal %d, exiting...\n", sig);
+    exit(0);
+}
+#endif
+
+/**
+ * @brief Main entry point for the OSCMix application
+ *
+ * Parses command line arguments, initializes networking and MIDI connections,
+ * creates threads for message handling, and enters the main event loop.
+ *
+ * @param argc Number of command line arguments
+ * @param argv Array of command line argument strings
+ * @return Exit code (0 on success, non-zero on failure)
+ */
+int main(int argc, char *argv[])
+{
+    char *recvaddr, *sendaddr;
+    thread_t midireader, oscreader;
+    const char *port;
+
+#ifdef _WIN32
+    /* Windows-specific initialization */
+    WSADATA wsaData;
+    MMRESULT mmResult;
+    UINT midiDeviceId;
+    char recvport[6] = "7222"; /**< Default port for receiving OSC messages */
+    char sendport[6] = "8222"; /**< Default port for sending OSC messages */
+
+    /* Initialize Windows Sockets */
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+    {
+        fatal("WSAStartup failed");
+    }
+
+    /* Set up control handler for clean shutdown */
+    SetConsoleCtrlHandler(controlHandler, TRUE);
+#else
+    /* POSIX-specific initialization */
+    int err, sig;
+    struct itimerval it;
+    sigset_t set;
+
+    /* Validate file descriptors for MIDI I/O */
     if (fcntl(6, F_GETFD) < 0)
         fatal("fcntl 6:");
     if (fcntl(7, F_GETFD) < 0)
         fatal("fcntl 7:");
+
+    /* Set up signal handlers */
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
 #endif
 
-    return 0;
-}
-
-void cleanup_midi(void)
-{
-#ifdef _WIN32
-    if (hMidiIn)
-    {
-        midiInStop(hMidiIn);
-        midiInClose(hMidiIn);
-    }
-    if (hMidiOut)
-    {
-        midiOutClose(hMidiOut);
-    }
-#endif
-    // Nothing special to do for POSIX
-}
-
-int main(int argc, char *argv[])
-{
-    static char defrecvaddr[] = "udp!127.0.0.1!7222";
-    static char defsendaddr[] = "udp!127.0.0.1!8222";
-    static char mcastaddr[] = "udp!224.0.0.1!8222";
-    static const unsigned char refreshosc[] = "/refresh\0\0\0\0,\0\0\0";
-    char *recvaddr, *sendaddr;
-    thread_t midireader, oscreader;
-    const char *port = NULL;
-#ifdef _WIN32
-    char recvport[6] = "7222";
-    char sendport[6] = "8222";
-    char recvaddr_with_port[256];
-    char sendaddr_with_port[256];
-    char *addr_part;
-#endif
-
-    // Initialize networking
-    if (init_networking() != 0)
-    {
-        return 1;
-    }
-
-    // Set up signal handlers for clean shutdown
-#ifdef _WIN32
-    SetConsoleCtrlHandler((PHANDLER_ROUTINE)handle_signal, TRUE);
-#else
-    signal(SIGINT, handle_signal);
-    signal(SIGTERM, handle_signal);
-#endif
-
-#ifdef _WIN32
-    addr_part = "127.0.0.1"; // Default IP without the protocol and port
-    recvaddr = addr_part;
-    sendaddr = addr_part;
-#else
+    /* Initialize network and port variables */
     recvaddr = defrecvaddr;
     sendaddr = defsendaddr;
-#endif
+    port = NULL;
 
+    /* Parse command line arguments */
     ARGBEGIN
     {
     case 'd':
@@ -543,11 +594,7 @@ int main(int argc, char *argv[])
         sendaddr = EARGF(usage());
         break;
     case 'm':
-#ifdef _WIN32
-        sendaddr = "224.0.0.1";
-#else
         sendaddr = mcastaddr;
-#endif
         break;
 #ifdef _WIN32
     case 'R':
@@ -562,28 +609,34 @@ int main(int argc, char *argv[])
     case 'p':
         port = EARGF(usage());
         break;
-    case 'h':
-    case '?':
-        print_help();
-        break;
     default:
         usage();
         break;
     }
     ARGEND
 
-    // Open sockets
 #ifdef _WIN32
-    snprintf(recvaddr_with_port, sizeof(recvaddr_with_port), "udp!%s!%s", recvaddr, recvport);
-    snprintf(sendaddr_with_port, sizeof(sendaddr_with_port), "udp!%s!%s", sendaddr, sendport);
+    /* Format UDP socket addresses with IP and port for Windows */
+    char recvaddr_with_port[256];
+    snprintf(recvaddr_with_port, sizeof(recvaddr_with_port), "udp!%s!%s",
+             strchr(recvaddr, '!') ? recvaddr + 4 : recvaddr,
+             recvport);
+
+    char sendaddr_with_port[256];
+    snprintf(sendaddr_with_port, sizeof(sendaddr_with_port), "udp!%s!%s",
+             strchr(sendaddr, '!') ? sendaddr + 4 : sendaddr,
+             sendport);
+
+    /* Open sockets for OSC communication */
     rfd = sockopen(recvaddr_with_port, 1);
     wfd = sockopen(sendaddr_with_port, 0);
 #else
+    /* Open sockets for OSC communication */
     rfd = sockopen(recvaddr, 1);
     wfd = sockopen(sendaddr, 0);
 #endif
 
-    // Check for MIDI device name
+    /* Get MIDI device port from argument or environment */
     if (!port)
     {
         port = getenv("MIDIPORT");
@@ -591,50 +644,98 @@ int main(int argc, char *argv[])
             fatal("device is not specified; pass -p or set MIDIPORT");
     }
 
-    // Initialize MIDI
-    if (init_midi(port) != 0)
+#ifdef _WIN32
+    /* Open MIDI devices on Windows */
+    if (openMidiDevice(port, &midiDeviceId) != MMSYSERR_NOERROR)
     {
-        cleanup_networking();
+        fprintf(stderr, "Could not find MIDI device: %s\n", port);
         return 1;
     }
 
-    // Initialize the application
+    /* Open MIDI input device with callback function */
+    mmResult = midiInOpen(&hMidiIn, midiDeviceId, (DWORD_PTR)midiInProc, 0, CALLBACK_FUNCTION);
+    if (mmResult != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "midiInOpen failed: %d\n", mmResult);
+        return 1;
+    }
+
+    /* Open MIDI output device */
+    mmResult = midiOutOpen(&hMidiOut, midiDeviceId, 0, 0, 0);
+    if (mmResult != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "midiOutOpen failed: %d\n", mmResult);
+        midiInClose(hMidiIn);
+        return 1;
+    }
+
+    /* Start MIDI input */
+    mmResult = midiInStart(hMidiIn);
+    if (mmResult != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "midiInStart failed: %d\n", mmResult);
+        midiOutClose(hMidiOut);
+        midiInClose(hMidiIn);
+        return 1;
+    }
+#endif
+
+    /* Initialize OSCMix core with the specified device */
     if (init(port) != 0)
     {
-        cleanup_midi();
-        cleanup_networking();
+#ifdef _WIN32
+        midiInStop(hMidiIn);
+        midiOutClose(hMidiOut);
+        midiInClose(hMidiIn);
+#endif
         return 1;
     }
 
-    // Create threads
-    thread_create(&midireader, midiread, &wfd);
-    thread_create(&oscreader, oscread, &rfd);
-
-    // Send initial refresh command
-    handleosc(refreshosc, sizeof refreshosc - 1);
-
-    // Main loop
 #ifdef _WIN32
-    for (;;)
+    /* Create thread for reading MIDI messages (Windows) */
+    midireader = (HANDLE)_beginthreadex(NULL, 0, midiread, NULL, 0, NULL);
+    if (midireader == NULL)
+        fatal("CreateThread failed");
+
+    /* Create thread for reading OSC messages (Windows) */
+    oscreader = (HANDLE)_beginthreadex(NULL, 0, oscread, &rfd, 0, NULL);
+    if (oscreader == NULL)
+        fatal("CreateThread failed");
+
+    /* Send initial refresh command and enter main loop (Windows) */
+    handleosc(refreshosc, sizeof refreshosc - 1);
+    while (running)
     {
-        sleep_ms(100);
+        Sleep(100);
         handletimer(lflag == 0);
     }
 #else
-    sigset_t set;
-    int sig;
-    struct itimerval it;
+    /* Block all signals in main thread */
+    sigfillset(&set);
+    pthread_sigmask(SIG_SETMASK, &set, NULL);
 
-    // Set up timer for periodic updates
+    /* Create thread for reading MIDI messages (POSIX) */
+    err = pthread_create(&midireader, NULL, midiread, NULL);
+    if (err)
+        fatal("pthread_create: %s", strerror(err));
+
+    /* Create thread for reading OSC messages (POSIX) */
+    err = pthread_create(&oscreader, NULL, oscread, &rfd);
+    if (err)
+        fatal("pthread_create: %s", strerror(err));
+
+    /* Set up real-time timer for periodic level updates */
     sigemptyset(&set);
     sigaddset(&set, SIGALRM);
     pthread_sigmask(SIG_SETMASK, &set, NULL);
     it.it_interval.tv_sec = 0;
-    it.it_interval.tv_usec = 100000;
+    it.it_interval.tv_usec = 100000; /* 100ms interval */
     it.it_value = it.it_interval;
     if (setitimer(ITIMER_REAL, &it, NULL) != 0)
         fatal("setitimer:");
 
+    /* Send initial refresh command and enter main loop (POSIX) */
+    handleosc(refreshosc, sizeof refreshosc - 1);
     for (;;)
     {
         sigwait(&set, &sig);
@@ -642,8 +743,12 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    // This point is never reached, but good practice
-    cleanup_midi();
-    cleanup_networking();
+    /* Cleanup (never reached in normal operation) */
+#ifdef _WIN32
+    midiInStop(hMidiIn);
+    midiOutClose(hMidiOut);
+    midiInClose(hMidiIn);
+    WSACleanup();
+#endif
     return 0;
 }
