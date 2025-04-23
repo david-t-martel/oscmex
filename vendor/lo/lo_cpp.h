@@ -13,10 +13,35 @@
 #include <memory>
 #include <vector>
 #include <functional>
+#include <any>
+#include <map>
+#include <algorithm>
+#include <chrono>
+
+// Forward declarations of C functions that aren't in the main headers
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+    // Server/ServerThread functions needed by this wrapper
+    lo_server lo_server_thread_get_server(lo_server_thread st);
+    void lo_server_thread_set_user_data(lo_server_thread st, void *user_data);
+    void *lo_server_thread_get_user_data(lo_server_thread st);
+    void *lo_server_get_user_data(lo_server s);
+    int lo_server_thread_start(lo_server_thread st);
+    int lo_server_thread_stop(lo_server_thread st);
+    void lo_server_thread_free(lo_server_thread st);
+    lo_server_thread lo_server_thread_new(const char *port, lo_err_handler err_h);
+    int lo_server_thread_get_port(lo_server_thread st);
+    lo_server lo_message_get_source(lo_message m);
+
+#ifdef __cplusplus
+}
+#endif
 
 namespace lo
 {
-
     // Forward declarations
     class Address;
     class Message;
@@ -32,6 +57,105 @@ namespace lo
         explicit Exception(const std::string &message)
             : std::runtime_error(message) {}
     };
+
+    // Message callback type for use with Method
+    using MessageCallback = std::function<void(const std::string &, const std::vector<std::any> &)>;
+
+    /**
+     * @brief RAII wrapper for lo_method
+     */
+    class Method
+    {
+    public:
+        /**
+         * @brief Destructor
+         */
+        ~Method()
+        {
+            if (method && server)
+            {
+                // Use C API to remove method
+                lo_server s = lo_server_thread_get_server(server);
+                if (s)
+                {
+                    lo_server_del_method(s, path.c_str(),
+                                         typespec.empty() ? nullptr : typespec.c_str());
+                }
+                method = nullptr;
+            }
+        }
+
+        // Delete copy operations
+        Method(const Method &) = delete;
+        Method &operator=(const Method &) = delete;
+
+        // Support move operations
+        Method(Method &&other) noexcept
+            : method(other.method), server(other.server),
+              path(std::move(other.path)), typespec(std::move(other.typespec))
+        {
+            other.method = nullptr;
+            other.server = nullptr;
+        }
+
+        Method &operator=(Method &&other) noexcept
+        {
+            if (this != &other)
+            {
+                if (method && server)
+                {
+                    lo_server s = lo_server_thread_get_server(server);
+                    if (s)
+                    {
+                        lo_server_del_method(s, path.c_str(),
+                                             typespec.empty() ? nullptr : typespec.c_str());
+                    }
+                }
+                method = other.method;
+                server = other.server;
+                path = std::move(other.path);
+                typespec = std::move(other.typespec);
+                other.method = nullptr;
+                other.server = nullptr;
+            }
+            return *this;
+        }
+
+    private:
+        // Private constructor - only ServerThread can create Method objects
+        Method(lo_method m, lo_server_thread s, const std::string &p, const std::string &t)
+            : method(m), server(s), path(p), typespec(t) {}
+
+        lo_method method = nullptr;
+        lo_server_thread server = nullptr;
+        std::string path;
+        std::string typespec;
+
+        friend class ServerThread;
+    };
+
+    // Helper function to convert from lo_arg to std::any
+    inline std::any lo_arg_to_any(const lo_arg *arg, char type)
+    {
+        switch (type)
+        {
+        case 'i':
+            return std::any(arg->i);
+        case 'f':
+            return std::any(arg->f);
+        case 's':
+            return std::any(std::string(&arg->s));
+        case 'b':
+            return std::any(true);
+        case 'F':
+            return std::any(false);
+        case 'd':
+            return std::any(arg->d);
+        // Add other types as needed
+        default:
+            return std::any();
+        }
+    }
 
     /**
      * @brief RAII wrapper for lo_address
@@ -134,10 +258,18 @@ namespace lo
         {
             if (!is_valid())
                 return "";
-            char *proto = lo_address_get_protocol(addr);
-            std::string result = proto ? proto : "";
-            free(proto);
-            return result;
+
+            const char *proto = "";
+            // Protocol is an integer in lo_address
+            int proto_id = lo_address_get_protocol(addr);
+            if (proto_id == 0)
+                proto = "udp";
+            else if (proto_id == 1)
+                proto = "tcp";
+            else if (proto_id == 2)
+                proto = "unix";
+
+            return proto;
         }
 
         /**
@@ -149,10 +281,8 @@ namespace lo
         {
             if (!is_valid())
                 return "";
-            char *host = lo_address_get_hostname(addr);
-            std::string result = host ? host : "";
-            free(host);
-            return result;
+            const char *host = lo_address_get_hostname(addr);
+            return host ? host : "";
         }
 
         /**
@@ -164,10 +294,8 @@ namespace lo
         {
             if (!is_valid())
                 return "";
-            char *port = lo_address_get_port(addr);
-            std::string result = port ? port : "";
-            free(port);
-            return result;
+            const char *port = lo_address_get_port(addr);
+            return port ? port : "";
         }
 
         /**
@@ -230,7 +358,6 @@ namespace lo
             if (is_valid())
             {
                 lo_address_set_tcp_nodelay(addr, 1); // Disable Nagle's algorithm
-                lo_address_set_timeout_ms(addr, timeout_ms);
             }
         }
 
@@ -242,6 +369,56 @@ namespace lo
          * @return int < 0 on error, >= 0 on success
          */
         int send(const std::string &path, const Message &message) const;
+
+        /**
+         * @brief Send a message with std::any arguments
+         *
+         * @param path OSC path
+         * @param args Vector of arguments
+         * @return int < 0 on error, >= 0 on success
+         */
+        int send(const std::string &path, const std::vector<std::any> &args)
+        {
+            if (!is_valid())
+            {
+                throw Exception("Cannot send message: Invalid address");
+            }
+
+            Message msg;
+            msg.add_from_vector(args);
+            return send(path, msg);
+        }
+
+        /**
+         * @brief Send a message and wait for a reply
+         *
+         * @param path OSC path
+         * @param args Vector of arguments
+         * @param reply_handler Function to handle the reply
+         * @param timeout_ms Timeout in milliseconds
+         * @return bool True if message was sent successfully
+         */
+        bool send_with_reply(const std::string &path,
+                             const std::vector<std::any> &args,
+                             MessageCallback reply_handler,
+                             int timeout_ms = 1000)
+        {
+            if (!is_valid())
+            {
+                return false;
+            }
+
+            // Send the message
+            Message msg;
+            msg.add_from_vector(args);
+            if (send(path, msg) < 0)
+            {
+                return false;
+            }
+
+            // TODO: Implement proper reply handling
+            return true;
+        }
 
         /**
          * @brief Get the underlying lo_address
@@ -392,6 +569,46 @@ namespace lo
         }
 
         /**
+         * @brief Add a std::any value to the message
+         *
+         * @param value Any value that can be converted to an OSC type
+         * @return Message& Reference to this message
+         */
+        Message &add_any(const std::any &value)
+        {
+            if (value.type() == typeid(int))
+                return add_int32(std::any_cast<int>(value));
+            else if (value.type() == typeid(float))
+                return add_float(std::any_cast<float>(value));
+            else if (value.type() == typeid(double))
+                return add_double(std::any_cast<double>(value));
+            else if (value.type() == typeid(const char *))
+                return add_string(std::any_cast<const char *>(value));
+            else if (value.type() == typeid(std::string))
+                return add_string(std::any_cast<std::string>(value).c_str());
+            else if (value.type() == typeid(bool))
+                return add_bool(std::any_cast<bool>(value));
+
+            // Add more type conversions as needed
+            throw Exception("Unsupported type in add_any");
+        }
+
+        /**
+         * @brief Add multiple std::any values from a vector
+         *
+         * @param args Vector of values to add
+         * @return Message& Reference to this message
+         */
+        Message &add_from_vector(const std::vector<std::any> &args)
+        {
+            for (const auto &arg : args)
+            {
+                add_any(arg);
+            }
+            return *this;
+        }
+
+        /**
          * @brief Get the underlying lo_message
          *
          * @return lo_message
@@ -410,9 +627,6 @@ namespace lo
 
     /**
      * @brief RAII wrapper for lo_server_thread
-     *
-     * Note: This is a partial implementation. The full wrapper would include
-     * more methods and support for callbacks.
      */
     class ServerThread
     {
@@ -421,14 +635,16 @@ namespace lo
          * @brief Create a server thread on the specified port
          *
          * @param port Port number as string
+         * @param user_data Optional user data pointer
          */
-        explicit ServerThread(const std::string &port)
+        explicit ServerThread(const std::string &port, void *user_data = nullptr)
         {
             server = lo_server_thread_new(port.c_str(), nullptr);
             if (!server)
             {
                 throw Exception("Failed to create lo_server_thread on port " + port);
             }
+            lo_server_thread_set_user_data(server, user_data ? user_data : this);
         }
 
         /**
@@ -447,7 +663,7 @@ namespace lo
         /**
          * @brief Move constructor
          */
-        ServerThread(ServerThread &&other) noexcept : server(other.server)
+        ServerThread(ServerThread &&other) noexcept : server(other.server), m_callbacks(std::move(other.m_callbacks))
         {
             other.server = nullptr;
         }
@@ -465,6 +681,7 @@ namespace lo
                     lo_server_thread_free(server);
                 }
                 server = other.server;
+                m_callbacks = std::move(other.m_callbacks);
                 other.server = nullptr;
             }
             return *this;
@@ -508,7 +725,105 @@ namespace lo
          */
         int get_port() const
         {
+            if (!server)
+                return -1;
             return lo_server_thread_get_port(server);
+        }
+
+        /**
+         * @brief Add a method handler to the server
+         *
+         * @param path OSC path to register the callback for
+         * @param typespec String of type characters, or empty string for any types
+         * @param callback C++ callback function
+         * @return std::unique_ptr<Method> RAII wrapper for the method
+         */
+        std::unique_ptr<Method> add_method(const std::string &path,
+                                           const std::string &typespec,
+                                           MessageCallback callback)
+        {
+            if (!server)
+            {
+                throw Exception("Cannot add method to null server");
+            }
+
+            // Store the callback
+            int callbackId = generate_callback_id();
+            m_callbacks[callbackId] = callback;
+
+            // Get the server from the server thread
+            lo_server s = lo_server_thread_get_server(server);
+            if (!s)
+            {
+                throw Exception("Failed to get server from server thread");
+            }
+
+            // Create method with liblo's C API
+            lo_method m = lo_server_add_method(
+                s,
+                path.c_str(),
+                typespec.empty() ? nullptr : typespec.c_str(),
+                &ServerThread::message_handler_static,
+                reinterpret_cast<void *>(static_cast<intptr_t>(callbackId)));
+
+            if (!m)
+            {
+                m_callbacks.erase(callbackId);
+                throw Exception("Failed to add method for " + path);
+            }
+
+            return std::unique_ptr<Method>(new Method(m, server, path, typespec));
+        }
+
+        /**
+         * @brief Remove a method handler from the server
+         *
+         * @param path OSC path to unregister
+         * @param typespec String of type characters, or empty string for any types
+         */
+        void remove_method(const std::string &path, const std::string &typespec)
+        {
+            if (server)
+            {
+                lo_server s = lo_server_thread_get_server(server);
+                if (s)
+                {
+                    lo_server_del_method(s, path.c_str(),
+                                         typespec.empty() ? nullptr : typespec.c_str());
+                }
+            }
+        }
+
+        /**
+         * @brief Wait for a specified time, processing any OSC messages received
+         *
+         * @param timeout Timeout in milliseconds
+         * @return int Number of bytes received, or 0 if timeout
+         */
+        int wait(int timeout)
+        {
+            if (!server)
+                return -1;
+            lo_server s = lo_server_thread_get_server(server);
+            if (!s)
+                return -1;
+            return lo_server_wait(s, timeout);
+        }
+
+        /**
+         * @brief Receive and dispatch one pending OSC message
+         *
+         * @param timeout Timeout in milliseconds
+         * @return int Number of bytes received, or 0 if timeout
+         */
+        int recv(int timeout)
+        {
+            if (!server)
+                return -1;
+            lo_server s = lo_server_thread_get_server(server);
+            if (!s)
+                return -1;
+            return lo_server_recv_noblock(s, timeout);
         }
 
         /**
@@ -521,8 +836,64 @@ namespace lo
             return server;
         }
 
+        /**
+         * @brief Get the underlying lo_server
+         *
+         * @return lo_server
+         */
+        lo_server get_server() const
+        {
+            if (!server)
+                return nullptr;
+            return lo_server_thread_get_server(server);
+        }
+
     private:
         lo_server_thread server;
+        std::map<int, MessageCallback> m_callbacks;
+        int m_nextCallbackId = 1;
+
+        int generate_callback_id()
+        {
+            return m_nextCallbackId++;
+        }
+
+        static int message_handler_static(const char *path, const char *types,
+                                          lo_arg **argv, int argc,
+                                          lo_message msg, void *user_data)
+        {
+            // Get server from message source
+            lo_server s = lo_message_get_source(msg);
+            if (!s)
+                return 0;
+
+            // Get user data from server
+            void *server_user_data = lo_server_get_user_data(s);
+            if (!server_user_data)
+                return 0;
+
+            // Cast to our ServerThread instance
+            ServerThread *self = static_cast<ServerThread *>(server_user_data);
+
+            // Get callback ID from user_data
+            int callbackId = static_cast<int>(reinterpret_cast<intptr_t>(user_data));
+            auto it = self->m_callbacks.find(callbackId);
+            if (it == self->m_callbacks.end())
+                return 0;
+
+            // Convert arguments to std::any vector
+            std::vector<std::any> args;
+            args.reserve(argc);
+
+            for (int i = 0; i < argc; i++)
+            {
+                args.push_back(lo_arg_to_any(argv[i], types[i]));
+            }
+
+            // Call the callback
+            it->second(path, args);
+            return 0;
+        }
     };
 
     // Implementation of Address::send that depends on Message

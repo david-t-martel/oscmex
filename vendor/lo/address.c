@@ -24,6 +24,11 @@
 #include <string.h>
 #include <sys/types.h>
 
+// Define PACKAGE_NAME if not already defined
+#ifndef PACKAGE_NAME
+#define PACKAGE_NAME "liblo"
+#endif
+
 #if defined(WIN32) || defined(_MSC_VER)
 #include <io.h>
 #define snprintf _snprintf
@@ -57,7 +62,7 @@ lo_address lo_address_new_with_proto(int proto, const char *host,
     if (proto != LO_UDP && proto != LO_TCP && proto != LO_UNIX)
         return NULL;
 
-    a = (lo_address) calloc(1, sizeof(struct _lo_address));
+    a = (lo_address)calloc(1, sizeof(struct _lo_address));
     if (a == NULL)
         return NULL;
 
@@ -66,14 +71,18 @@ lo_address lo_address_new_with_proto(int proto, const char *host,
     a->socket = -1;
     a->ownsocket = 1;
     a->protocol = proto;
-    a->flags = (lo_proto_flags) 0;
-    switch (proto) {
+    a->flags = (lo_proto_flags)0;
+    switch (proto)
+    {
     default:
     case LO_UDP:
     case LO_TCP:
-        if (host) {
+        if (host)
+        {
             a->host = strdup(host);
-        } else {
+        }
+        else
+        {
             a->host = strdup("localhost");
         }
         break;
@@ -81,9 +90,12 @@ lo_address lo_address_new_with_proto(int proto, const char *host,
         a->host = strdup("localhost");
         break;
     }
-    if (port) {
+    if (port)
+    {
         a->port = strdup(port);
-    } else {
+    }
+    else
+    {
         a->port = NULL;
     }
 
@@ -107,12 +119,14 @@ lo_address lo_address_new_from_url(const char *url)
     int protocol;
     char *host, *port, *proto;
 
-    if (!url || !*url) {
+    if (!url || !*url)
+    {
         return NULL;
     }
 
     protocol = lo_url_get_protocol_id(url);
-    if (protocol == LO_UDP || protocol == LO_TCP) {
+    if (protocol == LO_UDP || protocol == LO_TCP)
+    {
         host = lo_url_get_hostname(url);
         port = lo_url_get_port(url);
         a = lo_address_new_with_proto(protocol, host, port);
@@ -121,17 +135,22 @@ lo_address lo_address_new_from_url(const char *url)
         if (port)
             free(port);
 #if !defined(WIN32) && !defined(_MSC_VER)
-    } else if (protocol == LO_UNIX) {
+    }
+    else if (protocol == LO_UNIX)
+    {
         port = lo_url_get_path(url);
         a = lo_address_new_with_proto(LO_UNIX, NULL, port);
         if (port)
             free(port);
 #endif
-    } else {
+    }
+    else
+    {
         proto = lo_url_get_protocol(url);
         fprintf(stderr,
                 PACKAGE_NAME ": protocol '%s' not supported by this "
-                "version\n", proto);
+                             "version\n",
+                proto);
         if (proto)
             free(proto);
 
@@ -150,12 +169,14 @@ static void lo_address_resolve_source(lo_address a)
 
     if (a->protocol == LO_UDP && s && s->addr_len > 0)
     {
-        err = getnameinfo((struct sockaddr *) &s->addr, s->addr_len,
+        err = getnameinfo((struct sockaddr *)&s->addr, s->addr_len,
                           hostname, sizeof(hostname),
                           portname, sizeof(portname),
                           NI_NUMERICHOST | NI_NUMERICSERV);
-        if (err) {
-            switch (err) {
+        if (err)
+        {
+            switch (err)
+            {
             case EAI_AGAIN:
                 lo_throw(s, err, "Try again", a->source_path);
                 break;
@@ -191,12 +212,16 @@ static void lo_address_resolve_source(lo_address a)
         a->host = strdup(hostname);
         a->port = strdup(portname);
 #if !defined(WIN32) && !defined(_MSC_VER)
-    } else if (a->protocol== LO_UNIX) {
-        struct sockaddr_un * addr = (struct sockaddr_un *) &s->addr;
+    }
+    else if (a->protocol == LO_UNIX)
+    {
+        struct sockaddr_un *addr = (struct sockaddr_un *)&s->addr;
         a->host = strdup("");
         a->port = strdup(addr->sun_path);
 #endif
-    } else {
+    }
+    else
+    {
         a->host = strdup("");
         a->port = strdup("");
     }
@@ -204,7 +229,8 @@ static void lo_address_resolve_source(lo_address a)
 
 const char *lo_address_get_hostname(lo_address a)
 {
-    if (!a) {
+    if (!a)
+    {
         return NULL;
     }
 
@@ -216,7 +242,8 @@ const char *lo_address_get_hostname(lo_address a)
 
 int lo_address_get_protocol(lo_address a)
 {
-    if (!a) {
+    if (!a)
+    {
         return -1;
     }
 
@@ -225,7 +252,8 @@ int lo_address_get_protocol(lo_address a)
 
 const char *lo_address_get_port(lo_address a)
 {
-    if (!a) {
+    if (!a)
+    {
         return NULL;
     }
 
@@ -237,7 +265,8 @@ const char *lo_address_get_port(lo_address a)
 
 static const char *get_protocol_name(int proto)
 {
-    switch (proto) {
+    switch (proto)
+    {
     case LO_UDP:
         return "udp";
     case LO_TCP:
@@ -250,7 +279,6 @@ static const char *get_protocol_name(int proto)
     return NULL;
 }
 
-
 char *lo_address_get_url(lo_address a)
 {
     char *buf;
@@ -262,29 +290,34 @@ char *lo_address_get_url(lo_address a)
         lo_address_resolve_source(a);
 
     if (!a->host)
-		return NULL;
+        return NULL;
 
     needquote = strchr(a->host, ':') ? 1 : 0;
 
-    if (needquote) {
+    if (needquote)
+    {
         fmt = "osc.%s://[%s]:%s/";
-    } else {
+    }
+    else
+    {
         fmt = "osc.%s://%s:%s/";
     }
 #ifndef _MSC_VER
     ret = snprintf(NULL, 0, fmt,
                    get_protocol_name(a->protocol), a->host, a->port);
 #endif
-    if (ret <= 0) {
+    if (ret <= 0)
+    {
         /* this libc is not C99 compliant, guess a size */
         ret = 1023;
     }
-    buf = (char*) malloc((ret + 2) * sizeof(char));
+    buf = (char *)malloc((ret + 2) * sizeof(char));
     snprintf(buf, ret + 1, fmt,
              get_protocol_name(a->protocol), a->host, a->port);
 
-    if (a->protocol==LO_UNIX) {
-        buf[ret-1] = 0;
+    if (a->protocol == LO_UNIX)
+    {
+        buf[ret - 1] = 0;
     }
 
     return buf;
@@ -292,8 +325,10 @@ char *lo_address_get_url(lo_address a)
 
 void lo_address_free(lo_address a)
 {
-    if (a) {
-        if (a->socket != -1 && a->ownsocket) {
+    if (a)
+    {
+        if (a->socket != -1 && a->ownsocket)
+        {
 #ifdef SHUT_WR
             shutdown(a->socket, SHUT_WR);
 #endif
@@ -306,7 +341,8 @@ void lo_address_free(lo_address a)
 
 void lo_address_free_mem(lo_address a)
 {
-    if (a) {
+    if (a)
+    {
         if (a->host)
             free(a->host);
         if (a->port)
@@ -330,7 +366,8 @@ const char *lo_address_errstr(lo_address a)
 {
     char *msg;
 
-    if (a->errstr) {
+    if (a->errstr)
+    {
         return a->errstr;
     }
 
@@ -338,9 +375,12 @@ const char *lo_address_errstr(lo_address a)
         return "Success";
 
     msg = strerror(a->errnum);
-    if (msg) {
+    if (msg)
+    {
         return msg;
-    } else {
+    }
+    else
+    {
         return "unknown error";
     }
 
@@ -351,20 +391,26 @@ char *lo_url_get_protocol(const char *url)
 {
     char *protocol, *ret;
 
-    if (!url) {
+    if (!url)
+    {
         return NULL;
     }
 
-    protocol = (char*) malloc(strlen(url));
+    protocol = (char *)malloc(strlen(url));
 
-    if (sscanf(url, "osc://%s", protocol)) {
+    if (sscanf(url, "osc://%s", protocol))
+    {
         fprintf(stderr,
                 PACKAGE_NAME " warning: no protocol specified in URL, "
-                "assuming UDP.\n");
+                             "assuming UDP.\n");
         ret = strdup("udp");
-    } else if (sscanf(url, "osc.%[^:/[]", protocol)) {
+    }
+    else if (sscanf(url, "osc.%[^:/[]", protocol))
+    {
         ret = strdup(protocol);
-    } else {
+    }
+    else
+    {
         ret = NULL;
     }
 
@@ -375,20 +421,28 @@ char *lo_url_get_protocol(const char *url)
 
 int lo_url_get_protocol_id(const char *url)
 {
-    if (!url) {
+    if (!url)
+    {
         return -1;
     }
 
-    if (!strncmp(url, "osc:", 4)) {
+    if (!strncmp(url, "osc:", 4))
+    {
         fprintf(stderr,
                 PACKAGE_NAME " warning: no protocol specified in URL, "
-                "assuming UDP.\n");
-        return LO_UDP;          // should be LO_DEFAULT?
-    } else if (!strncmp(url, "osc.udp:", 8)) {
+                             "assuming UDP.\n");
+        return LO_UDP; // should be LO_DEFAULT?
+    }
+    else if (!strncmp(url, "osc.udp:", 8))
+    {
         return LO_UDP;
-    } else if (!strncmp(url, "osc.tcp:", 8)) {
+    }
+    else if (!strncmp(url, "osc.tcp:", 8))
+    {
         return LO_TCP;
-    } else if (!strncmp(url, "osc.unix:", 9)) {
+    }
+    else if (!strncmp(url, "osc.unix:", 9))
+    {
         return LO_UNIX;
     }
     return -1;
@@ -396,15 +450,18 @@ int lo_url_get_protocol_id(const char *url)
 
 char *lo_url_get_hostname(const char *url)
 {
-    char *hostname = (char*) malloc(strlen(url));
+    char *hostname = (char *)malloc(strlen(url));
 
-    if (sscanf(url, "osc://%[^[:/]", hostname)) {
+    if (sscanf(url, "osc://%[^[:/]", hostname))
+    {
         return hostname;
     }
-    if (sscanf(url, "osc.%*[^:/]://[%[^]/]]", hostname)) {
+    if (sscanf(url, "osc.%*[^:/]://[%[^]/]]", hostname))
+    {
         return hostname;
     }
-    if (sscanf(url, "osc.%*[^:/]://%[^[:/]", hostname)) {
+    if (sscanf(url, "osc.%*[^:/]://%[^[:/]", hostname))
+    {
         return hostname;
     }
 
@@ -416,24 +473,30 @@ char *lo_url_get_hostname(const char *url)
 
 char *lo_url_get_port(const char *url)
 {
-    char *port = (char*) malloc(strlen(url));
+    char *port = (char *)malloc(strlen(url));
 
-    if (sscanf(url, "osc://%*[^:]:%[0-9]", port) > 0) {
+    if (sscanf(url, "osc://%*[^:]:%[0-9]", port) > 0)
+    {
         return port;
     }
-    if (sscanf(url, "osc.%*[^:]://%*[^:]:%[0-9]", port) > 0) {
+    if (sscanf(url, "osc.%*[^:]://%*[^:]:%[0-9]", port) > 0)
+    {
         return port;
     }
-    if (sscanf(url, "osc://[%*[^]]]:%[0-9]", port) > 0) {
+    if (sscanf(url, "osc://[%*[^]]]:%[0-9]", port) > 0)
+    {
         return port;
     }
-    if (sscanf(url, "osc.%*[^:]://[%*[^]]]:%[0-9]", port) > 0) {
+    if (sscanf(url, "osc.%*[^:]://[%*[^]]]:%[0-9]", port) > 0)
+    {
         return port;
     }
-    if (sscanf(url, "osc://:%[0-9]", port) > 0) {
+    if (sscanf(url, "osc://:%[0-9]", port) > 0)
+    {
         return port;
     }
-    if (sscanf(url, "osc.%*[^:]://:%[0-9]", port) > 0) {
+    if (sscanf(url, "osc.%*[^:]://:%[0-9]", port) > 0)
+    {
         return port;
     }
 
@@ -445,23 +508,27 @@ char *lo_url_get_port(const char *url)
 
 char *lo_url_get_path(const char *url)
 {
-    char *path = (char*) malloc(strlen(url));
+    char *path = (char *)malloc(strlen(url));
 
-    if (sscanf(url, "osc://%*[^:]:%*[0-9]%s", path)) {
+    if (sscanf(url, "osc://%*[^:]:%*[0-9]%s", path))
+    {
         return path;
     }
-    if (sscanf(url, "osc.%*[^:]://%*[^:]:%*[0-9]%s", path) == 1) {
+    if (sscanf(url, "osc.%*[^:]://%*[^:]:%*[0-9]%s", path) == 1)
+    {
         return path;
     }
-    if (sscanf(url, "osc.unix://%*[^/]%s", path)) {
-        int i = (int) strlen(path)-1;
-        if (path[i]=='/') // remove trailing slash
+    if (sscanf(url, "osc.unix://%*[^/]%s", path))
+    {
+        int i = (int)strlen(path) - 1;
+        if (path[i] == '/') // remove trailing slash
             path[i] = 0;
         return path;
     }
-    if (sscanf(url, "osc.%*[^:]://%s", path)) {
-        int i = (int) strlen(path)-1;
-        if (path[i]=='/') // remove trailing slash
+    if (sscanf(url, "osc.%*[^:]://%s", path))
+    {
+        int i = (int)strlen(path) - 1;
+        if (path[i] == '/') // remove trailing slash
             path[i] = 0;
         return path;
     }
@@ -487,43 +554,41 @@ int lo_address_set_tcp_nodelay(lo_address t, int enable)
 {
     int r = (t->flags & LO_NODELAY) != 0;
     lo_address_set_flags(t, enable
-                         ? t->flags | LO_NODELAY
-                         : t->flags & ~LO_NODELAY);
+                                ? t->flags | LO_NODELAY
+                                : t->flags & ~LO_NODELAY);
     return r;
 }
 
 int lo_address_set_stream_slip(lo_address t, lo_slip_encoding encoding)
 {
     int r = t->flags & LO_SLIP_DBL_END
-        ? LO_SLIP_DOUBLE
-        : t->flags & LO_SLIP
-            ? LO_SLIP_SINGLE
-            : LO_SLIP_NONE;
+                ? LO_SLIP_DOUBLE
+            : t->flags & LO_SLIP
+                ? LO_SLIP_SINGLE
+                : LO_SLIP_NONE;
     lo_address_set_flags(t, encoding > 0
-                         ? t->flags | LO_SLIP
-                         : t->flags & ~LO_SLIP);
+                                ? t->flags | LO_SLIP
+                                : t->flags & ~LO_SLIP);
     lo_address_set_flags(t, encoding > 1
-                         ? t->flags | LO_SLIP_DBL_END
-                         : t->flags & ~LO_SLIP_DBL_END);
+                                ? t->flags | LO_SLIP_DBL_END
+                                : t->flags & ~LO_SLIP_DBL_END);
     return r;
 }
 
-static
-void lo_address_set_flags(lo_address t, int flags)
+static void lo_address_set_flags(lo_address t, int flags)
 {
-    if (((t->flags & LO_NODELAY) != (flags & LO_NODELAY))
-        && t->socket > 0)
+    if (((t->flags & LO_NODELAY) != (flags & LO_NODELAY)) && t->socket > 0)
     {
-        int option = (t->flags & LO_NODELAY)!=0;
+        int option = (t->flags & LO_NODELAY) != 0;
         setsockopt(t->socket, IPPROTO_TCP, TCP_NODELAY,
-                   (const char*)&option, sizeof(option));
+                   (const char *)&option, sizeof(option));
     }
 
-    t->flags = (lo_proto_flags) flags;
+    t->flags = (lo_proto_flags)flags;
 }
 
 #ifdef ENABLE_IPV6
-static int is_dotted_ipv4_address (const char* address)
+static int is_dotted_ipv4_address(const char *address)
 {
     int a[4];
     return sscanf(address, "%u.%u.%u.%u", &a[0], &a[1], &a[2], &a[3]);
@@ -536,11 +601,13 @@ void lo_address_copy(lo_address to, lo_address from)
      * lo_address is used. (e.g. resolving addrinfo) */
     memset(to, 0, sizeof(struct _lo_address));
     to->socket = from->socket;
-    if (from->host) {
+    if (from->host)
+    {
         free(to->host);
         to->host = strdup(from->host);
     }
-    if (from->port) {
+    if (from->port)
+    {
         free(to->port);
         to->port = strdup(from->port);
     }
@@ -559,14 +626,15 @@ void lo_address_init_with_sockaddr(lo_address a,
     int err = 0;
     assert(a != NULL);
     lo_address_free_mem(a);
-    a->host = (char*) malloc(INET_ADDRSTRLEN);
-    a->port = (char*) malloc(8);
+    a->host = (char *)malloc(INET_ADDRSTRLEN);
+    a->port = (char *)malloc(8);
 
-    err = getnameinfo((struct sockaddr *)sa, (socklen_t) sa_len,
+    err = getnameinfo((struct sockaddr *)sa, (socklen_t)sa_len,
                       a->host, INET_ADDRSTRLEN, a->port, 8,
                       NI_NUMERICHOST | NI_NUMERICSERV);
 
-    if (err) {
+    if (err)
+    {
         free(a->host);
         free(a->port);
         a->host = a->port = 0;
@@ -580,19 +648,21 @@ int lo_address_resolve(lo_address a)
 {
     int ret;
 
-    if (a->protocol == LO_UDP || a->protocol == LO_TCP) {
-        struct addrinfo *ai=NULL;
+    if (a->protocol == LO_UDP || a->protocol == LO_TCP)
+    {
+        struct addrinfo *ai = NULL;
         struct addrinfo hints;
-        const char* host = lo_address_get_hostname(a);
+        const char *host = lo_address_get_hostname(a);
 #ifdef ENABLE_IPV6
-        char hosttmp[7+16+1]; // room for ipv6 prefix + a dotted quad
+        char hosttmp[7 + 16 + 1]; // room for ipv6 prefix + a dotted quad
 #endif
 
         memset(&hints, 0, sizeof(hints));
 #ifdef ENABLE_IPV6
         hints.ai_family = PF_UNSPEC;
 
-        if (is_dotted_ipv4_address(host)) {
+        if (is_dotted_ipv4_address(host))
+        {
             host = hosttmp;
             strcpy(hosttmp, "::FFFF:");
             strncpy(hosttmp + 7, lo_address_get_hostname(a), 16);
@@ -603,14 +673,15 @@ int lo_address_resolve(lo_address a)
         hints.ai_socktype =
             a->protocol == LO_UDP ? SOCK_DGRAM : SOCK_STREAM;
 
-        if ((ret = getaddrinfo(host, lo_address_get_port(a), &hints, &ai))) {
+        if ((ret = getaddrinfo(host, lo_address_get_port(a), &hints, &ai)))
+        {
             a->errnum = ret;
             a->errstr = gai_strerror(ret);
             a->ai = NULL;
             a->ai_first = NULL;
             return -1;
         }
-        
+
         a->ai = ai;
         a->ai_first = ai;
     }
@@ -623,10 +694,11 @@ int lo_address_resolve(lo_address a)
 int lo_address_set_iface(lo_address t, const char *iface, const char *ip)
 {
     int fam;
-    if (!t->ai) {
+    if (!t->ai)
+    {
         lo_address_resolve(t);
         if (!t->ai)
-            return 2;  // Need the address family to continue
+            return 2; // Need the address family to continue
     }
     fam = t->ai->ai_family;
 
@@ -644,74 +716,84 @@ int lo_inaddr_find_iface(lo_inaddr t, int fam,
     int found;
 #endif
 
-	union {
+    union
+    {
         struct in_addr addr;
 #ifdef ENABLE_IPV6
         struct in6_addr addr6;
 #endif
     } a;
 
-    if (ip) {
+    if (ip)
+    {
 #ifdef HAVE_INET_PTON
         int rc = inet_pton(fam, ip, &a);
-        if (rc!=1)
-            return (rc<0) ? 3 : 4;
+        if (rc != 1)
+            return (rc < 0) ? 3 : 4;
 #else
-        if (fam!=AF_INET6)
-            *((unsigned long*)&a.addr) = inet_addr(ip);
+        if (fam != AF_INET6)
+            *((unsigned long *)&a.addr) = inet_addr(ip);
 #endif
     }
 
 #if defined(WIN32) || defined(_MSC_VER)
 
     /* Start with recommended 15k buffer for GetAdaptersAddresses. */
-    size = 15*1024/2;
+    size = 15 * 1024 / 2;
     tries = 3;
-    paa = malloc(size*2);
-    rc = ERROR_SUCCESS-1;
-    while (rc!=ERROR_SUCCESS && paa && tries-- > 0) {
+    paa = malloc(size * 2);
+    rc = ERROR_SUCCESS - 1;
+    while (rc != ERROR_SUCCESS && paa && tries-- > 0)
+    {
         size *= 2;
         paa = realloc(paa, size);
         rc = GetAdaptersAddresses(fam, 0, 0, paa, &size);
     }
-    if (rc!=ERROR_SUCCESS)
+    if (rc != ERROR_SUCCESS)
         return 2;
 
     aa = paa;
-    found=0;
-    while (aa && rc==ERROR_SUCCESS) {
-        if (iface) {
-            if (strcmp(iface, aa->AdapterName)==0)
+    found = 0;
+    while (aa && rc == ERROR_SUCCESS)
+    {
+        if (iface)
+        {
+            if (strcmp(iface, aa->AdapterName) == 0)
                 found = 1;
-            else {
+            else
+            {
                 WCHAR ifaceW[256];
                 MultiByteToWideChar(CP_ACP, 0, iface, -1,
                                     ifaceW, 256);
-                if (lstrcmpW(ifaceW, aa->FriendlyName)==0)
+                if (lstrcmpW(ifaceW, aa->FriendlyName) == 0)
                     found = 1;
             }
         }
-        if (ip) {
+        if (ip)
+        {
             PIP_ADAPTER_UNICAST_ADDRESS pua = aa->FirstUnicastAddress;
-            while (pua && !found) {
-                if (fam==AF_INET) {
+            while (pua && !found)
+            {
+                if (fam == AF_INET)
+                {
                     struct sockaddr_in *s =
-                        (struct sockaddr_in*)pua->Address.lpSockaddr;
-                    if (fam == s->sin_family
-                        && memcmp(&a.addr, &s->sin_addr,
-                                  sizeof(struct in_addr))==0) {
+                        (struct sockaddr_in *)pua->Address.lpSockaddr;
+                    if (fam == s->sin_family && memcmp(&a.addr, &s->sin_addr,
+                                                       sizeof(struct in_addr)) == 0)
+                    {
                         memcpy(&t->a.addr, &s->sin_addr,
                                sizeof(struct in_addr));
                         found = 1;
                     }
                 }
 #ifdef ENABLE_IPV6
-                else if (fam==AF_INET6) {
+                else if (fam == AF_INET6)
+                {
                     struct sockaddr_in6 *s =
-                        (struct sockaddr_in6*)pua->Address.lpSockaddr;
-                    if (fam == s->sin6_family
-                        && memcmp(&a.addr6, &s->sin6_addr,
-                                  sizeof(struct in6_addr))==0) {
+                        (struct sockaddr_in6 *)pua->Address.lpSockaddr;
+                    if (fam == s->sin6_family && memcmp(&a.addr6, &s->sin6_addr,
+                                                        sizeof(struct in6_addr)) == 0)
+                    {
                         memcpy(&t->a.addr6, &s->sin6_addr,
                                sizeof(struct in6_addr));
                         found = 1;
@@ -722,23 +804,29 @@ int lo_inaddr_find_iface(lo_inaddr t, int fam,
             }
         }
 
-        if (aa && found) {
+        if (aa && found)
+        {
             t->iface = strdup(aa->AdapterName);
-            if (!ip && aa->FirstUnicastAddress) {
+            if (!ip && aa->FirstUnicastAddress)
+            {
                 PIP_ADAPTER_UNICAST_ADDRESS pua = aa->FirstUnicastAddress;
-                while (pua) {
+                while (pua)
+                {
                     struct sockaddr_in *s =
-                        (struct sockaddr_in*)pua->Address.lpSockaddr;
-                    if (s->sin_family==fam) {
-                        if (fam==AF_INET) {
+                        (struct sockaddr_in *)pua->Address.lpSockaddr;
+                    if (s->sin_family == fam)
+                    {
+                        if (fam == AF_INET)
+                        {
                             memcpy(&t->a.addr, &s->sin_addr,
                                    sizeof(struct in_addr));
                             break;
                         }
 #ifdef ENABLE_IPV6
-                        else if (fam==AF_INET6) {
+                        else if (fam == AF_INET6)
+                        {
                             struct sockaddr_in6 *s6 =
-                                (struct sockaddr_in6*)pua->Address.lpSockaddr;
+                                (struct sockaddr_in6 *)pua->Address.lpSockaddr;
                             memcpy(&t->a.addr6, &s6->sin6_addr,
                                    sizeof(struct in6_addr));
                             break;
@@ -754,28 +842,33 @@ int lo_inaddr_find_iface(lo_inaddr t, int fam,
         aa = aa->Next;
     }
 
-    if (paa) free(paa);
+    if (paa)
+        free(paa);
 
     return !found;
 
 #else // !WIN32
 
     struct ifaddrs *ifa, *ifa_list;
-    if (getifaddrs(&ifa_list)==-1)
+    if (getifaddrs(&ifa_list) == -1)
         return 5;
     ifa = ifa_list;
 
     int found = 0;
-    while (ifa) {
-        if (!ifa->ifa_addr) {
+    while (ifa)
+    {
+        if (!ifa->ifa_addr)
+        {
             ifa = ifa->ifa_next;
             continue;
         }
-        if (ip) {
+        if (ip)
+        {
             if (ifa->ifa_addr->sa_family == AF_INET && fam == AF_INET)
             {
-                if (memcmp(&((struct sockaddr_in*)ifa->ifa_addr)->sin_addr,
-                           &a.addr, sizeof(struct in_addr))==0) {
+                if (memcmp(&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr,
+                           &a.addr, sizeof(struct in_addr)) == 0)
+                {
                     found = 1;
                     t->size = sizeof(struct in_addr);
                     memcpy(&t->a, &a, t->size);
@@ -785,8 +878,9 @@ int lo_inaddr_find_iface(lo_inaddr t, int fam,
 #ifdef ENABLE_IPV6
             else if (ifa->ifa_addr->sa_family == AF_INET6 && fam == AF_INET6)
             {
-                if (memcmp(&((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr,
-                           &a.addr6, sizeof(struct in6_addr))==0) {
+                if (memcmp(&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr,
+                           &a.addr6, sizeof(struct in6_addr)) == 0)
+                {
                     found = 1;
                     t->size = sizeof(struct in6_addr);
                     memcpy(&t->a, &a, t->size);
@@ -795,24 +889,24 @@ int lo_inaddr_find_iface(lo_inaddr t, int fam,
             }
 #endif
         }
-        if (iface) {
-            if (ifa->ifa_addr->sa_family == fam
-                && strcmp(ifa->ifa_name, iface)==0)
+        if (iface)
+        {
+            if (ifa->ifa_addr->sa_family == fam && strcmp(ifa->ifa_name, iface) == 0)
             {
-                if (fam==AF_INET) {
+                if (fam == AF_INET)
+                {
                     found = 1;
                     t->size = sizeof(struct in_addr);
-                    memcpy(&t->a, &((struct sockaddr_in*)
-                                    ifa->ifa_addr)->sin_addr,
+                    memcpy(&t->a, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr,
                            t->size);
                     break;
                 }
 #ifdef ENABLE_IPV6
-                else if (fam==AF_INET6) {
+                else if (fam == AF_INET6)
+                {
                     found = 1;
                     t->size = sizeof(struct in6_addr);
-                    memcpy(&t->a, &((struct sockaddr_in6*)
-                                    ifa->ifa_addr)->sin6_addr,
+                    memcpy(&t->a, &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr,
                            t->size);
                     break;
                 }
@@ -822,8 +916,10 @@ int lo_inaddr_find_iface(lo_inaddr t, int fam,
         ifa = ifa->ifa_next;
     }
 
-    if (found && ifa->ifa_name) {
-        if (t->iface) free(t->iface);
+    if (found && ifa->ifa_name)
+    {
+        if (t->iface)
+            free(t->iface);
         t->iface = strdup(ifa->ifa_name);
     }
 
@@ -832,7 +928,7 @@ int lo_inaddr_find_iface(lo_inaddr t, int fam,
 #endif
 }
 
-const char* lo_address_get_iface(lo_address t)
+const char *lo_address_get_iface(lo_address t)
 {
     if (t)
         return t->addr.iface;

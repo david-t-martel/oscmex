@@ -21,7 +21,9 @@
 			"vector": "cpp",
 			"deque": "cpp",
 			"list": "cpp",
-			"xstring": "cpp"
+			"xstring": "cpp",
+			"any": "cpp",
+			"stdexcept": "cpp"
 		},
 		"terminal.integrated.defaultProfile.windows": "Intel oneAPI",
 		"terminal.integrated.profiles.windows": {

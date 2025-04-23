@@ -31,6 +31,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <process.h>
+// Define threading implementation for Windows
+#define HAVE_WIN32_THREADS
 #else
 #include <unistd.h>
 #include <netdb.h>
@@ -40,6 +42,31 @@
 #include "lo_types_internal.h"
 #include "lo/lo.h"
 #include "lo/lo_throw.h"
+
+// Add missing callback type declarations if not defined in lo_types.h
+#ifndef LO_SERVER_THREAD_INIT_CALLBACK_DEFINED
+#define LO_SERVER_THREAD_INIT_CALLBACK_DEFINED
+typedef int (*lo_server_thread_init_callback)(lo_server_thread s, void *user_data);
+typedef void (*lo_server_thread_cleanup_callback)(lo_server_thread s, void *user_data);
+#endif
+
+// Add the server thread struct definition
+struct _lo_server_thread
+{
+    lo_server s;
+    void *user_data;
+#ifdef HAVE_LIBPTHREAD
+    pthread_t thread;
+#else
+#ifdef HAVE_WIN32_THREADS
+    HANDLE thread;
+#endif
+#endif
+    volatile int active;
+    volatile int done;
+    lo_server_thread_init_callback cb_init;
+    lo_server_thread_cleanup_callback cb_cleanup;
+};
 
 #ifdef HAVE_WIN32_THREADS
 static unsigned __stdcall thread_func(void *data);
