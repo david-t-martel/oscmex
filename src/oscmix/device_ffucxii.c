@@ -1,16 +1,26 @@
 #include "device.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/stat.h>
 
-#define LEN(a) (sizeof (a) / sizeof *(a))
+#ifdef _WIN32
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#endif
+
+#define LEN(a) (sizeof(a) / sizeof *(a))
 
 static const struct inputinfo inputs[] = {
-	{"Mic/Line 1",  INPUT_GAIN | INPUT_48V},
-	{"Mic/Line 2",  INPUT_GAIN | INPUT_48V},
+	{"Mic/Line 1", INPUT_GAIN | INPUT_48V},
+	{"Mic/Line 2", INPUT_GAIN | INPUT_48V},
 	{"Inst/Line 3", INPUT_GAIN | INPUT_REFLEVEL},
 	{"Inst/Line 4", INPUT_GAIN | INPUT_REFLEVEL},
-	{"Analog 5",    INPUT_GAIN | INPUT_REFLEVEL},
-	{"Analog 6",    INPUT_GAIN | INPUT_REFLEVEL},
-	{"Analog 7",    INPUT_GAIN | INPUT_REFLEVEL},
-	{"Analog 8",    INPUT_GAIN | INPUT_REFLEVEL},
+	{"Analog 5", INPUT_GAIN | INPUT_REFLEVEL},
+	{"Analog 6", INPUT_GAIN | INPUT_REFLEVEL},
+	{"Analog 7", INPUT_GAIN | INPUT_REFLEVEL},
+	{"Analog 8", INPUT_GAIN | INPUT_REFLEVEL},
 	{"SPDIF L"},
 	{"SPDIF R"},
 	{"AES L"},

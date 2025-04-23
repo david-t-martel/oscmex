@@ -1,42 +1,73 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-enum inputflags {
-	INPUT_GAIN = 1 << 0,
-	INPUT_REFLEVEL = 1 << 1,
-	INPUT_48V = 1 << 2,
-	INPUT_HIZ = 1 << 3,
+#include <stdbool.h>
+
+/* Device capability flags */
+#define DEVICE_DUREC 0x00000001	 /* Direct USB Recording */
+#define DEVICE_ROOMEQ 0x00000002 /* Room EQ */
+
+/* Input flags */
+#define INPUT_GAIN 0x00000001	  /* Has gain control */
+#define INPUT_48V 0x00000002	  /* Has phantom power */
+#define INPUT_REFLEVEL 0x00000004 /* Has reference level selection */
+#define INPUT_HIZ 0x00000008	  /* Has Hi-Z impedance option */
+
+/* Output flags */
+#define OUTPUT_REFLEVEL 0x00000001 /* Has reference level selection */
+
+/**
+ * @brief Input channel information structure
+ */
+struct inputinfo
+{
+	char name[32]; /* Input channel name */
+	int flags;	   /* Input capabilities */
 };
 
-struct inputinfo {
-	char name[12];
-	int flags;
+/**
+ * @brief Output channel information structure
+ */
+struct outputinfo
+{
+	const char *name; /* Output channel name */
+	int flags;		  /* Output capabilities */
 };
 
-enum outputflags {
-	OUTPUT_REFLEVEL = 1 << 0,
+/**
+ * @brief Audio device structure
+ */
+struct device
+{
+	const char *id;	  /* Device identifier */
+	const char *name; /* Device name */
+	int version;	  /* Device version */
+	int flags;		  /* Device capabilities */
+
+	const struct inputinfo *inputs; /* Array of input channels */
+	int inputslen;					/* Number of input channels */
+
+	const struct outputinfo *outputs; /* Array of output channels */
+	int outputslen;					  /* Number of output channels */
 };
 
-struct outputinfo {
-	const char *name;
-	int flags;
-};
+/**
+ * @brief Initialize the device subsystem
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int device_init(void);
 
-enum deviceflags {
-	DEVICE_DUREC = 1 << 0,
-	DEVICE_ROOMEQ = 1 << 1,
-};
+/**
+ * @brief Clean up the device subsystem
+ */
+void device_cleanup(void);
 
-struct device {
-	const char *id;
-	const char *name;
-	int version;
-	int flags;
+/**
+ * @brief Get a pointer to the current device
+ *
+ * @return Pointer to the current device structure
+ */
+const struct device *get_current_device(void);
 
-	const struct inputinfo *inputs;
-	int inputslen;
-	const struct outputinfo *outputs;
-	int outputslen;
-};
-
-#endif
+#endif /* DEVICE_H */

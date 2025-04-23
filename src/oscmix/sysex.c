@@ -1,6 +1,7 @@
 #include <string.h>
 #include "sysex.h"
 #include "intpack.h"
+#include "platform.h"
 
 size_t
 sysexenc(struct sysex *p, unsigned char *dst, int flags)
@@ -17,11 +18,15 @@ sysexenc(struct sysex *p, unsigned char *dst, int flags)
 	if (!dst)
 		return len;
 	*dst++ = 0xf0;
-	if (flags & SYSEX_MFRID) {
-		if (p->mfrid > 0x7f) {
+	if (flags & SYSEX_MFRID)
+	{
+		if (p->mfrid > 0x7f)
+		{
 			*dst++ = 0x00;
 			dst = putbe16(dst, p->mfrid);
-		} else {
+		}
+		else
+		{
 			*dst++ = p->mfrid;
 		}
 	}
@@ -38,19 +43,20 @@ sysexenc(struct sysex *p, unsigned char *dst, int flags)
 	return len;
 }
 
-int
-sysexdec(struct sysex *p, const unsigned char *src, size_t len, int flags)
+int sysexdec(struct sysex *p, const unsigned char *src, size_t len, int flags)
 {
 	if (len < 2 || src[0] != 0xf0 || src[len - 1] != 0xf7)
 		return -1;
 	++src;
 	len -= 2;
-	if (flags & SYSEX_MFRID) {
+	if (flags & SYSEX_MFRID)
+	{
 		if (len < 1)
 			return -1;
 		p->mfrid = *src++;
 		--len;
-		if (!p->mfrid) {
+		if (!p->mfrid)
+		{
 			if (len < 2)
 				return -1;
 			p->mfrid = getbe16(src);
@@ -58,13 +64,15 @@ sysexdec(struct sysex *p, const unsigned char *src, size_t len, int flags)
 			len -= 2;
 		}
 	}
-	if (flags & SYSEX_DEVID) {
+	if (flags & SYSEX_DEVID)
+	{
 		if (len < 1)
 			return -1;
 		p->devid = *src++;
 		--len;
 	}
-	if (flags & SYSEX_SUBID) {
+	if (flags & SYSEX_SUBID)
+	{
 		if (len < 1)
 			return -1;
 		p->subid = *src++;
@@ -75,19 +83,20 @@ sysexdec(struct sysex *p, const unsigned char *src, size_t len, int flags)
 	return 0;
 }
 
-void
-base128enc(unsigned char *dst, const unsigned char *src, size_t len)
+void base128enc(unsigned char *dst, const unsigned char *src, size_t len)
 {
 	unsigned b;
 	int i;
 
 	b = 0;
 	i = 0;
-	while (len-- > 0) {
+	while (len-- > 0)
+	{
 		b = *src++ << i | b;
 		*dst++ = b & 0x7f;
 		b >>= 7;
-		if (++i == 7) {
+		if (++i == 7)
+		{
 			*dst++ = b;
 			b = 0;
 			i = 0;
@@ -97,8 +106,7 @@ base128enc(unsigned char *dst, const unsigned char *src, size_t len)
 		*dst++ = b;
 }
 
-int
-base128dec(unsigned char *dst, const unsigned char *src, size_t len)
+int base128dec(unsigned char *dst, const unsigned char *src, size_t len)
 {
 	const unsigned char *end;
 	unsigned b, c;
@@ -107,18 +115,28 @@ base128dec(unsigned char *dst, const unsigned char *src, size_t len)
 	end = src + len;
 	b = 0;
 	i = 0;
-	while (src != end) {
+	while (src != end)
+	{
 		c = *src++;
 		if (c & ~0x7f)
 			return -1;
 		b |= c << i;
-		if (i == 0) {
+		if (i == 0)
+		{
 			i = 7;
-		} else {
+		}
+		else
+		{
 			*dst++ = b & 0xff;
 			b >>= 8;
 			--i;
 		}
 	}
 	return 0;
+}
+
+void send_sysex_message(const unsigned char *data, size_t length)
+{
+	// Use platform abstractions for MIDI operations
+	platform_midi_send(data, length);
 }

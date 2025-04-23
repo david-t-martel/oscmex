@@ -90,4 +90,21 @@ extern void writemidi(const void *buf, size_t len);
  */
 extern void writeosc(const void *buf, size_t len);
 
+/**
+ * Dump device state to console
+ */
+void dump(void);
+
+/**
+ * Dump device state to a JSON file
+ * @return 0 on success, non-zero on failure
+ */
+int dumpState(void);
+
+/**
+ * Exports device configuration to a JSON file
+ * @return 0 on success, negative value on error
+ */
+int dumpConfig(void);
+
 #endif /* OSCMIX_H */

@@ -76,30 +76,36 @@ flowchart TD
 ## Core Component Descriptions
 
 ### Initialization
+
 - **device_init()**: Detects the connected RME device and initializes the parameter mapping structure
 - **inputs_init()**, **outputs_init()**, **playbacks_init()**: Set up state tracking structures for different channel types
 
 ### OSC Message Processing
+
 - **oscmsg_parse()**: Extracts address pattern and arguments from incoming OSC message packets
 - **dispatch_set()**, **dispatch_get()**: Find parameter in the parameter tree and call appropriate handlers
 - **setreg()**: Core function that formats and sends MIDI SysEx commands to update device registers
 - **setint()**, **setfixed()**, **setenum()**, **setbool()**: Type-specific parameter value setting and validation
 
 ### MIDI Response Handling
+
 - **handlesysex()**: Processes SysEx responses received from the device
 - **handleregs()**: Updates internal state based on register values received from the device
 - **handlelevels()**: Processes level meter data and sends it as OSC messages
 
 ### Special Commands
+
 - **setrefresh()**: Initiates a full device state refresh
 - **oscsendenum()**: Returns the list of possible values for enumerated parameters
 - **dump()**: Debugging tool that prints internal state information
 
 ### OSC Message Generation
+
 - **oscsend()**: Formats and sends OSC messages to notify clients of state changes
 - **newint()**, **newfixed()**, **newenum()**, **newbool()**: Type-specific response formatting
 
 ## Data Flow
+
 1. OSC messages arrive from the network
 2. Messages are parsed and dispatched to appropriate handlers
 3. Parameters are validated and converted to device-specific values
@@ -108,6 +114,7 @@ flowchart TD
 6. Clients are notified of state changes via OSC messages
 
 ## Error Handling
+
 - Invalid messages and parameters are rejected with appropriate error responses
 - SysEx communication errors are detected and reported
 - Device state is maintained consistently between client and hardware

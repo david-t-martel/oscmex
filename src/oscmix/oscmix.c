@@ -28,6 +28,7 @@
 #include "osc.h"
 #include "sysex.h"
 #include "util.h"
+#include "dump.h"
 
 #define LEN(a) (sizeof(a) / sizeof *(a))
 #define PI 3.14159265358979323846
@@ -2169,7 +2170,7 @@ match(const char *pat, const char *str)
  * @param len The length of the buffer
  * @return 0 on success, non-zero on failure
  */
-int handleosc(const unsigned char *buf, size_t len)
+void handleosc(const void *buf, size_t len)
 {
 	const char *addr, *next;
 	const struct oscnode *path[8], *node;
@@ -2178,7 +2179,7 @@ int handleosc(const unsigned char *buf, size_t len)
 	int reg;
 
 	if (len % 4 != 0)
-		return -1;
+		return;
 	msg.err = NULL;
 	msg.buf = (unsigned char *)buf;
 	msg.end = (unsigned char *)buf + len;
@@ -2189,7 +2190,7 @@ int handleosc(const unsigned char *buf, size_t len)
 	if (msg.err)
 	{
 		fprintf(stderr, "invalid osc message: %s\n", msg.err);
-		return -1;
+		return;
 	}
 	++msg.type;
 
@@ -2224,7 +2225,30 @@ int handleosc(const unsigned char *buf, size_t len)
 			++node;
 		}
 	}
-	return 0;
+
+	// Check for special commands
+	if (strcmp(addr, "/dump") == 0)
+	{
+		// Original dump command - prints to console
+		dump();
+		return;
+	}
+	else if (strcmp(addr, "/dump/save") == 0)
+	{
+		// New command to save config to file
+		int result = dumpConfig();
+		if (result == 0)
+		{
+			// Send acknowledgment via OSC
+			oscsend("/dump/save", ",s", "Configuration saved successfully");
+		}
+		else
+		{
+			// Send error via OSC
+			oscsend("/error", ",s", "Failed to save configuration");
+		}
+		return;
+	}
 }
 
 static unsigned char oscbuf[8192];
@@ -2581,5 +2605,152 @@ int init(const char *port)
 		for (j = 0; j < device->inputslen + device->outputslen; ++j)
 			out->mix[j].vol = -650;
 	}
+	return 0;
+}
+
+/**
+ * Exports device configuration to a JSON file
+ * @return 0 on success, negative value on error
+ */
+int dumpConfig(void)
+{
+	extern const struct device *cur_device; // Reference to current device
+
+	if (!cur_device)
+	{
+		fprintf(stderr, "No device initialized\n");
+		return -1;
+	}
+
+	// Get application home directory
+	char app_home[256];
+	if (get_app_home_directory(app_home, sizeof(app_home)) != 0)
+	{
+		return -1;
+	}
+
+	// Create the device_config subdirectory
+	char config_dir[300];
+	snprintf(config_dir, sizeof(config_dir), "%s/device_config", app_home);
+	if (ensure_directory_exists(config_dir) != 0)
+	{
+		return -1;
+	}
+
+	// Get current date and time
+	time_t now = time(NULL);
+	struct tm *tm_info = localtime(&now);
+	char date_str[20];
+	strftime(date_str, sizeof(date_str), "%Y%m%d-%H%M%S", tm_info);
+
+	// Sanitize device name for filename
+	char safe_name[64] = {0};
+	const char *device_name = cur_device->name;
+	size_t name_len = strlen(device_name);
+	size_t j = 0;
+
+	for (size_t i = 0; i < name_len && j < sizeof(safe_name) - 1; i++)
+	{
+		char c = device_name[i];
+		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '-')
+		{
+			safe_name[j++] = c;
+		}
+		else if (c == ' ' || c == '.' || c == ',')
+		{
+			safe_name[j++] = '_';
+		}
+	}
+
+	// Create filename
+	char filename[400];
+	snprintf(filename, sizeof(filename), "%s/audio-device_%s_date-time_%s.json",
+			 config_dir, safe_name, date_str);
+
+	// Open file for writing
+	FILE *file = fopen(filename, "w");
+	if (!file)
+	{
+		fprintf(stderr, "Failed to open file for writing: %s\n", filename);
+		return -1;
+	}
+
+	// Write device state as JSON
+	fprintf(file, "{\n");
+	fprintf(file, "  \"device\": {\n");
+	fprintf(file, "    \"name\": \"%s\",\n", cur_device->name);
+	fprintf(file, "    \"id\": \"%s\",\n", cur_device->id);
+	fprintf(file, "    \"version\": %d,\n", cur_device->version);
+	fprintf(file, "    \"flags\": %d\n", cur_device->flags);
+	fprintf(file, "  },\n");
+
+	// Write inputs array
+	fprintf(file, "  \"inputs\": [\n");
+	for (int i = 0; i < cur_device->inputslen; i++)
+	{
+		fprintf(file, "    {\n");
+		fprintf(file, "      \"index\": %d,\n", i);
+		fprintf(file, "      \"name\": \"%s\",\n", cur_device->inputs[i].name);
+		fprintf(file, "      \"flags\": %d,\n", cur_device->inputs[i].flags);
+
+		// Write input state based on flags
+		if (cur_device->inputs[i].flags & INPUT_GAIN)
+		{
+			fprintf(file, "      \"gain\": %.1f,\n", getInputGain(i));
+		}
+		if (cur_device->inputs[i].flags & INPUT_48V)
+		{
+			fprintf(file, "      \"phantom\": %s,\n", getInputPhantom(i) ? "true" : "false");
+		}
+		if (cur_device->inputs[i].flags & INPUT_REFLEVEL)
+		{
+			fprintf(file, "      \"reflevel\": \"%s\",\n", getInputRefLevel(i));
+		}
+		if (cur_device->inputs[i].flags & INPUT_HIZ)
+		{
+			fprintf(file, "      \"hiz\": %s,\n", getInputHiZ(i) ? "true" : "false");
+		}
+
+		fprintf(file, "      \"mute\": %s\n", getInputMute(i) ? "true" : "false");
+		fprintf(file, "    }%s\n", (i < cur_device->inputslen - 1) ? "," : "");
+	}
+	fprintf(file, "  ],\n");
+
+	// Write outputs array
+	fprintf(file, "  \"outputs\": [\n");
+	for (int i = 0; i < cur_device->outputslen; i++)
+	{
+		fprintf(file, "    {\n");
+		fprintf(file, "      \"index\": %d,\n", i);
+		fprintf(file, "      \"name\": \"%s\",\n", cur_device->outputs[i].name);
+		fprintf(file, "      \"volume\": %.1f,\n", getOutputVolume(i));
+		fprintf(file, "      \"mute\": %s", getOutputMute(i) ? "true" : "false");
+
+		if (cur_device->outputs[i].flags & OUTPUT_REFLEVEL)
+		{
+			fprintf(file, ",\n      \"reflevel\": \"%s\"\n", getOutputRefLevel(i));
+		}
+		else
+		{
+			fprintf(file, "\n");
+		}
+
+		fprintf(file, "    }%s\n", (i < cur_device->outputslen - 1) ? "," : "");
+	}
+	fprintf(file, "  ],\n");
+
+	// Write system state
+	fprintf(file, "  \"system\": {\n");
+	fprintf(file, "    \"sample_rate\": %d,\n", getSampleRate());
+	fprintf(file, "    \"clock_source\": \"%s\",\n", getClockSource());
+	fprintf(file, "    \"buffer_size\": %d\n", getBufferSize());
+	fprintf(file, "  }\n");
+
+	fprintf(file, "}\n");
+
+	fclose(file);
+	printf("Device configuration saved to: %s\n", filename);
+
 	return 0;
 }

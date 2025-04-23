@@ -169,3 +169,12 @@ Support for additional RME devices can be added by implementing their device des
 ## OSC Command Reference
 
 For a full list of available OSC commands and their parameters, see the detailed parameter tree in the source code.
+
+## OSC Commands
+
+### Device State Management
+
+* `/dump` - Prints the current device state to the console (for debugging)
+* `/dump/save` - Exports the current device configuration to a JSON file in the app's home directory
+  * File is saved to `~/device_config/audio-device_DEVICENAME_date-time_DATETIME.json` (Windows: `%APPDATA%\OSCMix\device_config\...`)
+  * JSON format is machine-readable and can be used to restore device state or analyze configuration

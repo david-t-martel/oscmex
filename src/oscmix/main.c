@@ -16,33 +16,19 @@
  */
 
 /* Platform-specific includes */
-#if defined(_WIN32)
-#define _WIN32_WINNT 0x0601 /* Windows 7 or later */
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <mmsystem.h>
-#include <process.h>
-typedef HANDLE thread_t;
-typedef SOCKET socket_t;
-#define thread_create(t, f, a) ((*t = _beginthreadex(NULL, 0, f, a, 0, NULL)) == 0)
-#define thread_join(t) WaitForSingleObject(t, INFINITE)
-#define sleep_ms(ms) Sleep(ms)
+#include "platform.h"
+
+#ifdef PLATFORM_WINDOWS
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "winmm.lib")
-#else
-#define _POSIX_C_SOURCE 200809L
-#include <fcntl.h>
-#include <pthread.h>
-#include <signal.h>
-#include <sys/time.h>
-#include <unistd.h>
-typedef pthread_t thread_t;
-typedef int socket_t;
-#define thread_create(t, f, a) pthread_create(t, NULL, f, a)
-#define thread_join(t) pthread_join(t, NULL)
-#define sleep_ms(ms) usleep((ms) * 1000)
 #endif
+
+// Rename these for backward compatibility with existing code
+typedef platform_thread_t thread_t;
+typedef platform_socket_t socket_t;
+#define thread_create platform_thread_create
+#define thread_join platform_thread_join
+#define sleep_ms platform_sleep_ms
 
 /* Common includes */
 #include <assert.h>
@@ -537,22 +523,19 @@ static void signalHandler(int sig)
 int main(int argc, char *argv[])
 {
     char *recvaddr, *sendaddr;
-    thread_t midireader, oscreader;
+    platform_thread_t midireader, oscreader;
     const char *port;
 
+    if (platform_socket_init() != 0)
+    {
+        fatal("Socket initialization failed");
+    }
+
 #ifdef _WIN32
-    /* Windows-specific initialization */
-    WSADATA wsaData;
     MMRESULT mmResult;
     UINT midiDeviceId;
     char recvport[6] = "7222"; /**< Default port for receiving OSC messages */
     char sendport[6] = "8222"; /**< Default port for sending OSC messages */
-
-    /* Initialize Windows Sockets */
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-    {
-        fatal("WSAStartup failed");
-    }
 
     /* Set up control handler for clean shutdown */
     SetConsoleCtrlHandler(controlHandler, TRUE);
@@ -693,14 +676,10 @@ int main(int argc, char *argv[])
 
 #ifdef _WIN32
     /* Create thread for reading MIDI messages (Windows) */
-    midireader = (HANDLE)_beginthreadex(NULL, 0, midiread, NULL, 0, NULL);
-    if (midireader == NULL)
-        fatal("CreateThread failed");
+    platform_thread_create(&midireader, midiread, NULL);
 
     /* Create thread for reading OSC messages (Windows) */
-    oscreader = (HANDLE)_beginthreadex(NULL, 0, oscread, &rfd, 0, NULL);
-    if (oscreader == NULL)
-        fatal("CreateThread failed");
+    platform_thread_create(&oscreader, oscread, &rfd);
 
     /* Send initial refresh command and enter main loop (Windows) */
     handleosc(refreshosc, sizeof refreshosc - 1);
@@ -715,14 +694,10 @@ int main(int argc, char *argv[])
     pthread_sigmask(SIG_SETMASK, &set, NULL);
 
     /* Create thread for reading MIDI messages (POSIX) */
-    err = pthread_create(&midireader, NULL, midiread, NULL);
-    if (err)
-        fatal("pthread_create: %s", strerror(err));
+    platform_thread_create(&midireader, midiread, NULL);
 
     /* Create thread for reading OSC messages (POSIX) */
-    err = pthread_create(&oscreader, NULL, oscread, &rfd);
-    if (err)
-        fatal("pthread_create: %s", strerror(err));
+    platform_thread_create(&oscreader, oscread, &rfd);
 
     /* Set up real-time timer for periodic level updates */
     sigemptyset(&set);

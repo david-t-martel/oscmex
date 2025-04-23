@@ -1,4 +1,5 @@
 #define _WIN32_WINNT 0x0601 // Windows 7 or later
+#include "platform.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <limits.h>
@@ -73,22 +74,17 @@ socket_t sockopen(const char *addr, int recv)
 
 	for (ai = res; ai; ai = ai->ai_next)
 	{
-		fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-		if (fd == SOCKET_ERROR_VALUE)
+		platform_socket_t fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+		if (fd == PLATFORM_INVALID_SOCKET)
 			continue;
 
 		if (recv)
 		{
 			optval = 1;
-#ifdef _WIN32
-			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval, sizeof optval) < 0)
+			if (platform_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
 			{
-#else
-			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval) < 0)
-			{
-#endif
 				perror("setsockopt");
-				socket_close(fd);
+				platform_socket_close(fd);
 				continue;
 			}
 
@@ -163,4 +159,9 @@ socket_t sockopen(const char *addr, int recv)
 	freeaddrinfo(res);
 	free(addrstr);
 	return fd;
+}
+
+void socket_close(socket_t fd)
+{
+	platform_socket_close(fd);
 }

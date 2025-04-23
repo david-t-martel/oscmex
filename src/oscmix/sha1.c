@@ -23,6 +23,11 @@
  */
 
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include "sha1.h"
 #include "intpack.h"
 
@@ -185,4 +190,86 @@ void sha1_out(const sha1_context *cc, void *dst)
 	putbe32((unsigned char *)dst + 8, val[2]);
 	putbe32((unsigned char *)dst + 12, val[3]);
 	putbe32((unsigned char *)dst + 16, val[4]);
+}
+
+/*
+ * Dumps the device configuration/state to a JSON file
+ * Saves to "application_home/device_config/audio-device_{device_name}_{date_time}.json"
+ *
+ * @param device_name Name of the audio device
+ * @param state_obj JSON-formatted string containing the device state
+ * @return 0 on success, -1 on failure
+ */
+int dumpConfig(const char *device_name, const char *state_obj)
+{
+	if (!device_name || !state_obj)
+	{
+		return -1;
+	}
+
+	// Get home directory
+	const char *home_dir = getenv("HOME");
+	if (!home_dir)
+	{
+#ifdef _WIN32
+		home_dir = getenv("USERPROFILE");
+		if (!home_dir)
+		{
+			return -1;
+		}
+#else
+		return -1;
+#endif
+	}
+
+	// Create path for device_config directory
+	char config_dir[1024];
+	snprintf(config_dir, sizeof(config_dir), "%s/device_config", home_dir);
+
+// Create directory if it doesn't exist
+#ifdef _WIN32
+	mkdir(config_dir);
+#else
+	mkdir(config_dir, 0755);
+#endif
+
+	// Format current date and time
+	time_t now = time(NULL);
+	struct tm *tm_info = localtime(&now);
+	char date_time[64];
+	strftime(date_time, sizeof(date_time), "%Y-%m-%d_%H-%M-%S", tm_info);
+
+	// Sanitize device name (remove spaces and special characters)
+	char safe_device_name[256];
+	size_t j = 0;
+	for (size_t i = 0; i < strlen(device_name) && j < sizeof(safe_device_name) - 1; i++)
+	{
+		char c = device_name[i];
+		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_')
+		{
+			safe_device_name[j++] = c;
+		}
+		else if (c == ' ')
+		{
+			safe_device_name[j++] = '_';
+		}
+	}
+	safe_device_name[j] = '\0';
+
+	// Create full file path
+	char filepath[1280];
+	snprintf(filepath, sizeof(filepath), "%s/audio-device_%s_date-time_%s.json",
+			 config_dir, safe_device_name, date_time);
+
+	// Write state to file
+	FILE *fp = fopen(filepath, "w");
+	if (!fp)
+	{
+		return -1;
+	}
+
+	fputs(state_obj, fp);
+	fclose(fp);
+
+	return 0;
 }
