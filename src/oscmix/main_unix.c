@@ -1,3 +1,16 @@
+/**
+ * @file main_unix.c
+ * @brief Main entry point for OSCMix on POSIX systems (Linux/macOS)
+ *
+ * This file implements the main application logic and platform-specific code
+ * for running OSCMix on POSIX-compliant systems. It handles:
+ * - Command line argument parsing
+ * - Socket initialization for OSC communication
+ * - MIDI device connection
+ * - Threading for MIDI and OSC message handling
+ * - Signal handling for timers and cleanup
+ */
+
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <errno.h>
@@ -32,10 +45,14 @@ typedef pthread_t thread_t;
 #include "arg.h"
 #include "util.h"
 
-extern int dflag;
-static int lflag;
-static socket_t rfd, wfd;
+extern int dflag;	 /**< Debug flag: enables verbose logging when set */
+static int lflag;	 /**< Level meters flag: disables level meters when set */
+static socket_t rfd; /**< Socket file descriptor for receiving OSC messages */
+static socket_t wfd; /**< Socket file descriptor for sending OSC messages */
 
+/**
+ * @brief Prints usage information and exits
+ */
 static void
 usage(void)
 {
@@ -44,8 +61,25 @@ usage(void)
 }
 
 #ifdef _WIN32
+/**
+ * @brief Thread function for reading MIDI messages from the RME device (Windows)
+ *
+ * This is a placeholder for Windows - actual implementation is in main_old.c
+ *
+ * @param arg Thread argument (unused)
+ * @return Thread return value (unused)
+ */
 static unsigned __stdcall midiread(void *arg)
 #else
+/**
+ * @brief Thread function for reading MIDI messages from the RME device (POSIX)
+ *
+ * Continuously reads MIDI SysEx messages from the device via file descriptor 6,
+ * processes them using handlesysex(), and updates application state.
+ *
+ * @param arg Thread argument (unused)
+ * @return Thread return value (unused)
+ */
 static void *midiread(void *arg)
 #endif
 {
@@ -102,8 +136,23 @@ static void *midiread(void *arg)
 }
 
 #ifdef _WIN32
+/**
+ * @brief Thread function for reading OSC messages from the network (Windows)
+ *
+ * @param arg Pointer to the socket file descriptor
+ * @return Thread return value (unused)
+ */
 static unsigned __stdcall oscread(void *arg)
 #else
+/**
+ * @brief Thread function for reading OSC messages from the network (POSIX)
+ *
+ * Continuously reads OSC messages from the network socket,
+ * and dispatches them to handleosc() for processing.
+ *
+ * @param arg Pointer to the socket file descriptor
+ * @return Thread return value (unused)
+ */
 static void *oscread(void *arg)
 #endif
 {
@@ -139,6 +188,16 @@ static void *oscread(void *arg)
 	return 0;
 }
 
+/**
+ * @brief Sends MIDI data to the RME device
+ *
+ * Writes MIDI data to file descriptor 7, which is connected to the MIDI output
+ * of the device. This function is called by the oscmix core logic to send
+ * SysEx commands to the device.
+ *
+ * @param buf Pointer to the MIDI data to send
+ * @param len Length of the MIDI data in bytes
+ */
 void writemidi(const void *buf, size_t len)
 {
 #ifdef _WIN32
@@ -160,6 +219,15 @@ void writemidi(const void *buf, size_t len)
 #endif
 }
 
+/**
+ * @brief Sends OSC data to the network
+ *
+ * Writes OSC data to the network socket. This function is called by the oscmix
+ * core logic to send OSC responses and notifications to clients.
+ *
+ * @param buf Pointer to the OSC data to send
+ * @param len Length of the OSC data in bytes
+ */
 void writeosc(const void *buf, size_t len)
 {
 #ifdef _WIN32
@@ -190,12 +258,22 @@ void writeosc(const void *buf, size_t len)
 #endif
 }
 
+/**
+ * @brief Main entry point for the OSCMix application
+ *
+ * Parses command line arguments, initializes sockets and MIDI connections,
+ * creates threads for MIDI and OSC handling, and enters the main event loop.
+ *
+ * @param argc Number of command line arguments
+ * @param argv Array of command line argument strings
+ * @return Exit code (0 on success, non-zero on failure)
+ */
 int main(int argc, char *argv[])
 {
-	static char defrecvaddr[] = "udp!127.0.0.1!7222";
-	static char defsendaddr[] = "udp!127.0.0.1!8222";
-	static char mcastaddr[] = "udp!224.0.0.1!8222";
-	static const unsigned char refreshosc[] = "/refresh\0\0\0\0,\0\0\0";
+	static char defrecvaddr[] = "udp!127.0.0.1!7222";					 /**< Default address for receiving OSC messages */
+	static char defsendaddr[] = "udp!127.0.0.1!8222";					 /**< Default address for sending OSC messages */
+	static char mcastaddr[] = "udp!224.0.0.1!8222";						 /**< Multicast address for sending OSC messages */
+	static const unsigned char refreshosc[] = "/refresh\0\0\0\0,\0\0\0"; /**< OSC message for triggering a refresh */
 	char *recvaddr, *sendaddr;
 	thread_t midireader, oscreader;
 	const char *port;
@@ -221,6 +299,7 @@ int main(int argc, char *argv[])
 	sendaddr = defsendaddr;
 	port = NULL;
 
+	/* Parse command line arguments */
 	ARGBEGIN
 	{
 	case 'd':
@@ -247,27 +326,34 @@ int main(int argc, char *argv[])
 	}
 	ARGEND
 
+	/* Open sockets for OSC communication */
 	rfd = sockopen(recvaddr, 1);
 	wfd = sockopen(sendaddr, 0);
 
+	/* Get MIDI device port from argument or environment */
 	if (!port)
 	{
 		port = getenv("MIDIPORT");
 		if (!port)
 			fatal("device is not specified; pass -p or set MIDIPORT");
 	}
+
+	/* Initialize OSCMix core with the specified device */
 	if (init(port) != 0)
 		return 1;
 
 #ifdef _WIN32
+	/* Create thread for reading MIDI messages (Windows) */
 	midireader = (HANDLE)_beginthreadex(NULL, 0, midiread, &wfd, 0, NULL);
 	if (midireader == NULL)
 		fatal("CreateThread failed");
 
+	/* Create thread for reading OSC messages (Windows) */
 	oscreader = (HANDLE)_beginthreadex(NULL, 0, oscread, &rfd, 0, NULL);
 	if (oscreader == NULL)
 		fatal("CreateThread failed");
 
+	/* Send initial refresh command and enter main loop (Windows) */
 	handleosc(refreshosc, sizeof refreshosc - 1);
 	for (;;)
 	{
@@ -275,24 +361,31 @@ int main(int argc, char *argv[])
 		handletimer(lflag == 0);
 	}
 #else
+	/* Block all signals in main thread */
 	sigfillset(&set);
 	pthread_sigmask(SIG_SETMASK, &set, NULL);
+
+	/* Create thread for reading MIDI messages (POSIX) */
 	err = pthread_create(&midireader, NULL, midiread, &wfd);
 	if (err)
 		fatal("pthread_create: %s", strerror(err));
+
+	/* Create thread for reading OSC messages (POSIX) */
 	err = pthread_create(&oscreader, NULL, oscread, &rfd);
 	if (err)
 		fatal("pthread_create: %s", strerror(err));
 
+	/* Set up real-time timer for periodic level updates */
 	sigemptyset(&set);
 	sigaddset(&set, SIGALRM);
 	pthread_sigmask(SIG_SETMASK, &set, NULL);
 	it.it_interval.tv_sec = 0;
-	it.it_interval.tv_usec = 100000;
+	it.it_interval.tv_usec = 100000; /* 100ms interval */
 	it.it_value = it.it_interval;
 	if (setitimer(ITIMER_REAL, &it, NULL) != 0)
 		fatal("setitimer:");
 
+	/* Send initial refresh command and enter main loop (POSIX) */
 	handleosc(refreshosc, sizeof refreshosc - 1);
 	for (;;)
 	{
