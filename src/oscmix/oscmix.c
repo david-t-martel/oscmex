@@ -1,3 +1,18 @@
+/**
+ * @file oscmix.c
+ * @brief Core implementation for OSCMix - a bridge between OSC messages and RME audio devices
+ *
+ * This module implements the main functionality of the OSCMix application, which
+ * translates between OSC network messages and MIDI SysEx commands for RME audio interfaces.
+ *
+ * The implementation follows these key components:
+ * 1. Parameter definitions and data structures for device state tracking
+ * 2. OSC message parsing and dispatching
+ * 3. Device parameter manipulation
+ * 4. MIDI SysEx message handling
+ * 5. OSC message generation for notifications/responses
+ */
+
 #define _XOPEN_SOURCE 700 /* for memccpy */
 #include <assert.h>
 #include <math.h>
@@ -17,6 +32,13 @@
 #define LEN(a) (sizeof(a) / sizeof *(a))
 #define PI 3.14159265358979323846
 
+/**
+ * @brief Represents a node in the OSC address tree
+ *
+ * Each node corresponds to a parameter or a group of parameters
+ * in the device, and contains information about how to set or get
+ * the parameter value.
+ */
 struct oscnode
 {
 	const char *name;
@@ -40,12 +62,24 @@ struct oscnode
 	const struct oscnode *child;
 };
 
+/**
+ * @brief Represents a mix configuration for an output channel
+ *
+ * Contains information about the pan and volume settings for
+ * each output channel.
+ */
 struct mix
 {
 	signed char pan;
 	short vol;
 };
 
+/**
+ * @brief Represents an input channel configuration
+ *
+ * Contains information about the stereo, mute, and width settings
+ * for each input channel.
+ */
 struct input
 {
 	bool stereo;
@@ -53,12 +87,24 @@ struct input
 	float width;
 };
 
+/**
+ * @brief Represents an output channel configuration
+ *
+ * Contains information about the stereo setting and mix configuration
+ * for each output channel.
+ */
 struct output
 {
 	bool stereo;
 	struct mix *mix;
 };
 
+/**
+ * @brief Represents a durec file configuration
+ *
+ * Contains information about the durec file, including register values,
+ * name, sample rate, channels, and length.
+ */
 struct durecfile
 {
 	short reg[6];
@@ -68,6 +114,10 @@ struct durecfile
 	unsigned length;
 };
 
+/**
+ * @brief Debug flag for controlling verbosity
+ * Set by the -d command line option in main.c
+ */
 int dflag;
 static const struct device *device;
 static struct input *inputs;
@@ -101,6 +151,13 @@ static void oscsend(const char *addr, const char *type, ...);
 static void oscflush(void);
 static void oscsendenum(const char *addr, int val, const char *const names[], size_t nameslen);
 
+/**
+ * @brief Dumps the contents of a buffer to stdout
+ *
+ * @param name The name of the buffer
+ * @param ptr The pointer to the buffer
+ * @param len The length of the buffer
+ */
 static void
 dump(const char *name, const void *ptr, size_t len)
 {
@@ -121,6 +178,14 @@ dump(const char *name, const void *ptr, size_t len)
 	putchar('\n');
 }
 
+/**
+ * @brief Writes a SysEx message to the device
+ *
+ * @param subid The sub ID of the SysEx message
+ * @param buf The buffer containing the SysEx message data
+ * @param len The length of the buffer
+ * @param sysexbuf The buffer to store the encoded SysEx message
+ */
 static void
 writesysex(int subid, const unsigned char *buf, size_t len, unsigned char *sysexbuf)
 {
@@ -137,6 +202,13 @@ writesysex(int subid, const unsigned char *buf, size_t len, unsigned char *sysex
 	writemidi(sysexbuf, sysexlen);
 }
 
+/**
+ * @brief Sets a register value in the device
+ *
+ * @param reg The register address
+ * @param val The value to set
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setreg(unsigned reg, unsigned val)
 {
@@ -159,6 +231,14 @@ setreg(unsigned reg, unsigned val)
 	return 0;
 }
 
+/**
+ * @brief Sets an integer parameter value in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setint(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -171,6 +251,15 @@ setint(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new integer parameter value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newint(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -178,6 +267,14 @@ newint(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sets a fixed-point parameter value in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setfixed(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -192,6 +289,15 @@ setfixed(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new fixed-point parameter value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newfixed(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -202,6 +308,14 @@ newfixed(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sets an enumerated parameter value in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setenum(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -235,6 +349,15 @@ setenum(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new enumerated parameter value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newenum(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -245,6 +368,14 @@ newenum(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sets a boolean parameter value in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setbool(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -257,6 +388,15 @@ setbool(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new boolean parameter value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newbool(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -264,6 +404,13 @@ newbool(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sets an audio level parameter value in the device
+ *
+ * @param reg The register address
+ * @param level The audio level value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setlevel(int reg, float level)
 {
@@ -277,6 +424,13 @@ setlevel(int reg, float level)
 	return setreg(reg, val);
 }
 
+/**
+ * @brief Sets the audio levels for an output channel
+ *
+ * @param out The output channel
+ * @param in The input channel
+ * @param mix The mix configuration
+ */
 static void
 setlevels(struct output *out, struct input *in, struct mix *mix)
 {
@@ -298,6 +452,14 @@ setlevels(struct output *out, struct input *in, struct mix *mix)
 	}
 }
 
+/**
+ * @brief Sets the mute state for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setinputmute(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -340,6 +502,14 @@ setinputmute(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sets the stereo state for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setinputstereo(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -358,6 +528,15 @@ setinputstereo(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new stereo state for an input channel as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newinputstereo(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -376,6 +555,15 @@ newinputstereo(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new stereo state for an output channel as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newoutputstereo(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -394,6 +582,14 @@ newoutputstereo(const struct oscnode *path[], const char *addr, int reg, int val
 	return 0;
 }
 
+/**
+ * @brief Sets the name for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setinputname(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -418,6 +614,14 @@ setinputname(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sets the gain for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setinputgain(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -434,6 +638,15 @@ setinputgain(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new gain value for an input channel as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newinputgain(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -441,6 +654,14 @@ newinputgain(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sets the 48V phantom power state for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setinput48v(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -453,6 +674,15 @@ setinput48v(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return -1;
 }
 
+/**
+ * @brief Sends a new 48V phantom power state or reference level for an input channel as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newinput48v_reflevel(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -483,6 +713,14 @@ newinput48v_reflevel(const struct oscnode *path[], const char *addr, int reg, in
 	return -1;
 }
 
+/**
+ * @brief Sets the Hi-Z state for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setinputhiz(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -495,6 +733,15 @@ setinputhiz(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return -1;
 }
 
+/**
+ * @brief Sends a new Hi-Z state for an input channel as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newinputhiz(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -507,6 +754,14 @@ newinputhiz(const struct oscnode *path[], const char *addr, int reg, int val)
 	return -1;
 }
 
+/**
+ * @brief Sets the loopback state for an output channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setoutputloopback(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -525,6 +780,14 @@ setoutputloopback(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sets the EQD record state for the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 seteqdrecord(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -539,6 +802,15 @@ seteqdrecord(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new DSP load value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdspload(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -555,24 +827,58 @@ newdspload(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new DSP availability value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdspavail(const struct oscnode *path[], const char *addr, int reg, int val)
 {
 	return 0;
 }
 
+/**
+ * @brief Sends a new DSP active value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdspactive(const struct oscnode *path[], const char *addr, int reg, int val)
 {
 	return 0;
 }
 
+/**
+ * @brief Sends a new ARC encoder value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newarcencoder(const struct oscnode *path[], const char *addr, int reg, int val)
 {
 	return 0;
 }
 
+/**
+ * @brief Sets a dB value in the device
+ *
+ * @param reg The register address
+ * @param db The dB value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setdb(int reg, float db)
 {
@@ -582,6 +888,13 @@ setdb(int reg, float db)
 	return setreg(reg, val);
 }
 
+/**
+ * @brief Sets a pan value in the device
+ *
+ * @param reg The register address
+ * @param pan The pan value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setpan(int reg, int pan)
 {
@@ -591,6 +904,14 @@ setpan(int reg, int pan)
 	return setreg(reg, val);
 }
 
+/**
+ * @brief Sets a mix parameter value in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setmix(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -691,6 +1012,15 @@ setmix(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new mix parameter value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newmix(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -766,6 +1096,12 @@ newmix(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Gets the sample rate corresponding to a value
+ *
+ * @param val The value representing the sample rate
+ * @return The sample rate in Hz
+ */
 static long
 getsamplerate(int val)
 {
@@ -783,6 +1119,15 @@ getsamplerate(int val)
 	return val > 0 && val < LEN(samplerate) ? samplerate[val] : 0;
 }
 
+/**
+ * @brief Sends a new sample rate value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newsamplerate(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -794,6 +1139,15 @@ newsamplerate(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new dynamics level value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param unused Unused parameter
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdynlevel(const struct oscnode *path[], const char *unused, int reg, int val)
 {
@@ -818,6 +1172,15 @@ newdynlevel(const struct oscnode *path[], const char *unused, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec status value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecstatus(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -849,6 +1212,15 @@ newdurecstatus(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec time value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurectime(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -860,6 +1232,15 @@ newdurectime(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec USB status value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecusbstatus(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -880,6 +1261,15 @@ newdurecusbstatus(const struct oscnode *path[], const char *addr, int reg, int v
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec total space value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurectotalspace(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -894,6 +1284,15 @@ newdurectotalspace(const struct oscnode *path[], const char *addr, int reg, int 
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec free space value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecfreespace(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -908,6 +1307,15 @@ newdurecfreespace(const struct oscnode *path[], const char *addr, int reg, int v
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec files length value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecfileslen(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -925,6 +1333,14 @@ newdurecfileslen(const struct oscnode *path[], const char *addr, int reg, int va
 	return 0;
 }
 
+/**
+ * @brief Sets the durec file value in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setdurecfile(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -937,6 +1353,15 @@ setdurecfile(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec file value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecfile(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -948,6 +1373,15 @@ newdurecfile(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec next value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecnext(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -976,6 +1410,15 @@ newdurecnext(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec record time value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecrecordtime(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -987,6 +1430,15 @@ newdurecrecordtime(const struct oscnode *path[], const char *addr, int reg, int 
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec index value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecindex(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -996,6 +1448,15 @@ newdurecindex(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec name value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecname(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -1016,6 +1477,15 @@ newdurecname(const struct oscnode *path[], const char *addr, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec info value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param unused Unused parameter
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdurecinfo(const struct oscnode *path[], const char *unused, int reg, int val)
 {
@@ -1041,6 +1511,15 @@ newdurecinfo(const struct oscnode *path[], const char *unused, int reg, int val)
 	return 0;
 }
 
+/**
+ * @brief Sends a new durec length value as an OSC message
+ *
+ * @param path The OSC address path
+ * @param unused Unused parameter
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 newdureclength(const struct oscnode *path[], const char *unused, int reg, int val)
 {
@@ -1057,6 +1536,14 @@ newdureclength(const struct oscnode *path[], const char *unused, int reg, int va
 	return 0;
 }
 
+/**
+ * @brief Sets the durec stop state in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setdurecstop(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -1066,6 +1553,14 @@ setdurecstop(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sets the durec play state in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setdurecplay(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -1075,6 +1570,14 @@ setdurecplay(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sets the durec record state in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setdurecrecord(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -1084,6 +1587,14 @@ setdurecrecord(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sets the durec delete state in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setdurecdelete(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -1096,6 +1607,14 @@ setdurecdelete(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Sets the refresh state in the device
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the value
+ * @return 0 on success, non-zero on failure
+ */
 static int
 setrefresh(const struct oscnode *path[], int reg, struct oscmsg *msg)
 {
@@ -1118,6 +1637,15 @@ setrefresh(const struct oscnode *path[], int reg, struct oscmsg *msg)
 	return 0;
 }
 
+/**
+ * @brief Handles the completion of a refresh operation
+ *
+ * @param path The OSC address path
+ * @param addr The OSC address
+ * @param reg The register address
+ * @param val The value to send
+ * @return 0 on success, non-zero on failure
+ */
 static int
 refreshdone(const struct oscnode *path[], const char *addr, int reg, int val)
 {
@@ -1613,6 +2141,13 @@ static const struct oscnode tree[] = {
 	{0},
 };
 
+/**
+ * @brief Matches a pattern with a string
+ *
+ * @param pat The pattern to match
+ * @param str The string to match against
+ * @return The next character in the pattern if matched, NULL otherwise
+ */
 static const char *
 match(const char *pat, const char *str)
 {
@@ -1627,6 +2162,13 @@ match(const char *pat, const char *str)
 	}
 }
 
+/**
+ * @brief Handles an OSC message
+ *
+ * @param buf The buffer containing the OSC message
+ * @param len The length of the buffer
+ * @return 0 on success, non-zero on failure
+ */
 int handleosc(const unsigned char *buf, size_t len)
 {
 	const char *addr, *next;
@@ -1688,6 +2230,13 @@ int handleosc(const unsigned char *buf, size_t len)
 static unsigned char oscbuf[8192];
 static struct oscmsg oscmsg;
 
+/**
+ * @brief Sends an OSC message
+ *
+ * @param addr The OSC address
+ * @param type The OSC type tags
+ * @param ... The OSC arguments
+ */
 static void
 oscsend(const char *addr, const char *type, ...)
 {
@@ -1736,6 +2285,14 @@ oscsend(const char *addr, const char *type, ...)
 	putbe32(len, oscmsg.buf - len - 4);
 }
 
+/**
+ * @brief Sends an enumerated value as an OSC message
+ *
+ * @param addr The OSC address
+ * @param val The enumerated value
+ * @param names The array of enumeration names
+ * @param nameslen The length of the array
+ */
 static void
 oscsendenum(const char *addr, int val, const char *const names[], size_t nameslen)
 {
@@ -1750,6 +2307,9 @@ oscsendenum(const char *addr, int val, const char *const names[], size_t namesle
 	}
 }
 
+/**
+ * @brief Flushes the OSC message buffer
+ */
 static void
 oscflush(void)
 {
@@ -1760,6 +2320,12 @@ oscflush(void)
 	}
 }
 
+/**
+ * @brief Handles register values received from the device
+ *
+ * @param payload The buffer containing the register values
+ * @param len The length of the buffer
+ */
 static void
 handleregs(uint_least32_t *payload, size_t len)
 {
@@ -1818,6 +2384,13 @@ handleregs(uint_least32_t *payload, size_t len)
 	}
 }
 
+/**
+ * @brief Handles audio level values received from the device
+ *
+ * @param subid The sub ID of the SysEx message
+ * @param payload The buffer containing the audio level values
+ * @param len The length of the buffer
+ */
 static void
 handlelevels(int subid, uint_least32_t *payload, size_t len)
 {
@@ -1886,6 +2459,13 @@ handlelevels(int subid, uint_least32_t *payload, size_t len)
 	}
 }
 
+/**
+ * @brief Handles a SysEx message received from the device
+ *
+ * @param buf The buffer containing the SysEx message
+ * @param len The length of the buffer
+ * @param payload The buffer to store the decoded payload
+ */
 void handlesysex(const unsigned char *buf, size_t len, uint_least32_t *payload)
 {
 	struct sysex sysex;
@@ -1925,6 +2505,11 @@ void handlesysex(const unsigned char *buf, size_t len, uint_least32_t *payload)
 	oscflush();
 }
 
+/**
+ * @brief Handles a timer event
+ *
+ * @param levels Whether to request audio levels
+ */
 void handletimer(bool levels)
 {
 	static int serial;
@@ -1940,6 +2525,12 @@ void handletimer(bool levels)
 	serial = (serial + 1) & 0xf;
 }
 
+/**
+ * @brief Initializes the OSCMix application
+ *
+ * @param port The device identifier string
+ * @return 0 on success, non-zero on failure
+ */
 int init(const char *port)
 {
 	extern const struct device ffucxii;
