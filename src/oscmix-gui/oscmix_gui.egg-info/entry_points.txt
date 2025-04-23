@@ -1,0 +1,2 @@
+[console_scripts]
+oscmix-gui = oscmix_gui.main:run

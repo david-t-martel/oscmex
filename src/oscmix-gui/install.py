@@ -56,11 +56,51 @@ def create_virtual_environment(venv_dir_path):
     else:
         print(f"Creating virtual environment '{VENV_DIR}'...")
         try:
-            venv.create(venv_dir_path, with_pip=True)
+            # Using subprocess instead of venv module directly to ensure proper creation
+            subprocess.run(
+                [sys.executable, "-m", "venv", "--system-site-packages", venv_dir_path],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             print("Virtual environment created successfully.")
         except Exception as e:
             print(f"ERROR: Failed to create virtual environment: {e}")
             sys.exit(1)
+
+
+def verify_venv(venv_path):
+    """Verify that the virtual environment was created correctly."""
+    venv_exec_paths = get_venv_paths(venv_path)
+
+    # Check if Python exists in the venv
+    if not os.path.exists(venv_exec_paths["python"]):
+        print(f"Warning: Python executable not found at {venv_exec_paths['python']}")
+        # Try to find it in a different location
+        if platform.system() == "Windows":
+            alt_python = os.path.join(venv_path, "python.exe")
+            if os.path.exists(alt_python):
+                print(f"Found Python at alternate location: {alt_python}")
+                venv_exec_paths["python"] = alt_python
+            else:
+                # Windows Python 3.11+ might use a different structure
+                # Try creating again with system Python directly
+                print("Attempting to recreate virtual environment...")
+                subprocess.run(
+                    [sys.executable, "-m", "venv", venv_path],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                if not os.path.exists(venv_exec_paths["python"]):
+                    print(f"ERROR: Could not create a working virtual environment.")
+                    print(
+                        f"Please try creating it manually with: python -m venv {VENV_DIR}"
+                    )
+                    sys.exit(1)
+
+    # If we get here, Python exists in the venv
+    return venv_exec_paths
 
 
 def run_command(command, check=True, cwd=None, venv_paths=None):
@@ -128,48 +168,57 @@ def main():
     # 2. Create Virtual Environment
     venv_path = os.path.join(project_root, VENV_DIR)
     create_virtual_environment(venv_path)
-    venv_exec_paths = get_venv_paths(venv_path)
 
-    # Verify essential venv executables exist
-    if not os.path.exists(venv_exec_paths["python"]):
-        print(
-            f"ERROR: Python executable not found in venv: {venv_exec_paths['python']}"
-        )
-        sys.exit(1)
+    # 3. Verify virtual environment was created correctly
+    venv_exec_paths = verify_venv(venv_path)
+
+    # Check for pip in the virtual environment
     if not os.path.exists(venv_exec_paths["pip"]):
-        print(f"ERROR: Pip executable not found in venv: {venv_exec_paths['pip']}")
-        # Attempt upgrade? Might be complex if pip itself is broken.
-        # Let's try upgrading pip using the venv's python first.
-        print("Attempting to ensure pip is installed/upgraded...")
-        run_command(
-            ["python", "-m", "ensurepip", "--upgrade"], venv_paths=venv_exec_paths
-        )
-        # Re-check after ensurepip
+        print(f"WARNING: Pip executable not found in venv: {venv_exec_paths['pip']}")
+        # Attempt to ensure pip is installed
+        print("Attempting to ensure pip is installed...")
+        run_command([venv_exec_paths["python"], "-m", "ensurepip", "--upgrade"])
+
+        # If that doesn't work, try installing pip directly
         if not os.path.exists(venv_exec_paths["pip"]):
-            print(f"ERROR: Pip still not found after ensurepip attempt.")
+            print("Attempting to install pip directly...")
+            run_command(
+                [venv_exec_paths["python"], "-m", "pip", "install", "--upgrade", "pip"]
+            )
+
+        # Re-check after attempts
+        if not os.path.exists(venv_exec_paths["pip"]):
+            print(f"ERROR: Unable to install pip in the virtual environment.")
+            print(f"Please try installing manually after activating the environment.")
             sys.exit(1)
 
-    # 3. Install Requirements
+    # 4. Install Requirements
     print(f"\n--- Installing dependencies from {REQUIREMENTS_FILE} ---")
     requirements_path = os.path.join(project_root, REQUIREMENTS_FILE)
     if not os.path.exists(requirements_path):
         print(f"ERROR: '{REQUIREMENTS_FILE}' not found in {project_root}")
         sys.exit(1)
-    # Use the pip executable from the virtual environment
-    run_command(["pip", "install", "-r", requirements_path], venv_paths=venv_exec_paths)
+
+    # Use the python executable from the virtual environment to run pip
+    run_command(
+        [venv_exec_paths["python"], "-m", "pip", "install", "-r", requirements_path]
+    )
     print("Dependencies installed successfully.")
 
-    # 4. Install the oscmix-gui package itself
+    # 5. Install the oscmix-gui package itself
     print(f"\n--- Installing oscmix-gui package ---")
     setup_py_path = os.path.join(project_root, "setup.py")
     if not os.path.exists(setup_py_path):
         print(f"ERROR: 'setup.py' not found in {project_root}")
         sys.exit(1)
-    # Use pip to install the package defined by setup.py in the current directory (.)
-    run_command(["pip", "install", "."], cwd=project_root, venv_paths=venv_exec_paths)
+
+    # Use python from venv to run pip install
+    run_command(
+        [venv_exec_paths["python"], "-m", "pip", "install", "."], cwd=project_root
+    )
     print("oscmix-gui installed successfully.")
 
-    # 5. Print Final Instructions
+    # 6. Print Final Instructions
     print("\n--- Setup Complete ---")
     print("To run the application:")
     print("1. Activate the virtual environment:")
