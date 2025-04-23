@@ -5,6 +5,7 @@
 `oscmix` is a command-line application that acts as a bridge between OSC (Open Sound Control) messages and RME audio interfaces. It enables remote control of RME mixer functionality via network communications, translating OSC messages into MIDI SysEx commands that RME devices understand.
 
 The application allows for:
+
 - Controlling mixer settings (volume, mute, pan, etc.)
 - Adjusting device parameters (sample rate, clock source)
 - Applying effects (EQ, dynamics, reverb, etc.)
@@ -93,6 +94,7 @@ oscmix -r 0.0.0.0 -p "Fireface UCX II"
 ```
 
 Example:
+
 ```
 /output/1/volume -10.5
 /input/3/mute 1
@@ -112,6 +114,7 @@ Simply sending an OSC message to a parameter address without arguments will requ
 ## Supported Devices
 
 Currently, the application supports:
+
 - RME Fireface UCX II
 
 Support for additional RME devices can be added by implementing their device descriptors in the `device.c` file.

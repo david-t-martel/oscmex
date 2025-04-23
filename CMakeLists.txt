@@ -560,10 +560,10 @@ if(DOXYGEN_FOUND)
 			message(STATUS "Doxygen configuration file not found, skipping documentation build")
 			set(BUILD_DOCUMENTATION OFF CACHE BOOL "Build Doxygen documentation" FORCE)
 		endif()
+	else()
+		message(STATUS "Doxygen not found, documentation will not be built")
+		set(BUILD_DOCUMENTATION OFF CACHE BOOL "Build Doxygen documentation" FORCE)
 	endif()
-else()
-	message(STATUS "Doxygen not found, documentation will not be built")
-	set(BUILD_DOCUMENTATION OFF CACHE BOOL "Build Doxygen documentation" FORCE)
 endif()
 
 # Build additional tools
@@ -603,3 +603,73 @@ install(DIRECTORY src/lo/
 	DESTINATION include/lo
 	FILES_MATCHING PATTERN "*.h"
 )
+
+# Set C standard
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+# Enable verbose output for debugging
+# set(CMAKE_VERBOSE_MAKEFILE ON)
+
+# Set global compiler warnings
+if(MSVC)
+	add_compile_options(/W4)
+else()
+	add_compile_options(-Wall -Wextra -pedantic)
+endif()
+
+# Detect platform
+if(WIN32)
+	message(STATUS "Configuring for Windows")
+	set(PLATFORM_LIBS ws2_32 winmm)
+	add_definitions(-D_WIN32_WINNT=0x0601)
+elseif(APPLE)
+	message(STATUS "Configuring for macOS")
+	set(PLATFORM_LIBS pthread)
+
+	# MacOS may need CoreMIDI for MIDI support
+	find_library(COREMIDI_LIBRARY CoreMIDI)
+
+	if(COREMIDI_LIBRARY)
+		list(APPEND PLATFORM_LIBS ${COREMIDI_LIBRARY})
+	endif()
+else()
+	message(STATUS "Configuring for Linux/Unix")
+	set(PLATFORM_LIBS pthread rt)
+
+	# Check for ALSA (for Linux MIDI support)
+	find_package(ALSA)
+
+	if(ALSA_FOUND)
+		include_directories(${ALSA_INCLUDE_DIRS})
+		list(APPEND PLATFORM_LIBS ${ALSA_LIBRARIES})
+		add_definitions(-DHAVE_ALSA)
+	endif()
+endif()
+
+# Include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/oscmix)
+
+# Source files
+set(SOURCES
+	src/oscmix/main.c
+	src/oscmix/oscmix.c
+	src/oscmix/osc.c
+	src/oscmix/socket.c
+	src/oscmix/sysex.c
+	src/oscmix/intpack.c
+	src/oscmix/device.c
+	src/oscmix/util.c
+)
+
+# Add executable
+add_executable(oscmix ${SOURCES})
+
+# Link libraries
+target_link_libraries(oscmix m ${PLATFORM_LIBS})
+
+# Installation rules
+install(TARGETS oscmix DESTINATION bin)
+
+# Show summary
+message(STATUS "Platform libraries: ${PLATFORM_LIBS}")
