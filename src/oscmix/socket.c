@@ -10,127 +10,157 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-int sockopen(char *addr, int passive)
+socket_t sockopen(const char *addr, int recv)
 {
-	WSADATA wsaData;
-	struct addrinfo hint, *ais, *ai;
-	char *type, *port, *sep, *end;
-	int err, sock;
-	long val;
+	socket_t fd;
+	const char *type, *host, *port;
+	struct addrinfo hints, *res, *ai;
+	int err, optval;
+	char *addrstr, *p;
 
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-	{
-		fatal("WSAStartup failed");
-	}
+	addrstr = strdup(addr);
+	if (!addrstr)
+		fatal("strdup:");
 
-	val = strtol(addr, &end, 0);
-	if (*addr && !*end && val >= 0 && val < INT_MAX)
+	type = addrstr;
+	p = strchr(addrstr, '!');
+	if (!p)
 	{
-		return val;
+		free(addrstr);
+		fatal("invalid address format '%s'", addr);
 	}
+	*p++ = '\0';
+	host = p;
+	p = strchr(p, '!');
+	if (!p)
+	{
+		free(addrstr);
+		fatal("invalid address format '%s'", addr);
+	}
+	*p++ = '\0';
+	port = p;
 
-	type = addr;
-	addr = NULL;
-	port = NULL;
-	sep = strchr(type, '!');
-	if (sep)
-	{
-		*sep = '\0';
-		addr = sep + 1;
-		sep = strchr(addr, '!');
-		if (sep)
-		{
-			*sep = '\0';
-			port = sep + 1;
-			if (*port == '\0')
-				port = NULL;
-		}
-		if (*addr == '\0')
-			addr = NULL;
-	}
-	sock = INVALID_SOCKET;
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
 	if (strcmp(type, "udp") == 0)
 	{
-		memset(&hint, 0, sizeof hint);
-		hint.ai_flags = passive ? AI_PASSIVE : 0;
-		hint.ai_family = AF_UNSPEC;
-		hint.ai_socktype = SOCK_DGRAM;
-		hint.ai_protocol = IPPROTO_UDP;
-		err = getaddrinfo(addr, port, &hint, &ais);
-		if (err != 0)
-		{
-			fatal("getaddrinfo: %s", gai_strerror(err));
-		}
-		for (ai = ais; ai; ai = ai->ai_next)
-		{
-			sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-			if (sock != INVALID_SOCKET)
-			{
-				if (passive)
-				{
-					union
-					{
-						struct ip_mreq v4;
-						struct ipv6_mreq v6;
-					} mreq;
-					bool multicast = false;
-
-					switch (ai->ai_family)
-					{
-					case AF_INET:
-						mreq.v4.imr_multiaddr = ((struct sockaddr_in *)ai->ai_addr)->sin_addr;
-						if ((((unsigned char *)&mreq.v4.imr_multiaddr)[0] & 0xf0) == 0xe0)
-						{
-							mreq.v4.imr_interface.s_addr = INADDR_ANY;
-							if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq.v4, sizeof mreq.v4) != 0)
-							{
-								fatal("setsockopt IP_ADD_MEMBERSHIP:");
-							}
-							multicast = true;
-						}
-						break;
-					case AF_INET6:
-						mreq.v6.ipv6mr_multiaddr = ((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr;
-						if (mreq.v6.ipv6mr_multiaddr.s6_addr[0] == 0xff)
-						{
-							mreq.v6.ipv6mr_interface = 0;
-							if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char *)&mreq.v6, sizeof mreq.v6) != 0)
-							{
-								fatal("setsockopt IPV6_ADD_MEMBERSHIP:");
-							}
-							multicast = true;
-						}
-						break;
-					}
-
-					if (multicast && setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&(int){1}, sizeof(int)) != 0)
-					{
-						fatal("setsockopt SO_REUSEADDR:");
-					}
-					if (bind(sock, ai->ai_addr, (int)ai->ai_addrlen) == 0)
-					{
-						break;
-					}
-				}
-				else if (connect(sock, ai->ai_addr, (int)ai->ai_addrlen) == 0)
-				{
-					break;
-				}
-				closesocket(sock);
-				sock = INVALID_SOCKET;
-			}
-		}
-		freeaddrinfo(ais);
-		if (sock == INVALID_SOCKET)
-		{
-			fatal("connect:");
-		}
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_protocol = IPPROTO_UDP;
+	}
+	else if (strcmp(type, "tcp") == 0)
+	{
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
 	}
 	else
 	{
-		fatal("unsupported address type '%s'", type);
+		free(addrstr);
+		fatal("unknown socket type '%s'", type);
 	}
 
-	WSACleanup();
-	return sock;
+	if (recv)
+		hints.ai_flags = AI_PASSIVE;
+
+	err = getaddrinfo(recv && *host == '*' ? NULL : host, port, &hints, &res);
+	if (err)
+	{
+#ifdef _WIN32
+		fatal("getaddrinfo: %d", WSAGetLastError());
+#else
+		fatal("getaddrinfo: %s", gai_strerror(err));
+#endif
+	}
+
+	for (ai = res; ai; ai = ai->ai_next)
+	{
+		fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+		if (fd == SOCKET_ERROR_VALUE)
+			continue;
+
+		if (recv)
+		{
+			optval = 1;
+#ifdef _WIN32
+			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval, sizeof optval) < 0)
+			{
+#else
+			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval) < 0)
+			{
+#endif
+				perror("setsockopt");
+				socket_close(fd);
+				continue;
+			}
+
+			if (*host != '*')
+			{
+				/* check if multicast */
+				if (ai->ai_family == AF_INET)
+				{
+					struct sockaddr_in *sin;
+					sin = (struct sockaddr_in *)ai->ai_addr;
+					if (IN_MULTICAST(ntohl(sin->sin_addr.s_addr)))
+					{
+						struct ip_mreq mreq;
+						mreq.imr_multiaddr = sin->sin_addr;
+						mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+						if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+#ifdef _WIN32
+									   (const char *)&mreq,
+#else
+									   &mreq,
+#endif
+									   sizeof mreq) < 0)
+						{
+							perror("setsockopt");
+							socket_close(fd);
+							continue;
+						}
+					}
+				}
+				else if (ai->ai_family == AF_INET6)
+				{
+					/* TODO: IPv6 multicast */
+				}
+			}
+
+			if (bind(fd, ai->ai_addr, ai->ai_addrlen) < 0)
+			{
+#ifdef _WIN32
+				closesocket(fd);
+#else
+				close(fd);
+#endif
+				continue;
+			}
+		}
+		else
+		{
+			if (connect(fd, ai->ai_addr, ai->ai_addrlen) < 0)
+			{
+#ifdef _WIN32
+				closesocket(fd);
+#else
+				close(fd);
+#endif
+				continue;
+			}
+		}
+		break;
+	}
+
+	if (!ai)
+	{
+		freeaddrinfo(res);
+		free(addrstr);
+#ifdef _WIN32
+		fatal("could not open socket: %d", WSAGetLastError());
+#else
+		fatal("could not open socket: %s", strerror(errno));
+#endif
+	}
+
+	freeaddrinfo(res);
+	free(addrstr);
+	return fd;
 }

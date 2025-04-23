@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <mmsystem.h>
 #include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -21,11 +22,13 @@ typedef SSIZE_T ssize_t;
 #include "util.h"
 
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "winmm.lib")
 
 extern int dflag;
 static int lflag;
 static SOCKET rfd, wfd;
-static HANDLE hMidiIn, hMidiOut;
+static HMIDIIN hMidiIn;
+static HMIDIOUT hMidiOut;
 
 static void usage(void)
 {
@@ -33,52 +36,71 @@ static void usage(void)
     exit(1);
 }
 
+// MIDI callback function for Windows
+static void CALLBACK midiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance,
+                                DWORD_PTR dwParam1, DWORD_PTR dwParam2)
+{
+    static unsigned char sysexBuffer[8192];
+    static size_t sysexPos = 0;
+    uint_least32_t payload[sizeof(sysexBuffer) / 4];
+
+    if (wMsg == MIM_DATA)
+    {
+        // Handle short MIDI messages
+        DWORD dwMidiMessage = (DWORD)dwParam1;
+        // Process if needed
+    }
+    else if (wMsg == MIM_LONGDATA)
+    {
+        // Handle SysEx messages
+        MIDIHDR *pMidiHdr = (MIDIHDR *)dwParam1;
+
+        if (pMidiHdr->dwBytesRecorded > 0)
+        {
+            // Process SysEx data
+            handlesysex(pMidiHdr->lpData, pMidiHdr->dwBytesRecorded, payload);
+
+            // Prepare the buffer for reuse
+            pMidiHdr->dwBytesRecorded = 0;
+            midiInPrepareHeader(hMidiIn, pMidiHdr, sizeof(MIDIHDR));
+            midiInAddBuffer(hMidiIn, pMidiHdr, sizeof(MIDIHDR));
+        }
+    }
+}
+
 static unsigned __stdcall midiread(void *arg)
 {
     unsigned char data[8192], *datapos, *dataend, *nextpos;
     uint_least32_t payload[sizeof data / 4];
-    DWORD bytesRead;
+    MIDIHDR midiHdr;
+    MMRESULT mmResult;
 
-    dataend = data;
+    // Set up the MIDI input header
+    ZeroMemory(&midiHdr, sizeof(MIDIHDR));
+    midiHdr.lpData = data;
+    midiHdr.dwBufferLength = sizeof(data);
+    midiHdr.dwFlags = 0;
+
+    mmResult = midiInPrepareHeader(hMidiIn, &midiHdr, sizeof(MIDIHDR));
+    if (mmResult != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "midiInPrepareHeader failed: %d\n", mmResult);
+        return 1;
+    }
+
+    mmResult = midiInAddBuffer(hMidiIn, &midiHdr, sizeof(MIDIHDR));
+    if (mmResult != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "midiInAddBuffer failed: %d\n", mmResult);
+        return 1;
+    }
+
+    // Main loop to wait for messages
     for (;;)
     {
-        bytesRead = midiInGetMessage(hMidiIn, dataend, sizeof(data) - (dataend - data));
-        if (bytesRead == 0)
-        {
-            fprintf(stderr, "midiInGetMessage failed\n");
-            exit(1);
-        }
-        dataend += bytesRead;
-        datapos = data;
-        for (;;)
-        {
-            assert(datapos <= dataend);
-            datapos = memchr(datapos, 0xf0, dataend - datapos);
-            if (!datapos)
-            {
-                dataend = data;
-                break;
-            }
-            nextpos = memchr(datapos + 1, 0xf7, dataend - datapos - 1);
-            if (!nextpos)
-            {
-                if (dataend == data + sizeof data)
-                {
-                    fprintf(stderr, "sysex packet too large; dropping\n");
-                    dataend = data;
-                }
-                else
-                {
-                    memmove(data, datapos, dataend - datapos);
-                    dataend -= datapos - data;
-                }
-                break;
-            }
-            ++nextpos;
-            handlesysex(datapos, nextpos - datapos, payload);
-            datapos = nextpos;
-        }
+        Sleep(10); // Short sleep to reduce CPU usage
     }
+
     return 0;
 }
 
@@ -104,18 +126,60 @@ static unsigned __stdcall oscread(void *arg)
 void writemidi(const void *buf, size_t len)
 {
     const unsigned char *pos = buf;
-    DWORD bytesWritten;
+    MMRESULT mmResult;
 
-    while (len > 0)
+    if (buf == NULL || len == 0)
     {
-        bytesWritten = midiOutShortMsg(hMidiOut, *(DWORD *)pos);
-        if (bytesWritten != MMSYSERR_NOERROR)
+        return;
+    }
+
+    // If it's a SysEx message (starts with 0xF0)
+    if (pos[0] == 0xF0)
+    {
+        MIDIHDR midiHdr;
+
+        // Set up the MIDI output header
+        ZeroMemory(&midiHdr, sizeof(MIDIHDR));
+        midiHdr.lpData = (LPSTR)buf;
+        midiHdr.dwBufferLength = len;
+        midiHdr.dwFlags = 0;
+
+        mmResult = midiOutPrepareHeader(hMidiOut, &midiHdr, sizeof(MIDIHDR));
+        if (mmResult != MMSYSERR_NOERROR)
         {
-            fprintf(stderr, "midiOutShortMsg failed\n");
-            exit(1);
+            fprintf(stderr, "midiOutPrepareHeader failed: %d\n", mmResult);
+            return;
         }
-        pos += sizeof(DWORD);
-        len -= sizeof(DWORD);
+
+        mmResult = midiOutLongMsg(hMidiOut, &midiHdr, sizeof(MIDIHDR));
+        if (mmResult != MMSYSERR_NOERROR)
+        {
+            fprintf(stderr, "midiOutLongMsg failed: %d\n", mmResult);
+        }
+
+        // Wait for the message to be sent
+        while (!(midiHdr.dwFlags & MHDR_DONE))
+        {
+            Sleep(1);
+        }
+
+        mmResult = midiOutUnprepareHeader(hMidiOut, &midiHdr, sizeof(MIDIHDR));
+        if (mmResult != MMSYSERR_NOERROR)
+        {
+            fprintf(stderr, "midiOutUnprepareHeader failed: %d\n", mmResult);
+        }
+    }
+    else
+    {
+        // Short MIDI message
+        DWORD message = 0;
+        memcpy(&message, pos, min(len, 4)); // Copy up to 4 bytes
+
+        mmResult = midiOutShortMsg(hMidiOut, message);
+        if (mmResult != MMSYSERR_NOERROR)
+        {
+            fprintf(stderr, "midiOutShortMsg failed: %d\n", mmResult);
+        }
     }
 }
 
@@ -135,13 +199,45 @@ void writeosc(const void *buf, size_t len)
     }
 }
 
+// Open a MIDI device by name
+static MMRESULT openMidiDevice(const char *name, UINT *deviceId)
+{
+    UINT numDevs = midiInGetNumDevs();
+    MIDIINCAPS caps;
+    *deviceId = MIDI_MAPPER; // Default
+
+    for (UINT i = 0; i < numDevs; i++)
+    {
+        if (midiInGetDevCaps(i, &caps, sizeof(MIDIINCAPS)) == MMSYSERR_NOERROR)
+        {
+            if (strstr(caps.szPname, name) != NULL)
+            {
+                *deviceId = i;
+                return MMSYSERR_NOERROR;
+            }
+        }
+    }
+
+    // Not found, try as a device ID number
+    char *endptr;
+    long num = strtol(name, &endptr, 10);
+    if (*name != '\0' && *endptr == '\0' && num >= 0 && num < numDevs)
+    {
+        *deviceId = (UINT)num;
+        return MMSYSERR_NOERROR;
+    }
+
+    return MMSYSERR_ERROR;
+}
+
 int main(int argc, char *argv[])
 {
-    static char defrecvaddr[] = "udp!127.0.0.1!7222";
-    static char defsendaddr[] = "udp!127.0.0.1!8222";
-    static char mcastaddr[] = "udp!224.0.0.1!8222";
+    static char defrecvaddr[] = "127.0.0.1";
+    static char defsendaddr[] = "127.0.0.1";
+    static char mcastaddr[] = "224.0.0.1";
     static const unsigned char refreshosc[] = "/refresh\0\0\0\0,\0\0\0";
-    int err, sig;
+    MMRESULT mmResult;
+    UINT midiDeviceId;
     char *recvaddr, *sendaddr;
     char recvport[6] = "7222";
     char sendport[6] = "8222";
@@ -207,8 +303,46 @@ int main(int argc, char *argv[])
         if (!port)
             fatal("device is not specified; pass -p or set MIDIPORT");
     }
-    if (init(port) != 0)
+
+    // Open MIDI devices
+    if (openMidiDevice(port, &midiDeviceId) != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "Could not find MIDI device: %s\n", port);
         return 1;
+    }
+
+    mmResult = midiInOpen(&hMidiIn, midiDeviceId, (DWORD_PTR)midiInProc, 0, CALLBACK_FUNCTION);
+    if (mmResult != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "midiInOpen failed: %d\n", mmResult);
+        return 1;
+    }
+
+    mmResult = midiOutOpen(&hMidiOut, midiDeviceId, 0, 0, 0);
+    if (mmResult != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "midiOutOpen failed: %d\n", mmResult);
+        midiInClose(hMidiIn);
+        return 1;
+    }
+
+    // Start MIDI input
+    mmResult = midiInStart(hMidiIn);
+    if (mmResult != MMSYSERR_NOERROR)
+    {
+        fprintf(stderr, "midiInStart failed: %d\n", mmResult);
+        midiOutClose(hMidiOut);
+        midiInClose(hMidiIn);
+        return 1;
+    }
+
+    if (init(port) != 0)
+    {
+        midiInStop(hMidiIn);
+        midiOutClose(hMidiOut);
+        midiInClose(hMidiIn);
+        return 1;
+    }
 
     midireader = (HANDLE)_beginthreadex(NULL, 0, midiread, &wfd, 0, NULL);
     if (midireader == NULL)
@@ -225,6 +359,10 @@ int main(int argc, char *argv[])
         handletimer(lflag == 0);
     }
 
+    // Cleanup (never reached in this implementation)
+    midiInStop(hMidiIn);
+    midiOutClose(hMidiOut);
+    midiInClose(hMidiIn);
     WSACleanup();
     return 0;
 }

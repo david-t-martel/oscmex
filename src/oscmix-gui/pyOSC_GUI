@@ -1,0 +1,798 @@
+# oscmix_gui.py
+import sys
+import time
+import threading
+import queue
+from collections import defaultdict
+
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QGridLayout, QLabel, QLineEdit, QPushButton, QSlider, QCheckBox,
+    QProgressBar, QGroupBox, QStatusBar, QMessageBox, QTextEdit
+)
+from PySide6.QtCore import Qt, QThread, Signal, Slot, QObject, QTimer, QMetaObject, Q_ARG
+from PySide6.QtGui import QColor, QPalette # For status indication
+
+# Attempt to import python-osc, provide helpful error if missing
+try:
+    from pythonosc.dispatcher import Dispatcher
+    from pythonosc.osc_server import BlockingOSCUDPServer
+    from pythonosc.udp_client import SimpleUDPClient
+except ImportError:
+    print("ERROR: 'python-osc' library not found.")
+    print("Please install it using: pip install python-osc")
+    sys.exit(1)
+
+# --- Configuration ---
+# !!! IMPORTANT: Verify these OSC addresses from oscmix documentation/source !!!
+# --- Assumed oscmix OSC Address Patterns (MODIFY THESE!) ---
+# Using 1-based index based on typical OSC patterns, adjust if oscmix uses 0-based
+# Check oscmix documentation for the exact paths it expects and provides.
+OSC_INPUT_GAIN = "/input/{}/gain"      # Assumed: float 0.0-1.0
+OSC_INPUT_LINK = "/input/{}/link"       # Assumed: int 0/1 (sent to odd channel)
+OSC_INPUT_METER = "/input/{}/meter"     # Assumed: float 0.0-1.0 (peak)
+
+OSC_OUTPUT_GAIN = "/output/{}/gain"     # Assumed: float 0.0-1.0
+OSC_OUTPUT_LINK = "/output/{}/link"      # Assumed: int 0/1 (sent to odd channel)
+OSC_OUTPUT_METER = "/output/{}/meter"    # Assumed: float 0.0-1.0 (peak)
+
+# --- Connection Defaults (Likely for local oscmix server) ---
+DEFAULT_OSCMIX_IP = "127.0.0.1"     # IP where oscmix server is running
+DEFAULT_OSCMIX_SEND_PORT = 8000     # Port oscmix server LISTENS on (VERIFY THIS from oscmix output/docs)
+DEFAULT_LISTEN_IP = "0.0.0.0"       # IP this GUI listens on (use 0.0.0.0 to listen on all interfaces)
+DEFAULT_LISTEN_PORT = 9001          # Port this GUI listens on (oscmix needs to send replies/meters here)
+
+# --- Channel Counts (Adjust if your UCX II setup differs or oscmix exposes differently) ---
+NUM_INPUT_CHANNELS = 8
+NUM_OUTPUT_CHANNELS = 8
+
+# GUI Update Rates
+METER_GUI_UPDATE_RATE_HZ = 25 # Update GUI meters N times per second
+METER_GUI_UPDATE_INTERVAL_MS = int(1000 / METER_GUI_UPDATE_RATE_HZ)
+
+# --- Helper Functions ---
+def float_to_slider(val):
+    """Converts a float (0.0-1.0) to an integer slider value (0-100)."""
+    try:
+        # Ensure input is float, clamp between 0.0 and 1.0, then scale
+        return int(max(0.0, min(1.0, float(val))) * 100)
+    except (ValueError, TypeError):
+        # Return default value if conversion fails
+        return 0
+
+def slider_to_float(val):
+    """Converts an integer slider value (0-100) to a float (0.0-1.0)."""
+    return float(val) / 100.0
+
+#=============================================================================
+# OSC Communication Handler Class
+#=============================================================================
+class OSCHandler(QObject):
+    """
+    Handles OSC sending and receiving in a separate thread.
+    Communicates with the main GUI thread via Qt signals.
+    """
+    # Signals to send received data safely to the GUI thread
+    connected = Signal()
+    disconnected = Signal(str) # Carries reason for disconnection
+    message_received_signal = Signal(str, list) # Generic signal for logging all incoming messages
+
+    # Specific signals for updating GUI elements based on received OSC data
+    meter_received = Signal(str, int, float) # type ('input'/'output'), channel_idx (0-based), value (0.0-1.0)
+    gain_received = Signal(str, int, float)  # type, channel_idx (0-based), value (0.0-1.0)
+    link_received = Signal(str, int, bool)   # type, channel_idx (0-based, odd channel), value (True/False)
+
+    def __init__(self, listen_ip, listen_port, parent=None):
+        """Initializes the OSC Handler."""
+        super().__init__(parent)
+        self.listen_ip = listen_ip
+        self.listen_port = listen_port
+        self.target_ip = ""
+        self.target_port = 0
+
+        self.client = None # pythonosc UDP client instance
+        self.server = None # pythonosc OSC server instance
+        self.server_thread = None # Thread object for the server
+        self.dispatcher = Dispatcher() # Maps OSC addresses to handler functions
+        self._stop_event = threading.Event() # Used to signal the server thread to stop
+        self._is_connected = False # Tracks the connection state
+
+        # --- Map OSC addresses to handlers ---
+        # IMPORTANT: These mappings use the assumed OSC address patterns defined above.
+        # You MUST verify these against the actual oscmix implementation.
+        print("--- OSC Address Mapping (Verify with oscmix!) ---")
+        self._map_osc_addresses()
+        print("-------------------------------------------------")
+
+        # Catch-all for debugging unmapped messages received from oscmix
+        self.dispatcher.set_default_handler(self._default_handler)
+
+    def _map_osc_addresses(self):
+        """Sets up the OSC address mappings in the dispatcher."""
+        print(f"Mapping based on:")
+        print(f"  Input Gain : {OSC_INPUT_GAIN.format('<ch>')}")
+        print(f"  Input Link : {OSC_INPUT_LINK.format('<ch>')}")
+        print(f"  Input Meter: {OSC_INPUT_METER.format('<ch>')}")
+        print(f"  Output Gain: {OSC_OUTPUT_GAIN.format('<ch>')}")
+        print(f"  Output Link: {OSC_OUTPUT_LINK.format('<ch>')}")
+        print(f"  Output Meter:{OSC_OUTPUT_METER.format('<ch>')}")
+
+        # Map input channels (assuming 1-based channel numbers in OSC paths)
+        for i in range(1, NUM_INPUT_CHANNELS + 1):
+             ch_idx_0_based = i - 1
+             # Map meter address (e.g., /input/1/meter) to _handle_meter with args ('input', 0)
+             self.dispatcher.map(OSC_INPUT_METER.format(i), self._handle_meter, "input", ch_idx_0_based)
+             # Map gain address (e.g., /input/1/gain) to _handle_gain with args ('input', 0)
+             self.dispatcher.map(OSC_INPUT_GAIN.format(i), self._handle_gain, "input", ch_idx_0_based)
+             # Map link address only for odd channels (e.g., /input/1/link) to _handle_link with args ('input', 0)
+             if (i % 2) != 0:
+                 self.dispatcher.map(OSC_INPUT_LINK.format(i), self._handle_link, "input", ch_idx_0_based)
+
+        # Map output channels (assuming 1-based channel numbers in OSC paths)
+        for i in range(1, NUM_OUTPUT_CHANNELS + 1):
+            ch_idx_0_based = i - 1
+            self.dispatcher.map(OSC_OUTPUT_METER.format(i), self._handle_meter, "output", ch_idx_0_based)
+            self.dispatcher.map(OSC_OUTPUT_GAIN.format(i), self._handle_gain, "output", ch_idx_0_based)
+            if (i % 2) != 0:
+                 self.dispatcher.map(OSC_OUTPUT_LINK.format(i), self._handle_link, "output", ch_idx_0_based)
+
+    # --- Handlers for specific OSC messages ---
+    # These methods are called by the dispatcher when a matching message arrives.
+    # They parse the arguments and emit Qt signals to update the GUI safely.
+
+    def _handle_meter(self, address, *args):
+        """Handles incoming meter level messages."""
+        # Expected args passed from dispatcher: fixed_arg1, fixed_arg2, osc_arg1, osc_arg2, ...
+        # Here: type ('input'/'output'), ch_idx (0-based), value (float)
+        self.message_received_signal.emit(address, list(args)) # Log raw message first
+        if len(args) >= 3: # Need at least type, index, and value
+             osc_type = args[0]
+             ch_idx = args[1]
+             value = args[2] # Assuming the first OSC argument is the meter value
+             if isinstance(value, (float, int)):
+                 # Use invokeMethod for thread-safe signal emission from server thread to GUI thread
+                 QMetaObject.invokeMethod(self, "emit_meter_received", Qt.QueuedConnection,
+                                          Q_ARG(str, osc_type), Q_ARG(int, ch_idx), Q_ARG(float, float(value)))
+
+    def _handle_gain(self, address, *args):
+        """Handles incoming gain level messages."""
+        self.message_received_signal.emit(address, list(args))
+        if len(args) >= 3:
+             osc_type = args[0]
+             ch_idx = args[1]
+             value = args[2]
+             if isinstance(value, (float, int)):
+                 QMetaObject.invokeMethod(self, "emit_gain_received", Qt.QueuedConnection,
+                                          Q_ARG(str, osc_type), Q_ARG(int, ch_idx), Q_ARG(float, float(value)))
+
+    def _handle_link(self, address, *args):
+        """Handles incoming stereo link status messages."""
+        # Assuming link status is sent for the odd channel index (0, 2, 4...)
+        self.message_received_signal.emit(address, list(args))
+        if len(args) >= 3:
+             osc_type = args[0]
+             ch_idx = args[1] # Odd channel index (0, 2, 4...)
+             value = args[2]
+             # oscmix might send 0/1 integer for link status
+             if isinstance(value, (int, float, bool)):
+                 QMetaObject.invokeMethod(self, "emit_link_received", Qt.QueuedConnection,
+                                          Q_ARG(str, osc_type), Q_ARG(int, ch_idx), Q_ARG(bool, bool(value)))
+
+    # --- Slots for Safe Signal Emission ---
+    # These slots are targets for QMetaObject.invokeMethod to ensure signals are emitted correctly.
+    @Slot(str, int, float)
+    def emit_meter_received(self, type, ch_idx, val): self.meter_received.emit(type, ch_idx, val)
+    @Slot(str, int, float)
+    def emit_gain_received(self, type, ch_idx, val): self.gain_received.emit(type, ch_idx, val)
+    @Slot(str, int, bool)
+    def emit_link_received(self, type, ch_idx, val): self.link_received.emit(type, ch_idx, val)
+
+    def _default_handler(self, address, *args):
+        """Handles any unmapped OSC messages received, primarily for debugging."""
+        self.message_received_signal.emit(address, list(args))
+        # Optional: Print to console as well
+        # print(f"[OSC Handler Debug] Unmapped: {address} {args}")
+
+    # --- Server Thread Logic ---
+    def _server_thread_target(self):
+        """The function that runs in the separate OSC server thread."""
+        self._is_connected = False # Ensure disconnected state initially
+        server_error = None
+        try:
+            # Create the OSC UDP server
+            self.server = BlockingOSCUDPServer((self.listen_ip, self.listen_port), self.dispatcher)
+            print(f"[OSC Handler] Server listening on {self.server.server_address}")
+            self._is_connected = True
+            # Emit the 'connected' signal safely to the GUI thread
+            QMetaObject.invokeMethod(self, "connected", Qt.QueuedConnection)
+
+            # Server loop: handle requests with a timeout
+            while not self._stop_event.is_set():
+                self.server.handle_request_timeout(0.1) # Timeout allows checking stop_event
+
+        except OSError as e:
+            # Common error: Port already in use
+            server_error = f"Error starting server (Port {self.listen_port} in use?): {e}"
+            print(f"!!! [OSC Handler] {server_error}")
+        except Exception as e:
+            # Catch other potential server errors
+            server_error = f"Server error: {e}"
+            print(f"!!! [OSC Handler] {server_error}")
+        finally:
+            # Cleanup, regardless of how the loop exited
+            self._is_connected = False
+            disconnect_reason = server_error if server_error else "Disconnected normally"
+            if self.server:
+                try:
+                    # Properly close the server socket
+                    self.server.server_close()
+                except Exception as e_close:
+                     print(f"[OSC Handler] Error closing server socket: {e_close}")
+            print("[OSC Handler] Server stopped.")
+            # Emit the 'disconnected' signal safely to the GUI thread
+            QMetaObject.invokeMethod(self, "emit_disconnected", Qt.QueuedConnection,
+                                      Q_ARG(str, disconnect_reason))
+
+    @Slot(str)
+    def emit_disconnected(self, message):
+         """Slot to ensure the disconnected signal is emitted correctly."""
+         self.disconnected.emit(message)
+
+    # --- Public Control Methods ---
+    def start(self, target_ip, target_port):
+        """
+        Starts the OSC server thread and initializes the OSC client.
+        Returns True if the start attempt was initiated, False otherwise.
+        """
+        if self.server_thread and self.server_thread.is_alive():
+            print("[OSC Handler] Already running.")
+            return False # Indicate already running
+
+        self.target_ip = target_ip
+        self.target_port = target_port
+        try:
+            # Validate port number before creating client
+            if not (0 < target_port < 65536):
+                 raise ValueError("Invalid target port number")
+            # Create the OSC client (sends messages to oscmix)
+            self.client = SimpleUDPClient(self.target_ip, self.target_port)
+            print(f"[OSC Handler] Client configured for target {self.target_ip}:{self.target_port}")
+        except Exception as e:
+            # Emit disconnected signal if client setup fails
+            self.emit_disconnected(f"Client config error: {e}")
+            return False # Indicate start failed
+
+        # Clear the stop event flag and start the server thread
+        self._stop_event.clear()
+        self.server_thread = threading.Thread(target=self._server_thread_target, daemon=True)
+        self.server_thread.start()
+        # Note: Actual connection status is confirmed by the 'connected' signal
+        # emitted from the server thread once the socket is bound.
+        return True # Indicate start attempt was made
+
+    def stop(self):
+        """Stops the OSC server thread and cleans up."""
+        if not self.server_thread or not self.server_thread.is_alive():
+            print("[OSC Handler] Not running.")
+            if not self._is_connected: # Ensure GUI knows if already stopped
+                 self.emit_disconnected("Stopped manually (was not running)")
+            self._is_connected = False
+            return
+
+        print("[OSC Handler] Stopping...")
+        # Signal the server thread to stop
+        self._stop_event.set()
+
+        # Request the blocking server to shut down (non-blocking call)
+        server_instance = getattr(self, 'server', None)
+        if server_instance:
+             try:
+                  server_instance.shutdown()
+             except Exception as e:
+                  print(f"[OSC Handler] Error during server shutdown call: {e}")
+
+        # Wait briefly for the thread to finish
+        self.server_thread.join(timeout=1.0)
+        if self.server_thread.is_alive():
+             print("[OSC Handler] Warning: Server thread did not exit cleanly.")
+
+        # Clean up resources
+        self.server_thread = None
+        self.server = None
+        self.client = None
+        self._is_connected = False
+        print("[OSC Handler] Stopped.")
+        # The disconnected signal is emitted by the server thread's finally block
+
+    def send(self, address, value):
+        """Sends an OSC message to the target (oscmix)."""
+        if self.client and self._is_connected:
+            try:
+                # print(f"[OSC SEND] {address} {value}") # Uncomment for debug
+                self.client.send_message(address, value)
+            except Exception as e:
+                print(f"!!! [OSC Handler] Send Error to {address}: {e}")
+                # Consider emitting an error signal to the GUI status bar
+        elif not self._is_connected:
+             print(f"[OSC Handler] Not connected, cannot send: {address} {value}")
+        else: # Should not happen if _is_connected is True
+             print(f"[OSC Handler] Client is None, cannot send: {address} {value}")
+
+
+#=============================================================================
+# Main GUI Window Class
+#=============================================================================
+class OscmixControlGUI(QMainWindow):
+    """Main application window for controlling oscmix via OSC."""
+    def __init__(self):
+        """Initializes the main GUI window."""
+        super().__init__()
+        self.setWindowTitle("oscmix GUI Control (RME UCX II)")
+        self.setGeometry(100, 100, 900, 650) # x, y, width, height (made wider for log)
+
+        # Instantiate the OSC handler
+        self.osc_handler = OSCHandler(DEFAULT_LISTEN_IP, DEFAULT_LISTEN_PORT)
+
+        # Data storage for meter values received between GUI updates
+        # Using defaultdict avoids checking if key exists before writing
+        self.last_meter_values = {
+            'input': defaultdict(float),
+            'output': defaultdict(float)
+        }
+
+        # Dictionary to hold references to GUI widgets for easy access
+        self.widgets = {
+            'input_gain': [], 'input_link': [], 'input_meter': [],
+            'output_gain': [], 'output_link': [], 'output_meter': []
+        }
+
+        # Build the user interface
+        self.init_ui()
+        # Connect signals from GUI elements and OSC handler to slots
+        self.connect_signals()
+
+        # Timer for throttling meter updates in the GUI
+        self.meter_timer = QTimer(self)
+        self.meter_timer.setInterval(METER_GUI_UPDATE_INTERVAL_MS)
+        self.meter_timer.timeout.connect(self.update_gui_meters)
+
+        # Set initial status bar message
+        self.status_bar.showMessage("Disconnected. Ensure 'oscmix' is running and configured.")
+
+    def init_ui(self):
+        """Creates and arranges all the GUI widgets."""
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QVBoxLayout(main_widget) # Main vertical layout
+
+        # --- Connection Group ---
+        conn_group = QGroupBox("Connection to 'oscmix' Server")
+        conn_layout = QHBoxLayout()
+        conn_group.setLayout(conn_layout)
+
+        self.ip_input = QLineEdit(DEFAULT_OSCMIX_IP)
+        self.ip_input.setToolTip("IP address where the oscmix server is running (often 127.0.0.1)")
+        self.port_input = QLineEdit(str(DEFAULT_OSCMIX_SEND_PORT))
+        self.port_input.setToolTip("Port number the oscmix server is LISTENING on")
+        self.listen_port_input = QLineEdit(str(DEFAULT_LISTEN_PORT))
+        self.listen_port_input.setToolTip("Port number this GUI should listen on for replies from oscmix")
+        self.connect_button = QPushButton("Connect")
+        self.disconnect_button = QPushButton("Disconnect")
+        self.disconnect_button.setEnabled(False) # Disabled initially
+        self.connection_status_label = QLabel("DISCONNECTED")
+        self.connection_status_label.setStyleSheet("font-weight: bold; color: red;")
+
+        # Add connection widgets to layout
+        conn_layout.addWidget(QLabel("'oscmix' Server IP:"))
+        conn_layout.addWidget(self.ip_input)
+        conn_layout.addWidget(QLabel("Server Port:"))
+        conn_layout.addWidget(self.port_input)
+        conn_layout.addWidget(QLabel("GUI Listen Port:"))
+        conn_layout.addWidget(self.listen_port_input)
+        conn_layout.addWidget(self.connect_button)
+        conn_layout.addWidget(self.disconnect_button)
+        conn_layout.addStretch() # Push status label to the right
+        conn_layout.addWidget(self.connection_status_label)
+
+        main_layout.addWidget(conn_group) # Add connection group to main layout
+
+        # --- Channels Layout (Inputs and Outputs side-by-side) ---
+        channels_layout = QHBoxLayout()
+
+        # --- Input Channels Group ---
+        input_group = QGroupBox("Inputs")
+        input_grid = QGridLayout() # Use grid for alignment
+        input_group.setLayout(input_grid)
+
+        # Add Header Row for Inputs
+        input_grid.addWidget(QLabel("Meter"), 0, 0, 1, NUM_INPUT_CHANNELS, alignment=Qt.AlignCenter)
+        input_grid.addWidget(QLabel("Gain"), 2, 0, 1, NUM_INPUT_CHANNELS, alignment=Qt.AlignCenter)
+        input_grid.addWidget(QLabel("Link"), 4, 0, 1, NUM_INPUT_CHANNELS, alignment=Qt.AlignCenter)
+
+        # Create widgets for each input channel
+        for i in range(NUM_INPUT_CHANNELS):
+            ch_label = QLabel(f"{i+1}") # Channel number label
+            gain_slider = QSlider(Qt.Vertical)
+            gain_slider.setRange(0, 100) # Represents 0.0 to 1.0 gain
+            gain_slider.setValue(0) # Default gain
+            gain_slider.setObjectName(f"input_gain_{i}") # Store index in object name
+            gain_slider.setToolTip("Input Gain")
+
+            meter_bar = QProgressBar()
+            meter_bar.setRange(0, 100) # Represents 0.0 to 1.0 meter level
+            meter_bar.setValue(0)
+            meter_bar.setTextVisible(False) # Don't show percentage text
+            meter_bar.setOrientation(Qt.Vertical)
+            meter_bar.setFixedHeight(100) # Give meters some visual height
+            meter_bar.setToolTip("Input Meter Level")
+
+            link_cb = QCheckBox() # Checkbox for stereo link
+            link_cb.setObjectName(f"input_link_{i}")
+            link_cb.setVisible((i % 2) == 0) # Only show link checkbox for odd channels (0, 2, 4...)
+            link_cb.setToolTip("Link Ch {}".format(i+1) + "/{}".format(i+2) if (i%2)==0 else "")
+
+            # Add widgets to the input grid layout
+            input_grid.addWidget(meter_bar, 1, i, alignment=Qt.AlignCenter) # Row 1
+            input_grid.addWidget(gain_slider, 3, i, alignment=Qt.AlignCenter) # Row 3
+            input_grid.addWidget(link_cb, 5, i, alignment=Qt.AlignCenter) # Row 5
+            input_grid.addWidget(ch_label, 6, i, alignment=Qt.AlignCenter) # Row 6 (Channel number)
+
+            # Store references to the widgets
+            self.widgets['input_gain'].append(gain_slider)
+            self.widgets['input_link'].append(link_cb)
+            self.widgets['input_meter'].append(meter_bar)
+
+        channels_layout.addWidget(input_group) # Add input group to the horizontal channels layout
+
+        # --- Output Channels Group (Similar structure to Inputs) ---
+        output_group = QGroupBox("Outputs")
+        output_grid = QGridLayout()
+        output_group.setLayout(output_grid)
+         # Add Header Row for Outputs
+        output_grid.addWidget(QLabel("Meter"), 0, 0, 1, NUM_OUTPUT_CHANNELS, alignment=Qt.AlignCenter)
+        output_grid.addWidget(QLabel("Gain"), 2, 0, 1, NUM_OUTPUT_CHANNELS, alignment=Qt.AlignCenter)
+        output_grid.addWidget(QLabel("Link"), 4, 0, 1, NUM_OUTPUT_CHANNELS, alignment=Qt.AlignCenter)
+
+        # Create widgets for each output channel
+        for i in range(NUM_OUTPUT_CHANNELS):
+            ch_label = QLabel(f"{i+1}")
+            gain_slider = QSlider(Qt.Vertical)
+            gain_slider.setRange(0, 100)
+            gain_slider.setValue(0)
+            gain_slider.setObjectName(f"output_gain_{i}")
+            gain_slider.setToolTip("Output Gain")
+
+            meter_bar = QProgressBar()
+            meter_bar.setRange(0, 100)
+            meter_bar.setValue(0)
+            meter_bar.setTextVisible(False)
+            meter_bar.setOrientation(Qt.Vertical)
+            meter_bar.setFixedHeight(100)
+            meter_bar.setToolTip("Output Meter Level")
+
+            link_cb = QCheckBox()
+            link_cb.setObjectName(f"output_link_{i}")
+            link_cb.setVisible((i % 2) == 0)
+            link_cb.setToolTip("Link Ch {}".format(i+1) + "/{}".format(i+2) if (i%2)==0 else "")
+
+
+            # Add widgets to the output grid layout
+            output_grid.addWidget(meter_bar, 1, i, alignment=Qt.AlignCenter)
+            output_grid.addWidget(gain_slider, 3, i, alignment=Qt.AlignCenter)
+            output_grid.addWidget(link_cb, 5, i, alignment=Qt.AlignCenter)
+            output_grid.addWidget(ch_label, 6, i, alignment=Qt.AlignCenter)
+
+            # Store references to the widgets
+            self.widgets['output_gain'].append(gain_slider)
+            self.widgets['output_link'].append(link_cb)
+            self.widgets['output_meter'].append(meter_bar)
+
+        channels_layout.addWidget(output_group) # Add output group to the horizontal channels layout
+        main_layout.addLayout(channels_layout) # Add channels layout to main vertical layout
+
+        # --- OSC Log ---
+        log_group = QGroupBox("OSC Message Log (Incoming from oscmix)")
+        log_layout = QVBoxLayout()
+        self.osc_log = QTextEdit()
+        self.osc_log.setReadOnly(True) # User cannot type in the log
+        self.osc_log.setMaximumHeight(100) # Limit vertical space
+        self.osc_log.setToolTip("Shows raw OSC messages received from the oscmix server")
+        log_layout.addWidget(self.osc_log)
+        log_group.setLayout(log_layout)
+        main_layout.addWidget(log_group) # Add log group to main layout
+
+        # --- Status Bar ---
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+
+    def connect_signals(self):
+        """Connects Qt signals from widgets and OSC handler to corresponding slots."""
+        # OSC Handler -> GUI Updates
+        self.osc_handler.connected.connect(self.on_osc_connected)
+        self.osc_handler.disconnected.connect(self.on_osc_disconnected)
+        self.osc_handler.message_received_signal.connect(self.log_osc_message) # Log all incoming
+        self.osc_handler.meter_received.connect(self.on_meter_received) # Store meter value
+        self.osc_handler.gain_received.connect(self.on_gain_received)   # Update gain slider
+        self.osc_handler.link_received.connect(self.on_link_received)   # Update link checkbox
+
+        # GUI -> OSC Sending
+        self.connect_button.clicked.connect(self.connect_osc)
+        self.disconnect_button.clicked.connect(self.disconnect_osc)
+
+        # Connect gain sliders and link checkboxes for all channels
+        for i in range(NUM_INPUT_CHANNELS):
+            # When slider value changes, call send_gain_from_gui
+            self.widgets['input_gain'][i].valueChanged.connect(self.send_gain_from_gui)
+            # Only connect link checkbox for odd channels
+            if (i % 2) == 0:
+                 # When checkbox state changes, call send_link_from_gui
+                 self.widgets['input_link'][i].stateChanged.connect(self.send_link_from_gui)
+        for i in range(NUM_OUTPUT_CHANNELS):
+             self.widgets['output_gain'][i].valueChanged.connect(self.send_gain_from_gui)
+             if (i % 2) == 0:
+                 self.widgets['output_link'][i].stateChanged.connect(self.send_link_from_gui)
+
+    # --- Slots for Handling GUI Actions and OSC Events ---
+
+    @Slot()
+    def connect_osc(self):
+        """Initiates connection to the oscmix server when Connect button is clicked."""
+        ip = self.ip_input.text().strip() # Get IP from input field
+        try:
+            # Get ports and validate they are integers within the valid range
+            send_port = int(self.port_input.text())
+            listen_port = int(self.listen_port_input.text())
+            if not (0 < send_port < 65536 and 0 < listen_port < 65536):
+                 raise ValueError("Port numbers must be between 1 and 65535")
+        except ValueError as e:
+            QMessageBox.warning(self, "Input Error", f"Invalid port number: {e}")
+            return
+
+        # Update status bar and log
+        self.status_bar.showMessage(f"Attempting connection to oscmix at {ip}:{send_port}...")
+        self.log_osc_message("[GUI]", [f"Connecting to oscmix @ {ip}:{send_port}...", f"Listening on {self.osc_handler.listen_ip}:{listen_port}"])
+        # Update visual connection status label
+        self.connection_status_label.setText("CONNECTING...")
+        self.connection_status_label.setStyleSheet("font-weight: bold; color: orange;")
+
+        # Update handler's listen port before starting
+        # self.osc_handler.listen_ip = DEFAULT_LISTEN_IP # Could make this configurable too
+        self.osc_handler.listen_port = listen_port
+
+        # Attempt to start the OSC handler
+        if not self.osc_handler.start(ip, send_port):
+             # If start() returns False or raises an exception handled by disconnected signal
+             self.status_bar.showMessage("Connection Failed (Check Console/Log)")
+             self.connection_status_label.setText("FAILED")
+             self.connection_status_label.setStyleSheet("font-weight: bold; color: red;")
+
+    @Slot()
+    def disconnect_osc(self):
+        """Stops the OSC handler when Disconnect button is clicked."""
+        self.status_bar.showMessage("Disconnecting...")
+        self.log_osc_message("[GUI]", ["Disconnecting OSC Handler."])
+        self.osc_handler.stop()
+        # GUI state updates (buttons, status label) are handled by the on_osc_disconnected slot
+
+    @Slot()
+    def on_osc_connected(self):
+        """Slot called when the OSC handler successfully connects."""
+        status_msg = f"Connected to oscmix ({self.osc_handler.target_ip}:{self.osc_handler.target_port}) | GUI Listening on {self.osc_handler.listen_port}"
+        self.status_bar.showMessage(status_msg)
+        self.log_osc_message("[GUI]", [status_msg])
+        self.connection_status_label.setText("CONNECTED")
+        self.connection_status_label.setStyleSheet("font-weight: bold; color: green;")
+        # Update button and input field enabled states
+        self.connect_button.setEnabled(False)
+        self.disconnect_button.setEnabled(True)
+        self.ip_input.setEnabled(False)
+        self.port_input.setEnabled(False)
+        self.listen_port_input.setEnabled(False)
+        # Start the timer to update GUI meters periodically
+        self.meter_timer.start()
+        # --- Optional: Query initial state ---
+        # If oscmix supports query messages (e.g., sending "/input/1/gain" with no args
+        # causes it to reply with the current value), you could send them here.
+        # self.query_initial_state()
+
+    @Slot(str)
+    def on_osc_disconnected(self, reason):
+        """Slot called when the OSC handler disconnects (normally or due to error)."""
+        status_msg = f"Disconnected: {reason}"
+        self.status_bar.showMessage(status_msg)
+        self.log_osc_message("[GUI]", [status_msg])
+        self.connection_status_label.setText("DISCONNECTED")
+        self.connection_status_label.setStyleSheet("font-weight: bold; color: red;")
+        # Update button and input field enabled states
+        self.connect_button.setEnabled(True)
+        self.disconnect_button.setEnabled(False)
+        self.ip_input.setEnabled(True)
+        self.port_input.setEnabled(True)
+        self.listen_port_input.setEnabled(True)
+        # Stop the meter update timer
+        self.meter_timer.stop()
+        # Reset meters visually to zero on disconnect
+        for meter_list in [self.widgets['input_meter'], self.widgets['output_meter']]:
+            for meter in meter_list:
+                 meter.setValue(0)
+        # Clear stored meter values
+        self.last_meter_values['input'].clear()
+        self.last_meter_values['output'].clear()
+
+    @Slot(str, list)
+    def log_osc_message(self, address, args):
+        """Appends details of incoming OSC messages to the log view."""
+        # Basic log trimming to prevent excessive memory usage
+        if self.osc_log.document().blockCount() > 200:
+             cursor = self.osc_log.textCursor()
+             cursor.movePosition(cursor.Start)
+             cursor.select(cursor.BlockUnderCursor) # Select the first block
+             cursor.removeSelectedText() # Remove it
+             cursor.deleteChar() # Remove the newline left behind
+
+        # Append the new message and auto-scroll to the bottom
+        self.osc_log.append(f"{address} {args}")
+        self.osc_log.verticalScrollBar().setValue(self.osc_log.verticalScrollBar().maximum())
+
+    @Slot(str, int, float)
+    def on_meter_received(self, type, ch_idx, value):
+        """Stores received meter value. GUI update is handled by the timer."""
+        # Store the latest value received for this meter
+        # For peak hold within the timer interval, use:
+        # self.last_meter_values[type][ch_idx] = max(self.last_meter_values[type].get(ch_idx, 0.0), value)
+        self.last_meter_values[type][ch_idx] = value
+
+    @Slot()
+    def update_gui_meters(self):
+        """Periodically updates meter progress bars based on stored values."""
+        # Iterate through stored input meter values and update corresponding progress bars
+        for ch_idx, value in self.last_meter_values['input'].items():
+             if 0 <= ch_idx < len(self.widgets['input_meter']):
+                 self.widgets['input_meter'][ch_idx].setValue(float_to_slider(value))
+        # Iterate through stored output meter values
+        for ch_idx, value in self.last_meter_values['output'].items():
+             if 0 <= ch_idx < len(self.widgets['output_meter']):
+                 self.widgets['output_meter'][ch_idx].setValue(float_to_slider(value))
+
+        # Reset stored values for the next interval. This makes meters drop to 0
+        # if no new value is received in the interval (simple decay).
+        self.last_meter_values['input'].clear()
+        self.last_meter_values['output'].clear()
+
+    @Slot(str, int, float)
+    def on_gain_received(self, type, ch_idx, value):
+        """Updates a gain slider when a gain message is received from oscmix."""
+        slider_list = self.widgets.get(f"{type}_gain")
+        if slider_list and 0 <= ch_idx < len(slider_list):
+            slider = slider_list[ch_idx]
+            # Temporarily block signals from the slider to prevent feedback loop
+            # (where setting the value programmatically triggers valueChanged again)
+            slider.blockSignals(True)
+            slider.setValue(float_to_slider(value))
+            slider.blockSignals(False) # Re-enable signals
+
+    @Slot(str, int, bool)
+    def on_link_received(self, type, ch_idx, value):
+        """Updates a link checkbox when a link message is received from oscmix."""
+        # ch_idx is the odd channel index (0, 2, 4...)
+        cb_list = self.widgets.get(f"{type}_link")
+        # Checkbox widget only exists at the odd channel index
+        if cb_list and 0 <= ch_idx < len(cb_list) and (ch_idx % 2 == 0):
+            cb = cb_list[ch_idx]
+            # Block signals to prevent feedback loop
+            cb.blockSignals(True)
+            cb.setChecked(value)
+            cb.blockSignals(False)
+            # Update the enabled state of the paired (even) channel's controls
+            self._update_linked_channel_state(type, ch_idx, value)
+
+    @Slot(int)
+    def send_gain_from_gui(self, value):
+        """Sends OSC gain message when a GUI slider value changes."""
+        sender_widget = self.sender() # Get the widget that emitted the signal
+        if not sender_widget: return
+        obj_name = sender_widget.objectName() # e.g., "input_gain_0"
+        try:
+            # Parse type ('input'/'output') and index from the widget's object name
+            type, _, idx_str = obj_name.split('_')
+            ch_idx = int(idx_str) # 0-based index from widget name
+        except Exception as e:
+            print(f"Error parsing sender object name '{obj_name}': {e}")
+            return # Ignore if name is not as expected
+
+        float_value = slider_to_float(value) # Convert slider int (0-100) to float (0.0-1.0)
+        ch_num_1_based = ch_idx + 1 # Convert to 1-based index for OSC path
+
+        # Construct the OSC address based on type and channel number
+        if type == 'input':
+            osc_address = OSC_INPUT_GAIN.format(ch_num_1_based)
+        elif type == 'output':
+            osc_address = OSC_OUTPUT_GAIN.format(ch_num_1_based)
+        else:
+            return # Should not happen
+
+        # Send the OSC message
+        self.osc_handler.send(osc_address, float_value)
+
+    @Slot(int)
+    def send_link_from_gui(self, state):
+        """Sends OSC link message when a GUI checkbox state changes."""
+        sender_widget = self.sender()
+        if not sender_widget: return
+        obj_name = sender_widget.objectName() # e.g., "input_link_0"
+        try:
+            type, _, idx_str = obj_name.split('_')
+            ch_idx = int(idx_str) # 0-based odd index (0, 2, ...)
+        except Exception as e:
+            print(f"Error parsing sender object name '{obj_name}': {e}")
+            return
+
+        bool_value = (state == Qt.Checked) # Convert Qt state to boolean
+        osc_value = 1 if bool_value else 0 # Convert boolean to integer 0 or 1 for OSC
+        ch_num_1_based = ch_idx + 1 # 1-based odd channel number for OSC path
+
+        # Construct OSC address
+        if type == 'input':
+             osc_address = OSC_INPUT_LINK.format(ch_num_1_based)
+        elif type == 'output':
+             osc_address = OSC_OUTPUT_LINK.format(ch_num_1_based)
+        else:
+            return
+
+        # Send OSC message
+        self.osc_handler.send(osc_address, osc_value)
+        # Update the linked channel's GUI state immediately
+        self._update_linked_channel_state(type, ch_idx, bool_value)
+
+    def _update_linked_channel_state(self, type, odd_ch_idx, is_linked):
+         """
+         Enables or disables the gain slider of the paired (even) channel
+         based on the link state of the odd channel.
+         """
+         even_ch_idx = odd_ch_idx + 1
+         gain_list = self.widgets.get(f"{type}_gain")
+         # Check if the even channel index is valid
+         if gain_list and 0 <= even_ch_idx < len(gain_list):
+             # Disable the gain slider of the even channel if the pair is linked
+             gain_list[even_ch_idx].setEnabled(not is_linked)
+             # Optional: Could add visual indication like changing background color
+
+    # def query_initial_state(self):
+    #      """Optional: Sends messages to query the current state from oscmix."""
+    #      print("[GUI] Querying initial state from oscmix (if supported)...")
+    #      # Example: Assumes sending address with no args triggers a reply
+    #      # You MUST verify if/how oscmix supports state queries!
+    #      for i in range(1, NUM_INPUT_CHANNELS + 1):
+    #          self.osc_handler.send(OSC_INPUT_GAIN.format(i), []) # Sending empty list? Or specific query value?
+    #          if (i % 2) != 0:
+    #              self.osc_handler.send(OSC_INPUT_LINK.format(i), [])
+    #      for i in range(1, NUM_OUTPUT_CHANNELS + 1):
+    #          self.osc_handler.send(OSC_OUTPUT_GAIN.format(i), [])
+    #          if (i % 2) != 0:
+    #              self.osc_handler.send(OSC_OUTPUT_LINK.format(i), [])
+
+
+    def closeEvent(self, event):
+        """Ensures the OSC handler is stopped cleanly when the GUI window is closed."""
+        print("[GUI] Closing application...")
+        self.meter_timer.stop() # Stop the meter update timer
+        self.osc_handler.stop() # Stop the OSC handler thread
+        event.accept() # Allow the window to close
+
+
+#=============================================================================
+# Main Execution Block
+#=============================================================================
+if __name__ == '__main__':
+    # Create the Qt Application
+    app = QApplication(sys.argv)
+
+    # Optional: Apply a style for a different look
+    # app.setStyle("Fusion")
+
+    # Create and show the main window
+    window = OscmixControlGUI()
+    window.show()
+
+    # Start the Qt event loop
+    sys.exit(app.exec())
