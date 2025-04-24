@@ -17,7 +17,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
-#include <signal.h> /* For signal constants */
+#include <signal.h>
+#include <stdarg.h>
 
 /* Platform detection and specific includes */
 #if defined(_WIN32)
@@ -49,6 +50,7 @@ typedef HANDLE platform_event_t;
 typedef SOCKET platform_socket_t;
 #define PLATFORM_INVALID_SOCKET INVALID_SOCKET
 #define PLATFORM_SOCKET_ERROR SOCKET_ERROR
+#define PLATFORM_ECONNREFUSED WSAECONNREFUSED
 
 /* File handling */
 #define platform_mkdir(path) _mkdir(path)
@@ -96,6 +98,7 @@ typedef pthread_cond_t platform_event_t;
 typedef int platform_socket_t;
 #define PLATFORM_INVALID_SOCKET -1
 #define PLATFORM_SOCKET_ERROR -1
+#define PLATFORM_ECONNREFUSED ECONNREFUSED
 
 /* File handling */
 #define platform_mkdir(path) mkdir(path, 0755)
@@ -112,7 +115,21 @@ typedef void *(*platform_thread_func_t)(void *);
 
 #endif
 
-/* Common platform-independent functions */
+/* Platform-independent type definitions */
+
+/**
+ * @brief Platform-independent stream type
+ */
+typedef FILE platform_stream_t;
+
+/* Forward declaration for logging functions */
+struct log_handle;
+
+/* Function prototypes */
+
+/*------------------------------------------------------------------------------
+ * File System Functions
+ *----------------------------------------------------------------------------*/
 
 /**
  * @brief Gets the application data directory path
@@ -167,7 +184,35 @@ int platform_create_valid_filename(const char *input, char *output, size_t outpu
  */
 int platform_format_time(char *buffer, size_t size, const char *format);
 
-/* Path manipulation functions */
+/**
+ * @brief Opens a file using the platform's file API
+ *
+ * @param filename Name of the file to open
+ * @param mode Mode to open the file in ("r", "w", etc.)
+ * @return FILE pointer on success, NULL on failure
+ */
+FILE *platform_fopen(const char *filename, const char *mode);
+
+/**
+ * @brief Removes a file
+ *
+ * @param filename Name of the file to remove
+ * @return 0 on success, -1 on failure
+ */
+int platform_remove(const char *filename);
+
+/**
+ * @brief Renames a file
+ *
+ * @param oldname Current name of the file
+ * @param newname New name for the file
+ * @return 0 on success, -1 on failure
+ */
+int platform_rename(const char *oldname, const char *newname);
+
+/*------------------------------------------------------------------------------
+ * Path Manipulation Functions
+ *----------------------------------------------------------------------------*/
 
 /**
  * @brief Joins two path components with the correct separator
@@ -219,25 +264,28 @@ int platform_path_basename(const char *path, char *buffer, size_t size);
  */
 int platform_path_dirname(const char *path, char *buffer, size_t size);
 
-/* Thread and synchronization functions */
+/*------------------------------------------------------------------------------
+ * Thread and Synchronization Functions
+ *----------------------------------------------------------------------------*/
 
 /**
  * @brief Creates a new thread
  *
  * @param thread Pointer to store the thread handle
- * @param func Thread function to execute
+ * @param start_routine Thread entry point
  * @param arg Argument to pass to the thread function
- * @return 0 on success, non-zero on failure
+ * @return 0 on success, error code on failure
  */
-int platform_thread_create(platform_thread_t *thread, platform_thread_func_t func, void *arg);
+int platform_thread_create(platform_thread_t *thread, void *(*start_routine)(void *), void *arg);
 
 /**
  * @brief Waits for a thread to complete
  *
  * @param thread Thread handle to wait for
- * @return 0 on success, non-zero on failure
+ * @param retval Pointer to store return value
+ * @return 0 on success, error code on failure
  */
-int platform_thread_join(platform_thread_t thread);
+int platform_thread_join(platform_thread_t thread, void **retval);
 
 /**
  * @brief Sleeps for the specified number of milliseconds
@@ -278,7 +326,9 @@ int platform_mutex_lock(platform_mutex_t *mutex);
  */
 int platform_mutex_unlock(platform_mutex_t *mutex);
 
-/* Signal handling functions */
+/*------------------------------------------------------------------------------
+ * Signal Handling Functions
+ *----------------------------------------------------------------------------*/
 
 /**
  * @brief Sets a signal handler for common termination signals
@@ -296,7 +346,9 @@ int platform_set_signal_handler(void (*handler)(int));
  */
 int platform_set_cleanup_handler(void (*cleanup_func)(void));
 
-/* Socket functions */
+/*------------------------------------------------------------------------------
+ * Socket Functions
+ *----------------------------------------------------------------------------*/
 
 /**
  * @brief Initializes the socket subsystem
@@ -362,54 +414,113 @@ int platform_socket_bind(platform_socket_t socket, const char *address, int port
 int platform_socket_connect(platform_socket_t socket, const char *address, int port);
 
 /**
- * @brief Sends data through a socket
+ * @brief Open a socket
  *
- * @param socket Socket handle
- * @param data Pointer to the data to send
- * @param len Length of the data to send
- * @return Number of bytes sent on success, -1 on failure
+ * @param address Address string in the format "udp!host!port"
+ * @param server 1 for server (bind), 0 for client (connect)
+ * @return Socket handle or PLATFORM_INVALID_SOCKET on error
  */
-int platform_socket_send(platform_socket_t socket, const void *data, size_t len);
+platform_socket_t platform_socket_open(const char *address, int server);
 
 /**
- * @brief Receives data from a socket
+ * @brief Send data on a socket
  *
- * @param socket Socket handle
- * @param buffer Buffer to store the received data
- * @param size Size of the buffer
- * @return Number of bytes received on success, -1 on failure
+ * @param sock Socket handle
+ * @param buf Data buffer
+ * @param len Data length
+ * @param flags Send flags
+ * @return Number of bytes sent or -1 on error
  */
-int platform_socket_recv(platform_socket_t socket, void *buffer, size_t size);
-
-/* File functions */
+ssize_t platform_socket_send(platform_socket_t sock, const void *buf, size_t len, int flags);
 
 /**
- * @brief Opens a file using the platform's file API
+ * @brief Receive data from a socket
  *
- * @param filename Name of the file to open
- * @param mode Mode to open the file in ("r", "w", etc.)
- * @return FILE pointer on success, NULL on failure
+ * @param sock Socket handle
+ * @param buf Data buffer
+ * @param len Buffer size
+ * @param flags Receive flags
+ * @return Number of bytes received or -1 on error
  */
-FILE *platform_fopen(const char *filename, const char *mode);
+ssize_t platform_socket_recv(platform_socket_t sock, void *buf, size_t len, int flags);
+
+/*------------------------------------------------------------------------------
+ * Stream Functions
+ *----------------------------------------------------------------------------*/
 
 /**
- * @brief Removes a file
+ * @brief Get standard input stream
  *
- * @param filename Name of the file to remove
- * @return 0 on success, -1 on failure
+ * @return Standard input stream
  */
-int platform_remove(const char *filename);
+platform_stream_t *platform_get_stdin(void);
 
 /**
- * @brief Renames a file
+ * @brief Get standard output stream
  *
- * @param oldname Current name of the file
- * @param newname New name for the file
- * @return 0 on success, -1 on failure
+ * @return Standard output stream
  */
-int platform_rename(const char *oldname, const char *newname);
+platform_stream_t *platform_get_stdout(void);
 
-/* MIDI functions */
+/**
+ * @brief Read line from stream
+ *
+ * @param buf Buffer to read into
+ * @param size Buffer size
+ * @param stream Input stream
+ * @return Buffer pointer or NULL on error or EOF
+ */
+char *platform_gets(char *buf, size_t size, platform_stream_t *stream);
+
+/**
+ * @brief Write formatted string to stream
+ *
+ * @param stream Output stream
+ * @param format Format string
+ * @param ... Format arguments
+ * @return Number of characters written or negative on error
+ */
+int platform_printf(platform_stream_t *stream, const char *format, ...);
+
+/**
+ * @brief Write data to stream
+ *
+ * @param buf Data buffer
+ * @param size Data size
+ * @param stream Output stream
+ * @return Number of items written
+ */
+size_t platform_write(const void *buf, size_t size, platform_stream_t *stream);
+
+/**
+ * @brief Read data from stream
+ *
+ * @param buf Buffer to read into
+ * @param size Item size
+ * @param stream Input stream
+ * @return Number of items read
+ */
+size_t platform_read(void *buf, size_t size, platform_stream_t *stream);
+
+/**
+ * @brief Flush stream output
+ *
+ * @param stream Output stream
+ * @return 0 on success, non-zero on failure
+ */
+int platform_flush(platform_stream_t *stream);
+
+/**
+ * @brief Check if stream has error
+ *
+ * @param stream Stream to check
+ * @return Non-zero if error, 0 otherwise
+ */
+int platform_error(platform_stream_t *stream);
+
+/*------------------------------------------------------------------------------
+ * MIDI Functions
+ *----------------------------------------------------------------------------*/
 
 /**
  * @brief Initializes the MIDI subsystem
@@ -492,32 +603,9 @@ typedef void (*platform_midi_callback_t)(void *data, size_t len, void *user_data
  */
 int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_t callback, void *user_data);
 
-/**
- * @brief Platform-independent socket type
- */
-#if defined(PLATFORM_WINDOWS)
-typedef SOCKET platform_socket_t;
-#define PLATFORM_INVALID_SOCKET INVALID_SOCKET
-#define PLATFORM_ECONNREFUSED WSAECONNREFUSED
-#else
-typedef int platform_socket_t;
-#define PLATFORM_INVALID_SOCKET (-1)
-#define PLATFORM_ECONNREFUSED ECONNREFUSED
-#endif
-
-/**
- * @brief Platform-independent stream type
- */
-typedef FILE platform_stream_t;
-
-/**
- * @brief Platform-independent thread type
- */
-#if defined(PLATFORM_WINDOWS)
-typedef HANDLE platform_thread_t;
-#else
-typedef pthread_t platform_thread_t;
-#endif
+/*------------------------------------------------------------------------------
+ * Error Handling Functions
+ *----------------------------------------------------------------------------*/
 
 /**
  * @brief Get platform error code
@@ -533,132 +621,5 @@ int platform_errno(void);
  * @return Error message string
  */
 const char *platform_strerror(int errnum);
-
-/**
- * @brief Open a socket
- *
- * @param address Address string in the format "udp!host!port"
- * @param server 1 for server (bind), 0 for client (connect)
- * @return Socket handle or PLATFORM_INVALID_SOCKET on error
- */
-platform_socket_t platform_socket_open(const char *address, int server);
-
-/**
- * @brief Close a socket
- *
- * @param sock Socket handle
- */
-void platform_socket_close(platform_socket_t sock);
-
-/**
- * @brief Send data on a socket
- *
- * @param sock Socket handle
- * @param buf Data buffer
- * @param len Data length
- * @param flags Send flags
- * @return Number of bytes sent or -1 on error
- */
-ssize_t platform_socket_send(platform_socket_t sock, const void *buf, size_t len, int flags);
-
-/**
- * @brief Receive data from a socket
- *
- * @param sock Socket handle
- * @param buf Data buffer
- * @param len Buffer size
- * @param flags Receive flags
- * @return Number of bytes received or -1 on error
- */
-ssize_t platform_socket_recv(platform_socket_t sock, void *buf, size_t len, int flags);
-
-/**
- * @brief Get standard input stream
- *
- * @return Standard input stream
- */
-platform_stream_t *platform_get_stdin(void);
-
-/**
- * @brief Get standard output stream
- *
- * @return Standard output stream
- */
-platform_stream_t *platform_get_stdout(void);
-
-/**
- * @brief Read line from stream
- *
- * @param buf Buffer to read into
- * @param size Buffer size
- * @param stream Input stream
- * @return Buffer pointer or NULL on error or EOF
- */
-char *platform_gets(char *buf, size_t size, platform_stream_t *stream);
-
-/**
- * @brief Write formatted string to stream
- *
- * @param stream Output stream
- * @param format Format string
- * @param ... Format arguments
- * @return Number of characters written or negative on error
- */
-int platform_printf(platform_stream_t *stream, const char *format, ...);
-
-/**
- * @brief Write data to stream
- *
- * @param buf Data buffer
- * @param size Data size
- * @param stream Output stream
- * @return Number of items written
- */
-size_t platform_write(const void *buf, size_t size, platform_stream_t *stream);
-
-/**
- * @brief Read data from stream
- *
- * @param buf Buffer to read into
- * @param size Item size
- * @param stream Input stream
- * @return Number of items read
- */
-size_t platform_read(void *buf, size_t size, platform_stream_t *stream);
-
-/**
- * @brief Flush stream output
- *
- * @param stream Output stream
- * @return 0 on success, non-zero on failure
- */
-int platform_flush(platform_stream_t *stream);
-
-/**
- * @brief Check if stream has error
- *
- * @param stream Stream to check
- * @return Non-zero if error, 0 otherwise
- */
-int platform_error(platform_stream_t *stream);
-
-/**
- * @brief Create a thread
- *
- * @param thread Pointer to thread handle
- * @param start_routine Thread entry point
- * @param arg Thread argument
- * @return 0 on success, error code on failure
- */
-int platform_thread_create(platform_thread_t *thread, void *(*start_routine)(void *), void *arg);
-
-/**
- * @brief Join a thread
- *
- * @param thread Thread handle
- * @param retval Pointer to store return value
- * @return 0 on success, error code on failure
- */
-int platform_thread_join(platform_thread_t thread, void **retval);
 
 #endif /* PLATFORM_H */

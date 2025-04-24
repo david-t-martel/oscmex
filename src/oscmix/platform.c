@@ -4,10 +4,16 @@
  */
 
 #include "platform.h"
+#include "logging.h"
 
 #ifdef PLATFORM_WINDOWS
 #include <shlobj.h> // For SHGetFolderPath
+#else
+#include <netdb.h> // For POSIX networking functions
 #endif
+
+/* Initialize global state */
+static int g_socket_initialized = 0;
 
 /* Directory and path functions */
 
@@ -31,10 +37,12 @@ int platform_get_app_data_dir(char *buffer, size_t size)
 
 #if defined(__APPLE__)
     // macOS: ~/Library/Application Support
-    snprintf(buffer, size, "%s/Library/Application Support", home);
+    if (snprintf(buffer, size, "%s/Library/Application Support", home) >= (int)size)
+        return -1;
 #else
     // Linux/FreeBSD: ~/.local/share
-    snprintf(buffer, size, "%s/.local/share", home);
+    if (snprintf(buffer, size, "%s/.local/share", home) >= (int)size)
+        return -1;
 #endif
 
     return 0;
@@ -43,30 +51,34 @@ int platform_get_app_data_dir(char *buffer, size_t size)
 
 int platform_get_device_config_dir(char *buffer, size_t size)
 {
-    char app_dir[256];
+    char app_dir[PLATFORM_MAX_PATH];
     int result;
 
     result = platform_get_app_data_dir(app_dir, sizeof(app_dir));
     if (result != 0)
     {
+        log_error("Failed to get app data directory");
         return result;
     }
 
     // First join the paths
     if (platform_path_join(buffer, size, app_dir, "OSCMix") != 0)
     {
+        log_error("Failed to join paths: %s and OSCMix", app_dir);
         return -1;
     }
 
     // Now create the directory
     if (platform_ensure_directory(buffer) != 0)
     {
+        log_error("Failed to create directory: %s", buffer);
         return -1;
     }
 
     // Add the device_config part
     if (platform_path_join(buffer, size, buffer, "device_config") != 0)
     {
+        log_error("Failed to join paths: %s and device_config", buffer);
         return -1;
     }
 
@@ -80,7 +92,7 @@ int platform_ensure_directory(const char *path)
         return -1;
 
     // Make a copy of the path that we can modify
-    char dir_path[1024];
+    char dir_path[PLATFORM_MAX_PATH];
     strncpy(dir_path, path, sizeof(dir_path) - 1);
     dir_path[sizeof(dir_path) - 1] = '\0';
 
@@ -123,7 +135,10 @@ int platform_ensure_directory(const char *path)
             if (platform_access(dir_path, 0) != 0)
             {
                 if (platform_mkdir(dir_path) != 0)
+                {
+                    log_error("Failed to create directory: %s", dir_path);
                     return -1;
+                }
             }
         }
 
@@ -157,15 +172,25 @@ int platform_create_valid_filename(const char *input, char *output, size_t outpu
     for (i = 0; i < input_len && j < output_size - 1; i++)
     {
         char c = input[i];
+        // Allow alphanumeric, dash, underscore, and period
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-            (c >= '0' && c <= '9') || c == '-')
+            (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
         {
             output[j++] = c;
         }
-        else if (c == ' ' || c == '.' || c == ',')
+        else if (c == ' ' || c == ',' || c == '+' || c == '=')
         {
+            // Replace common separators with underscore
             output[j++] = '_';
         }
+        // Skip other characters
+    }
+
+    // Ensure output is not empty
+    if (j == 0 && output_size > 4)
+    {
+        strcpy(output, "file");
+        j = 4;
     }
 
     output[j] = '\0';
@@ -196,6 +221,21 @@ int platform_path_join(char *buffer, size_t size, const char *part1, const char 
     if (!buffer || size == 0 || !part1 || !part2)
         return -1;
 
+    // Handle empty parts
+    if (*part1 == '\0')
+    {
+        if (strlcpy(buffer, part2, size) >= size)
+            return -1;
+        return 0;
+    }
+
+    if (*part2 == '\0')
+    {
+        if (strlcpy(buffer, part1, size) >= size)
+            return -1;
+        return 0;
+    }
+
     size_t len1 = strlen(part1);
     size_t len2 = strlen(part2);
 
@@ -205,26 +245,49 @@ int platform_path_join(char *buffer, size_t size, const char *part1, const char 
     // Check if part2 starts with a separator
     bool skip_separator = (len2 > 0 && part2[0] == PLATFORM_PATH_SEPARATOR);
 
+    // Calculate required buffer size
+    size_t required_size;
+
     if (has_separator && skip_separator)
     {
         // Both have separators, skip one
-        snprintf(buffer, size, "%s%s", part1, part2 + 1);
+        required_size = len1 + len2; // +1 for null terminator, -1 for skipping separator
     }
     else if (!has_separator && !skip_separator)
     {
         // Neither has a separator, add one
-        snprintf(buffer, size, "%s%c%s", part1, PLATFORM_PATH_SEPARATOR, part2);
+        required_size = len1 + 1 + len2 + 1;
     }
     else
     {
         // One has a separator, use as is
-        snprintf(buffer, size, "%s%s", part1, part2);
+        required_size = len1 + len2 + 1;
     }
 
-    // Ensure null-termination
-    buffer[size - 1] = '\0';
+    if (required_size > size)
+    {
+        return -1;
+    }
 
-    // Return success - don't automatically create the directory
+    if (has_separator && skip_separator)
+    {
+        // Both have separators, skip one
+        if (snprintf(buffer, size, "%s%s", part1, part2 + 1) >= (int)size)
+            return -1;
+    }
+    else if (!has_separator && !skip_separator)
+    {
+        // Neither has a separator, add one
+        if (snprintf(buffer, size, "%s%c%s", part1, PLATFORM_PATH_SEPARATOR, part2) >= (int)size)
+            return -1;
+    }
+    else
+    {
+        // One has a separator, use as is
+        if (snprintf(buffer, size, "%s%s", part1, part2) >= (int)size)
+            return -1;
+    }
+
     return 0;
 }
 
@@ -256,14 +319,14 @@ int platform_path_basename(const char *path, char *buffer, size_t size)
         last_separator++;
 
         // Copy basename to buffer
-        strncpy(buffer, last_separator, size);
-        buffer[size - 1] = '\0';
+        if (strlcpy(buffer, last_separator, size) >= size)
+            return -1;
     }
     else
     {
         // No separator, copy the whole path
-        strncpy(buffer, path, size);
-        buffer[size - 1] = '\0';
+        if (strlcpy(buffer, path, size) >= size)
+            return -1;
     }
 
     return 0;
@@ -282,7 +345,7 @@ int platform_path_dirname(const char *path, char *buffer, size_t size)
 
         // Ensure buffer is big enough
         if (len >= size)
-            len = size - 1;
+            return -1;
 
         // Copy dirname to buffer
         memcpy(buffer, path, len);
@@ -291,6 +354,9 @@ int platform_path_dirname(const char *path, char *buffer, size_t size)
     else
     {
         // No separator, use current directory
+        if (size < 2)
+            return -1;
+
         buffer[0] = '.';
         buffer[1] = '\0';
     }
@@ -302,109 +368,366 @@ int platform_ensure_path(char *buffer, size_t size, const char *part1, const cha
 {
     int result = platform_path_join(buffer, size, part1, part2);
     if (result != 0)
+    {
+        log_error("Failed to join paths: %s and %s", part1, part2);
         return result;
+    }
 
     return platform_ensure_directory(buffer);
 }
 
 /* Socket functions */
 
+int platform_socket_init(void)
+{
 #if defined(PLATFORM_WINDOWS)
-int platform_socket_init(void)
-{
     WSADATA wsaData;
-    return WSAStartup(MAKEWORD(2, 2), &wsaData);
-}
-
-void platform_socket_cleanup(void)
-{
-    WSACleanup();
-}
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (result != 0)
+    {
+        log_error("WSAStartup failed: %d", result);
+    }
+    return result;
 #else
-int platform_socket_init(void)
-{
     return 0; // No initialization needed on POSIX
+#endif
 }
 
 void platform_socket_cleanup(void)
 {
+#if defined(PLATFORM_WINDOWS)
+    WSACleanup();
+    log_debug("Socket subsystem cleaned up");
+#endif
     // No cleanup needed on POSIX
 }
-#endif
 
 platform_socket_t platform_socket_create(int domain, int type, int protocol)
 {
-    return socket(domain, type, protocol);
+    // Initialize socket subsystem if not already done
+    if (!g_socket_initialized)
+    {
+        platform_socket_init();
+        g_socket_initialized = 1;
+    }
+
+    platform_socket_t sock = socket(domain, type, protocol);
+    if (sock == PLATFORM_INVALID_SOCKET)
+    {
+        log_error("Failed to create socket: %s", platform_strerror(platform_errno()));
+    }
+    return sock;
 }
 
 int platform_socket_close(platform_socket_t socket)
 {
+    if (socket == PLATFORM_INVALID_SOCKET)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
-    return closesocket(socket);
+    int result = closesocket(socket);
 #else
-    return close(socket);
+    int result = close(socket);
 #endif
+    if (result != 0)
+    {
+        log_error("Failed to close socket: %s", platform_strerror(platform_errno()));
+    }
+    return result;
 }
 
 int platform_socket_setsockopt(platform_socket_t socket, int level, int optname,
                                const void *optval, socklen_t optlen)
 {
+    if (socket == PLATFORM_INVALID_SOCKET || !optval)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
-    return setsockopt(socket, level, optname, (const char *)optval, optlen);
+    int result = setsockopt(socket, level, optname, (const char *)optval, optlen);
 #else
-    return setsockopt(socket, level, optname, optval, optlen);
+    int result = setsockopt(socket, level, optname, optval, optlen);
 #endif
+    if (result != 0)
+    {
+        log_error("Failed to set socket option: %s", platform_strerror(platform_errno()));
+    }
+    return result;
 }
 
 int platform_socket_bind(platform_socket_t socket, const char *address, int port)
 {
+    if (socket == PLATFORM_INVALID_SOCKET || port < 0 || port > 65535)
+        return -1;
+
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    addr.sin_port = htons((unsigned short)port);
 
     if (address)
     {
-        inet_pton(AF_INET, address, &addr.sin_addr);
+        if (inet_pton(AF_INET, address, &addr.sin_addr) != 1)
+        {
+            log_error("Invalid IP address: %s", address);
+            return -1;
+        }
     }
     else
     {
         addr.sin_addr.s_addr = INADDR_ANY;
     }
 
-    return bind(socket, (struct sockaddr *)&addr, sizeof(addr));
+    int result = bind(socket, (struct sockaddr *)&addr, sizeof(addr));
+    if (result != 0)
+    {
+        log_error("Failed to bind socket to %s:%d: %s",
+                  address ? address : "0.0.0.0", port, platform_strerror(platform_errno()));
+    }
+    else
+    {
+        log_debug("Socket bound to %s:%d", address ? address : "0.0.0.0", port);
+    }
+    return result;
 }
 
 int platform_socket_connect(platform_socket_t socket, const char *address, int port)
 {
+    if (socket == PLATFORM_INVALID_SOCKET || !address || port < 0 || port > 65535)
+        return -1;
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons((unsigned short)port);
+
+    if (inet_pton(AF_INET, address, &addr.sin_addr) != 1)
+    {
+        // Try to resolve hostname
+        struct hostent *he = gethostbyname(address);
+        if (!he)
+        {
+            log_error("Failed to resolve host: %s", address);
+            return -1;
+        }
+        memcpy(&addr.sin_addr, he->h_addr_list[0], he->h_length);
+    }
+
+    int result = connect(socket, (struct sockaddr *)&addr, sizeof(addr));
+    if (result != 0)
+    {
+        log_error("Failed to connect socket to %s:%d: %s",
+                  address, port, platform_strerror(platform_errno()));
+    }
+    else
+    {
+        log_debug("Socket connected to %s:%d", address, port);
+    }
+    return result;
+}
+
+platform_socket_t platform_socket_open(const char *address, int server)
+{
+    if (!address)
+    {
+        log_error("Invalid address: NULL");
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    // Initialize socket subsystem if needed
+    if (!g_socket_initialized)
+    {
+        platform_socket_init();
+        g_socket_initialized = 1;
+    }
+
+    // Parse the address string (format: "udp!host!port")
+    char proto[16], host[256], port_str[16];
+
+    // Copy the address to a buffer we can modify
+    char addr_buf[PLATFORM_MAX_PATH];
+    if (strlcpy(addr_buf, address, sizeof(addr_buf)) >= sizeof(addr_buf))
+    {
+        log_error("Address string too long: %s", address);
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    // Parse parts
+    char *proto_part = strtok(addr_buf, "!");
+    char *host_part = strtok(NULL, "!");
+    char *port_part = strtok(NULL, "!");
+
+    if (!proto_part || !host_part || !port_part)
+    {
+        log_error("Invalid address format: %s (expected proto!host!port)", address);
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    if (strlcpy(proto, proto_part, sizeof(proto)) >= sizeof(proto) ||
+        strlcpy(host, host_part, sizeof(host)) >= sizeof(host) ||
+        strlcpy(port_str, port_part, sizeof(port_str)) >= sizeof(port_str))
+    {
+        log_error("Address component too long in: %s", address);
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    int port = atoi(port_str);
+    if (port <= 0 || port > 65535)
+    {
+        log_error("Invalid port number: %s", port_str);
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    // Only UDP is supported for now
+    if (strcmp(proto, "udp") != 0)
+    {
+        log_error("Unsupported protocol: %s (only udp is supported)", proto);
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    // Create socket
+    platform_socket_t sock = platform_socket_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock == PLATFORM_INVALID_SOCKET)
+    {
+        log_error("Failed to create socket: %s", platform_strerror(platform_errno()));
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    // Set up address structure
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
 
-    if (!address || inet_pton(AF_INET, address, &addr.sin_addr) != 1)
+    if (server)
     {
-        return -1;
+        // For server (receiver), bind to the port
+        int optval = 1;
+
+        // Allow address reuse
+        if (platform_socket_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+                                       &optval, sizeof(optval)) != 0)
+        {
+            log_warning("Failed to set SO_REUSEADDR: %s", platform_strerror(platform_errno()));
+        }
+
+        // Check if this is a multicast address
+        if (strncmp(host, "224.", 4) == 0 || strncmp(host, "239.", 4) == 0)
+        {
+            struct ip_mreq mreq;
+
+            // Set up the multicast group
+            mreq.imr_multiaddr.s_addr = inet_addr(host);
+            mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+            // Join the multicast group
+            if (platform_socket_setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+                                           &mreq, sizeof(mreq)) != 0)
+            {
+                log_error("Failed to join multicast group: %s", platform_strerror(platform_errno()));
+                platform_socket_close(sock);
+                return PLATFORM_INVALID_SOCKET;
+            }
+
+            log_info("Joined multicast group: %s", host);
+            addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        }
+        else if (strcmp(host, "0.0.0.0") == 0 || strcmp(host, "*") == 0)
+        {
+            // Bind to all interfaces
+            addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        }
+        else
+        {
+            // Bind to specific interface
+            addr.sin_addr.s_addr = inet_addr(host);
+            if (addr.sin_addr.s_addr == INADDR_NONE)
+            {
+                log_error("Invalid IP address: %s", host);
+                platform_socket_close(sock);
+                return PLATFORM_INVALID_SOCKET;
+            }
+        }
+
+        // Bind to the address
+        if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+        {
+            log_error("Failed to bind socket: %s", platform_strerror(platform_errno()));
+            platform_socket_close(sock);
+            return PLATFORM_INVALID_SOCKET;
+        }
+
+        log_info("Socket bound to %s:%d", host, port);
+    }
+    else
+    {
+        // For client (sender), connect to the destination
+        addr.sin_addr.s_addr = inet_addr(host);
+
+        if (addr.sin_addr.s_addr == INADDR_NONE)
+        {
+            // Try to resolve hostname
+            struct hostent *he = gethostbyname(host);
+            if (!he)
+            {
+                log_error("Failed to resolve host: %s", host);
+                platform_socket_close(sock);
+                return PLATFORM_INVALID_SOCKET;
+            }
+            memcpy(&addr.sin_addr, he->h_addr_list[0], he->h_length);
+        }
+
+        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+        {
+            log_error("Failed to connect socket: %s", platform_strerror(platform_errno()));
+            platform_socket_close(sock);
+            return PLATFORM_INVALID_SOCKET;
+        }
+
+        log_info("Socket connected to %s:%d", host, port);
     }
 
-    return connect(socket, (struct sockaddr *)&addr, sizeof(addr));
+    return sock;
 }
 
-int platform_socket_send(platform_socket_t socket, const void *data, size_t len)
+/**
+ * @brief Send data on a socket
+ *
+ * @param sock Socket handle
+ * @param buf Data buffer
+ * @param len Data length
+ * @param flags Send flags
+ * @return Number of bytes sent or -1 on error
+ */
+ssize_t platform_socket_send(platform_socket_t sock, const void *buf, size_t len, int flags)
 {
+    if (sock == PLATFORM_INVALID_SOCKET || !buf || len == 0)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
-    return send(socket, (const char *)data, (int)len, 0);
+    return send(sock, (const char *)buf, (int)len, flags);
 #else
-    return send(socket, data, len, 0);
+    return send(sock, buf, len, flags);
 #endif
 }
 
-int platform_socket_recv(platform_socket_t socket, void *buffer, size_t size)
+/**
+ * @brief Receive data from a socket
+ *
+ * @param sock Socket handle
+ * @param buf Data buffer
+ * @param len Buffer size
+ * @param flags Receive flags
+ * @return Number of bytes received or -1 on error
+ */
+ssize_t platform_socket_recv(platform_socket_t sock, void *buf, size_t len, int flags)
 {
+    if (sock == PLATFORM_INVALID_SOCKET || !buf || len == 0)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
-    return recv(socket, (char *)buffer, (int)size, 0);
+    return recv(sock, (char *)buf, (int)len, flags);
 #else
-    return recv(socket, buffer, size, 0);
+    return recv(sock, buf, len, flags);
 #endif
 }
 
@@ -412,32 +735,63 @@ int platform_socket_recv(platform_socket_t socket, void *buffer, size_t size)
 
 FILE *platform_fopen(const char *filename, const char *mode)
 {
+    if (!filename || !mode)
+        return NULL;
+
 #if defined(PLATFORM_WINDOWS)
     FILE *fp;
     if (fopen_s(&fp, filename, mode) != 0)
     {
+        log_error("Failed to open file: %s (mode %s)", filename, mode);
         return NULL;
     }
     return fp;
 #else
-    return fopen(filename, mode);
+    FILE *fp = fopen(filename, mode);
+    if (!fp)
+    {
+        log_error("Failed to open file: %s (mode %s): %s",
+                  filename, mode, strerror(errno));
+    }
+    return fp;
 #endif
 }
 
 int platform_remove(const char *filename)
 {
-    return remove(filename);
+    if (!filename)
+        return -1;
+
+    int result = remove(filename);
+    if (result != 0)
+    {
+        log_error("Failed to remove file: %s: %s",
+                  filename, platform_strerror(platform_errno()));
+    }
+    return result;
 }
 
 int platform_rename(const char *oldname, const char *newname)
 {
-    return rename(oldname, newname);
+    if (!oldname || !newname)
+        return -1;
+
+    int result = rename(oldname, newname);
+    if (result != 0)
+    {
+        log_error("Failed to rename file from %s to %s: %s",
+                  oldname, newname, platform_strerror(platform_errno()));
+    }
+    return result;
 }
 
 /* Thread functions */
 
 int platform_thread_create(platform_thread_t *thread, platform_thread_func_t func, void *arg)
 {
+    if (!thread || !func)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
     *thread = (platform_thread_t)_beginthreadex(NULL, 0, func, arg, 0, NULL);
     return (*thread == 0) ? -1 : 0;
@@ -477,8 +831,10 @@ int platform_set_signal_handler(void (*handler)(int))
     global_signal_handler = handler;
     if (!SetConsoleCtrlHandler(win32_signal_handler, TRUE))
     {
+        log_error("Failed to set console control handler: %s", platform_strerror(GetLastError()));
         return -1;
     }
+    log_debug("Set signal handler for Windows");
     return 0;
 }
 
@@ -518,10 +874,17 @@ int platform_set_signal_handler(void (*handler)(int))
     sigfillset(&sa.sa_mask); // Block all signals during handler
 
     if (sigaction(SIGINT, &sa, NULL) != 0)
+    {
+        log_error("Failed to set SIGINT handler: %s", strerror(errno));
         return -1;
+    }
     if (sigaction(SIGTERM, &sa, NULL) != 0)
+    {
+        log_error("Failed to set SIGTERM handler: %s", strerror(errno));
         return -1;
+    }
 
+    log_debug("Set signal handlers for POSIX");
     return 0;
 }
 #endif
@@ -532,6 +895,7 @@ int platform_set_cleanup_handler(void (*cleanup_func)(void))
         return -1;
 
     atexit(cleanup_func);
+    log_debug("Set cleanup handler");
     return 0;
 }
 
@@ -628,9 +992,11 @@ int platform_midi_open_input(const char *device_name, platform_midiin_t *handle)
     result = midiInOpen(handle, deviceId, NULL, 0, CALLBACK_NULL);
     if (result != MMSYSERR_NOERROR)
     {
+        log_error("Failed to open MIDI input device: %s", device_name);
         return -1;
     }
 
+    log_info("Opened MIDI input device: %s (ID: %u)", device_name, deviceId);
     return 0;
 }
 
@@ -672,9 +1038,11 @@ int platform_midi_open_output(const char *device_name, platform_midiout_t *handl
     result = midiOutOpen(handle, deviceId, 0, 0, CALLBACK_NULL);
     if (result != MMSYSERR_NOERROR)
     {
+        log_error("Failed to open MIDI output device: %s", device_name);
         return -1;
     }
 
+    log_info("Opened MIDI output device: %s (ID: %u)", device_name, deviceId);
     return 0;
 }
 
@@ -685,6 +1053,7 @@ int platform_midi_close_input(platform_midiin_t handle)
         midiInStop(handle);
         midiInReset(handle);
         midiInClose(handle);
+        log_debug("Closed MIDI input device");
     }
     return 0;
 }
@@ -695,6 +1064,7 @@ int platform_midi_close_output(platform_midiout_t handle)
     {
         midiOutReset(handle);
         midiOutClose(handle);
+        log_debug("Closed MIDI output device");
     }
     return 0;
 }
@@ -715,29 +1085,38 @@ int platform_midi_send(platform_midiout_t handle, const void *data, size_t len)
         // Set up the MIDI output header
         ZeroMemory(&midiHdr, sizeof(MIDIHDR));
         midiHdr.lpData = (LPSTR)data;
-        midiHdr.dwBufferLength = len;
+        midiHdr.dwBufferLength = (DWORD)len;
         midiHdr.dwFlags = 0;
 
         result = midiOutPrepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
         if (result != MMSYSERR_NOERROR)
+        {
+            log_error("Failed to prepare MIDI header: %u", result);
             return -1;
+        }
 
         result = midiOutLongMsg(handle, &midiHdr, sizeof(MIDIHDR));
         if (result != MMSYSERR_NOERROR)
         {
             midiOutUnprepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
+            log_error("Failed to send MIDI long message: %u", result);
             return -1;
         }
 
         // Wait for the message to be sent
-        while (!(midiHdr.dwFlags & MHDR_DONE))
+        int wait_count = 0;
+        while (!(midiHdr.dwFlags & MHDR_DONE) && wait_count < 100)
         {
             Sleep(1);
+            wait_count++;
         }
 
         result = midiOutUnprepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
         if (result != MMSYSERR_NOERROR)
+        {
+            log_error("Failed to unprepare MIDI header: %u", result);
             return -1;
+        }
     }
     else
     {
@@ -753,25 +1132,36 @@ int platform_midi_send(platform_midiout_t handle, const void *data, size_t len)
 
         result = midiOutShortMsg(handle, message);
         if (result != MMSYSERR_NOERROR)
+        {
+            log_error("Failed to send MIDI short message: %u", result);
             return -1;
+        }
     }
 
+    log_debug("Sent %zu bytes of MIDI data", len);
     return 0;
 }
 
 int platform_midi_add_buffer(platform_midiin_t handle, void *buffer, size_t len)
 {
-    MIDIHDR *midiHdr = (MIDIHDR *)calloc(1, sizeof(MIDIHDR));
-    if (!midiHdr)
+    if (!handle || !buffer || len == 0)
         return -1;
 
+    MIDIHDR *midiHdr = (MIDIHDR *)calloc(1, sizeof(MIDIHDR));
+    if (!midiHdr)
+    {
+        log_error("Failed to allocate MIDI header");
+        return -1;
+    }
+
     midiHdr->lpData = buffer;
-    midiHdr->dwBufferLength = len;
+    midiHdr->dwBufferLength = (DWORD)len;
     midiHdr->dwFlags = 0;
 
     MMRESULT result = midiInPrepareHeader(handle, midiHdr, sizeof(MIDIHDR));
     if (result != MMSYSERR_NOERROR)
     {
+        log_error("Failed to prepare MIDI input header: %u", result);
         free(midiHdr);
         return -1;
     }
@@ -779,19 +1169,27 @@ int platform_midi_add_buffer(platform_midiin_t handle, void *buffer, size_t len)
     result = midiInAddBuffer(handle, midiHdr, sizeof(MIDIHDR));
     if (result != MMSYSERR_NOERROR)
     {
+        log_error("Failed to add MIDI input buffer: %u", result);
         midiInUnprepareHeader(handle, midiHdr, sizeof(MIDIHDR));
         free(midiHdr);
         return -1;
     }
 
+    log_debug("Added %zu bytes MIDI input buffer", len);
     return 0;
 }
 
 int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_t callback, void *user_data)
 {
+    if (!handle || !callback)
+        return -1;
+
     midi_callback_info *info = (midi_callback_info *)calloc(1, sizeof(midi_callback_info));
     if (!info)
+    {
+        log_error("Failed to allocate MIDI callback info");
         return -1;
+    }
 
     info->callback = callback;
     info->user_data = user_data;
@@ -800,6 +1198,7 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
     UINT deviceId;
     if (midiInGetID(handle, &deviceId) != MMSYSERR_NOERROR)
     {
+        log_error("Failed to get MIDI device ID");
         free(info);
         return -1;
     }
@@ -812,6 +1211,7 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
                                  (DWORD_PTR)info, CALLBACK_FUNCTION);
     if (result != MMSYSERR_NOERROR)
     {
+        log_error("Failed to reopen MIDI device with callback: %u", result);
         free(info);
         return -1;
     }
@@ -819,11 +1219,13 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
     result = midiInStart(handle);
     if (result != MMSYSERR_NOERROR)
     {
+        log_error("Failed to start MIDI input: %u", result);
         midiInClose(handle);
         free(info);
         return -1;
     }
 
+    log_debug("Set MIDI input callback");
     return 0;
 }
 
@@ -833,11 +1235,13 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
 
 int platform_midi_init(void)
 {
+    log_info("MIDI subsystem initialized (POSIX stub)");
     return 0; // Not implemented
 }
 
 void platform_midi_cleanup(void)
 {
+    log_info("MIDI subsystem cleaned up (POSIX stub)");
     // Not implemented
 }
 
@@ -848,7 +1252,14 @@ int platform_midi_open_input(const char *device_name, platform_midiin_t *handle)
 
     // For POSIX, we might open a device like /dev/midi
     *handle = open(device_name, O_RDONLY | O_NONBLOCK);
-    return (*handle < 0) ? -1 : 0;
+    if (*handle < 0)
+    {
+        log_error("Failed to open MIDI input device: %s: %s", device_name, strerror(errno));
+        return -1;
+    }
+
+    log_info("Opened MIDI input device: %s", device_name);
+    return 0;
 }
 
 int platform_midi_open_output(const char *device_name, platform_midiout_t *handle)
@@ -858,20 +1269,33 @@ int platform_midi_open_output(const char *device_name, platform_midiout_t *handl
 
     // For POSIX, we might open a device like /dev/midi
     *handle = open(device_name, O_WRONLY);
-    return (*handle < 0) ? -1 : 0;
+    if (*handle < 0)
+    {
+        log_error("Failed to open MIDI output device: %s: %s", device_name, strerror(errno));
+        return -1;
+    }
+
+    log_info("Opened MIDI output device: %s", device_name);
+    return 0;
 }
 
 int platform_midi_close_input(platform_midiin_t handle)
 {
     if (handle >= 0)
+    {
         close(handle);
+        log_debug("Closed MIDI input device");
+    }
     return 0;
 }
 
 int platform_midi_close_output(platform_midiout_t handle)
 {
     if (handle >= 0)
+    {
         close(handle);
+        log_debug("Closed MIDI output device");
+    }
     return 0;
 }
 
@@ -882,18 +1306,27 @@ int platform_midi_send(platform_midiout_t handle, const void *data, size_t len)
 
     // Simple write to the file descriptor
     ssize_t written = write(handle, data, len);
-    return (written == len) ? 0 : -1;
+    if (written != (ssize_t)len)
+    {
+        log_error("Failed to send MIDI data: %s", strerror(errno));
+        return -1;
+    }
+
+    log_debug("Sent %zu bytes of MIDI data", len);
+    return 0;
 }
 
 int platform_midi_add_buffer(platform_midiin_t handle, void *buffer, size_t len)
 {
     // Not directly applicable to POSIX, would depend on the specific MIDI library
+    log_info("MIDI add buffer not implemented for POSIX");
     return -1;
 }
 
 int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_t callback, void *user_data)
 {
     // Not directly applicable to POSIX, would depend on the specific MIDI library
+    log_info("MIDI callback not implemented for POSIX");
     return -1;
 }
 #endif
@@ -902,6 +1335,9 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
 
 int platform_mutex_init(platform_mutex_t *mutex)
 {
+    if (!mutex)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
     *mutex = CreateMutex(NULL, FALSE, NULL);
     return (*mutex == NULL) ? -1 : 0;
@@ -912,6 +1348,9 @@ int platform_mutex_init(platform_mutex_t *mutex)
 
 int platform_mutex_destroy(platform_mutex_t *mutex)
 {
+    if (!mutex)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
     if (*mutex != NULL)
     {
@@ -926,6 +1365,9 @@ int platform_mutex_destroy(platform_mutex_t *mutex)
 
 int platform_mutex_lock(platform_mutex_t *mutex)
 {
+    if (!mutex)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
     DWORD result = WaitForSingleObject(*mutex, INFINITE);
     return (result == WAIT_OBJECT_0 || result == WAIT_ABANDONED) ? 0 : -1;
@@ -936,6 +1378,9 @@ int platform_mutex_lock(platform_mutex_t *mutex)
 
 int platform_mutex_unlock(platform_mutex_t *mutex)
 {
+    if (!mutex)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
     return ReleaseMutex(*mutex) ? 0 : -1;
 #else
@@ -1113,42 +1558,6 @@ platform_socket_t platform_socket_open(const char *address, int server)
 }
 
 /**
- * @brief Send data on a socket
- *
- * @param sock Socket handle
- * @param buf Data buffer
- * @param len Data length
- * @param flags Send flags
- * @return Number of bytes sent or -1 on error
- */
-ssize_t platform_socket_send(platform_socket_t sock, const void *buf, size_t len, int flags)
-{
-#if defined(PLATFORM_WINDOWS)
-    return send(sock, (const char *)buf, (int)len, flags);
-#else
-    return send(sock, buf, len, flags);
-#endif
-}
-
-/**
- * @brief Receive data from a socket
- *
- * @param sock Socket handle
- * @param buf Data buffer
- * @param len Buffer size
- * @param flags Receive flags
- * @return Number of bytes received or -1 on error
- */
-ssize_t platform_socket_recv(platform_socket_t sock, void *buf, size_t len, int flags)
-{
-#if defined(PLATFORM_WINDOWS)
-    return recv(sock, (char *)buf, (int)len, flags);
-#else
-    return recv(sock, buf, len, flags);
-#endif
-}
-
-/**
  * @brief Get standard input stream
  *
  * @return Standard input stream
@@ -1178,6 +1587,9 @@ platform_stream_t *platform_get_stdout(void)
  */
 char *platform_gets(char *buf, size_t size, platform_stream_t *stream)
 {
+    if (!buf || !stream || size == 0)
+        return NULL;
+
     if (fgets(buf, (int)size, stream) == NULL)
         return NULL;
 
@@ -1199,6 +1611,9 @@ char *platform_gets(char *buf, size_t size, platform_stream_t *stream)
  */
 int platform_printf(platform_stream_t *stream, const char *format, ...)
 {
+    if (!stream || !format)
+        return -1;
+
     va_list args;
     int ret;
 
@@ -1219,6 +1634,9 @@ int platform_printf(platform_stream_t *stream, const char *format, ...)
  */
 size_t platform_write(const void *buf, size_t size, platform_stream_t *stream)
 {
+    if (!buf || !stream || size == 0)
+        return 0;
+
     return fwrite(buf, 1, size, stream);
 }
 
@@ -1232,6 +1650,9 @@ size_t platform_write(const void *buf, size_t size, platform_stream_t *stream)
  */
 size_t platform_read(void *buf, size_t size, platform_stream_t *stream)
 {
+    if (!buf || !stream || size == 0)
+        return 0;
+
     return fread(buf, 1, size, stream);
 }
 
@@ -1243,6 +1664,9 @@ size_t platform_read(void *buf, size_t size, platform_stream_t *stream)
  */
 int platform_flush(platform_stream_t *stream)
 {
+    if (!stream)
+        return -1;
+
     return fflush(stream);
 }
 
@@ -1254,6 +1678,9 @@ int platform_flush(platform_stream_t *stream)
  */
 int platform_error(platform_stream_t *stream)
 {
+    if (!stream)
+        return -1;
+
     return ferror(stream);
 }
 
@@ -1267,6 +1694,9 @@ int platform_error(platform_stream_t *stream)
  */
 int platform_thread_create(platform_thread_t *thread, void *(*start_routine)(void *), void *arg)
 {
+    if (!thread || !start_routine)
+        return -1;
+
 #if defined(PLATFORM_WINDOWS)
     unsigned thread_id;
     *thread = (HANDLE)_beginthreadex(NULL, 0,
