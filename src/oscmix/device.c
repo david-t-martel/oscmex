@@ -27,6 +27,32 @@ int sample_rate = 0;          // Current sample rate index
 int clock_source = 0;         // Current clock source index
 int buffer_size = 0;          // Current buffer size index
 
+/* Define shared constants */
+const long SAMPLE_RATES[SAMPLE_RATE_COUNT] = {
+    44100, 48000, 88200, 96000, 176400, 192000,
+    352800, 384000, 705600, 768000};
+
+const char *const DUREC_STATUS_NAMES[] = {
+    "No Media",
+    "Filesystem Error",
+    "Initializing",
+    "Reinitializing",
+    NULL,
+    "Stopped",
+    "Recording",
+    NULL, NULL, NULL,
+    "Playing",
+    "Paused"};
+
+const char *const DUREC_PLAYMODE_NAMES[] = {
+    "Single", "Repeat", "Sequence", "Random"};
+
+const char *const INPUT_REF_LEVEL_NAMES[] = {
+    "Lo Gain", "+4 dBu", "-10 dBV", "Hi Gain"};
+
+const char *const OUTPUT_REF_LEVEL_NAMES[] = {
+    "Hi Gain", "+4 dBu", "-10 dBV", "Lo Gain"};
+
 /* RME Fireface UCX II definitions */
 static const struct inputinfo ffucxii_inputs[] = {
     {"MIC 1", INPUT_GAIN | INPUT_48V | INPUT_REFLEVEL | INPUT_HIZ},
@@ -253,3 +279,37 @@ int load_device_config(const char *device_id, struct devicestate *state)
 
     // Rest of config loading code...
 }
+
+/**
+ * @brief Update DSP status from register value
+ * @param reg_value The raw register value
+ * @return 0 on success, non-zero on failure
+ */
+int update_dsp_status(uint16_t reg_value)
+{
+    int load = reg_value & 0xff;
+    int vers = reg_value >> 8;
+
+    // Update internal state
+    set_dsp_state(vers, load);
+
+    return 0;
+}
+
+/**
+ * @brief Update DURec status from register value
+ * @param reg_value The raw register value
+ * @return 0 on success, non-zero on failure
+ */
+int update_durec_status(uint16_t reg_value)
+{
+    int status = reg_value & 0xf;
+    int position = (reg_value >> 8) * 100 / 65;
+
+    // Update internal state
+    set_durec_state(status, position, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
+
+    return 0;
+}
+
+// Additional parameter update functions...

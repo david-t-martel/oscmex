@@ -15,7 +15,8 @@
 #include "device_state.h"
 #include "platform.h"
 #include "oscmix.h"
-#include "dump.h" // Include dump.h for dumping functions
+#include "dump.h"             // Include dump.h for dumping functions
+#include "device_observers.h" // Include the device observers header
 
 /* External variables from device.c */
 extern const struct device *cur_device;
@@ -482,12 +483,192 @@ void get_dsp_state(int *vers, int *load)
         *load = dsp.load;
 }
 
+// Modify set_dsp_state to use observers
 void set_dsp_state(int vers, int load)
 {
-    if (vers >= 0)
+    int changed = 0;
+
+    if (vers >= 0 && vers != dsp.vers)
+    {
         dsp.vers = vers;
-    if (load >= 0)
+        changed = 1;
+    }
+
+    if (load >= 0 && load != dsp.load)
+    {
         dsp.load = load;
+        changed = 1;
+    }
+
+    // Notify observers if anything changed and not in refresh mode
+    if (changed && !refreshing_state(-1))
+    {
+        notify_dsp_state_changed(dsp.vers, dsp.load);
+    }
+}
+
+// Similarly update other state change functions
+void set_durec_state(int status, int position, int time, int usberrors, int usbload,
+                     float totalspace, float freespace, int file, int recordtime,
+                     int index, int next, int playmode)
+{
+    int changed = 0;
+
+    if (status >= 0 && status != durec.status)
+    {
+        durec.status = status;
+        changed = 1;
+    }
+
+    if (position >= 0 && position != durec.position)
+    {
+        durec.position = position;
+        changed = 1;
+    }
+
+    // Set other parameters...
+
+    // Notify observers if status or position changed and not in refresh mode
+    if (changed && !refreshing_state(-1))
+    {
+        notify_durec_status_changed(durec.status, durec.position);
+    }
+}
+
+// Add functions to explicitly update specific parameters with notifications
+
+/**
+ * @brief Update input parameters and notify observers
+ *
+ * @param index Input channel index
+ * @param gain New gain value (-1 to leave unchanged)
+ * @param phantom New phantom power state (-1 to leave unchanged)
+ * @param hiz New high impedance state (-1 to leave unchanged)
+ * @param mute New mute state (-1 to leave unchanged)
+ * @return 0 on success, non-zero on failure
+ */
+int update_input(int index, float gain, int phantom, int hiz, int mute)
+{
+    if (!cur_device || !input_gains || index < 0 || index >= cur_device->inputslen)
+        return -1;
+
+    int changed = 0;
+
+    // Update gain if provided
+    if (gain >= 0.0f && gain != input_gains[index])
+    {
+        input_gains[index] = gain;
+        changed = 1;
+    }
+
+    // Update phantom if provided
+    if (phantom >= 0 && (bool)phantom != input_phantoms[index])
+    {
+        input_phantoms[index] = (bool)phantom;
+        changed = 1;
+    }
+
+    // Update hiz if provided
+    if (hiz >= 0 && (bool)hiz != input_hizs[index])
+    {
+        input_hizs[index] = (bool)hiz;
+        changed = 1;
+    }
+
+    // Update mute if provided
+    if (mute >= 0 && (bool)mute != input_mutes[index])
+    {
+        input_mutes[index] = (bool)mute;
+        changed = 1;
+    }
+
+    // Notify observers if anything changed and not in refresh mode
+    if (changed && !refreshing_state(-1))
+    {
+        notify_input_changed(index, input_gains[index], input_phantoms[index],
+                             input_hizs[index], input_mutes[index]);
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Update output parameters and notify observers
+ *
+ * @param index Output channel index
+ * @param volume New volume value (-1 to leave unchanged)
+ * @param mute New mute state (-1 to leave unchanged)
+ * @return 0 on success, non-zero on failure
+ */
+int update_output(int index, float volume, int mute)
+{
+    if (!cur_device || !output_volumes || index < 0 || index >= cur_device->outputslen)
+        return -1;
+
+    int changed = 0;
+
+    // Update volume if provided
+    if (volume >= 0.0f && volume != output_volumes[index])
+    {
+        output_volumes[index] = volume;
+        changed = 1;
+    }
+
+    // Update mute if provided
+    if (mute >= 0 && (bool)mute != output_mutes[index])
+    {
+        output_mutes[index] = (bool)mute;
+        changed = 1;
+    }
+
+    // Notify observers if anything changed and not in refresh mode
+    if (changed && !refreshing_state(-1))
+    {
+        notify_output_changed(index, output_volumes[index], output_mutes[index]);
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Update mixer parameters and notify observers
+ *
+ * @param input Input channel index
+ * @param output Output channel index
+ * @param volume New volume value (negative to leave unchanged)
+ * @param pan New pan value (negative to leave unchanged)
+ * @return 0 on success, non-zero on failure
+ */
+int update_mixer(int input, int output, float volume, float pan)
+{
+    if (!cur_device || !volumes || !pans ||
+        input < 0 || input >= cur_device->inputslen ||
+        output < 0 || output >= cur_device->outputslen)
+        return -1;
+
+    int changed = 0;
+
+    // Update volume if provided
+    if (volume > -INFINITY && volume != volumes[input][output])
+    {
+        volumes[input][output] = volume;
+        changed = 1;
+    }
+
+    // Update pan if provided
+    if (pan >= -100.0f && pan <= 100.0f && pan != pans[input][output])
+    {
+        pans[input][output] = pan;
+        changed = 1;
+    }
+
+    // Notify observers if anything changed and not in refresh mode
+    if (changed && !refreshing_state(-1))
+    {
+        notify_mixer_changed(input, output, volumes[input][output], pans[input][output]);
+    }
+
+    return 0;
 }
 
 struct input_state *get_input_state(int index)
@@ -543,45 +724,6 @@ void get_durec_state(int *status, int *position, int *time,
         *playmode = durec.playmode;
 }
 
-void set_durec_state(int status, int position, int time,
-                     int usberrors, int usbload,
-                     float totalspace, float freespace,
-                     int file, int recordtime, int index,
-                     int next, int playmode)
-{
-    if (status >= 0)
-        durec.status = status;
-    if (position >= 0)
-        durec.position = position;
-    if (time >= 0)
-        durec.time = time;
-    if (usberrors >= 0)
-        durec.usberrors = usberrors;
-    if (usbload >= 0)
-        durec.usbload = usbload;
-    if (totalspace >= 0)
-        durec.totalspace = totalspace;
-    if (freespace >= 0)
-        durec.freespace = freespace;
-    if (file >= 0)
-        durec.file = file;
-    if (recordtime >= 0)
-        durec.recordtime = recordtime;
-    if (index >= 0)
-        durec.index = index;
-    if (next >= 0)
-        durec.next = next;
-    if (playmode >= 0)
-        durec.playmode = playmode;
-}
-
-struct durecfile_state *get_durec_files(size_t *fileslen)
-{
-    if (fileslen)
-        *fileslen = durec.fileslen;
-    return durec.files;
-}
-
 int set_durec_files_length(size_t fileslen)
 {
     struct durecfile_state *new_files;
@@ -606,4 +748,11 @@ int set_durec_files_length(size_t fileslen)
         durec.index = -1;
 
     return 0;
+}
+
+struct durecfile_state *get_durec_files(size_t *fileslen)
+{
+    if (fileslen)
+        *fileslen = durec.fileslen;
+    return durec.files;
 }

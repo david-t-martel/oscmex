@@ -953,3 +953,80 @@ int setoutputname(const struct oscnode *path[], int reg, struct oscmsg *msg)
 
     return 0;
 }
+
+// Add a new command handler
+
+/**
+ * @brief Handle OSC status request
+ *
+ * This function responds to the /oscstatus OSC message
+ * by sending the current status of OSC observers.
+ *
+ * @param path The OSC address path
+ * @param addr The full OSC address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int oscstatus(const struct oscnode *path[], const char *addr, struct oscmsg *msg)
+{
+    bool dsp_active, durec_active, samplerate_active;
+    bool input_active, output_active, mixer_active;
+
+    // Get observer status
+    int active_count = get_observer_status(&dsp_active, &durec_active, &samplerate_active,
+                                           &input_active, &output_active, &mixer_active);
+
+    // Send status response
+    oscsend("/oscstatus/active", ",i", active_count);
+    oscsend("/oscstatus/dsp", ",i", dsp_active ? 1 : 0);
+    oscsend("/oscstatus/durec", ",i", durec_active ? 1 : 0);
+    oscsend("/oscstatus/samplerate", ",i", samplerate_active ? 1 : 0);
+    oscsend("/oscstatus/input", ",i", input_active ? 1 : 0);
+    oscsend("/oscstatus/output", ",i", output_active ? 1 : 0);
+    oscsend("/oscstatus/mixer", ",i", mixer_active ? 1 : 0);
+
+    // Send log status
+    const char *recent_logs[10];
+    int log_count = log_get_recent(recent_logs, 10);
+
+    // Send the most recent error/warning log (if any)
+    for (int i = 0; i < log_count; i++)
+    {
+        if (strstr(recent_logs[i], "[ERROR]") || strstr(recent_logs[i], "[WARNING]"))
+        {
+            oscsend("/oscstatus/lastlog", ",s", recent_logs[i]);
+            break;
+        }
+    }
+
+    oscflush();
+
+    // Send full device state if requested and observers are partially active
+    if (msg->argc > 0 && msg->argv[0].type == 'i' && msg->argv[0].i > 0 && active_count > 0)
+    {
+        send_full_device_state();
+    }
+
+    return 0;
+}
+
+// Add a function to report errors to GUI clients
+
+/**
+ * @brief Send an error message to GUI clients
+ *
+ * @param error_code Error code
+ * @param context Context string (e.g., function name)
+ * @param message Error message
+ */
+void send_error_to_gui(int error_code, const char *context, const char *message)
+{
+    // Log the error
+    log_error("%s: %s (code %d)", context, message, error_code);
+
+    // Send via OSC for GUI clients
+    oscsend("/error", ",iss", error_code, context, message);
+    oscflush();
+}
+
+// Register the command in the OSC node tree setup

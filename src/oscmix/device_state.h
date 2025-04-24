@@ -224,4 +224,39 @@ struct durecfile_state *get_durec_files(size_t *fileslen);
  */
 int set_durec_files_length(size_t fileslen);
 
+// Add these function declarations:
+
+/**
+ * @brief Update input parameters and notify observers
+ *
+ * @param index Input channel index
+ * @param gain New gain value (-1 to leave unchanged)
+ * @param phantom New phantom power state (-1 to leave unchanged)
+ * @param hiz New high impedance state (-1 to leave unchanged)
+ * @param mute New mute state (-1 to leave unchanged)
+ * @return 0 on success, non-zero on failure
+ */
+int update_input(int index, float gain, int phantom, int hiz, int mute);
+
+/**
+ * @brief Update output parameters and notify observers
+ *
+ * @param index Output channel index
+ * @param volume New volume value (-1 to leave unchanged)
+ * @param mute New mute state (-1 to leave unchanged)
+ * @return 0 on success, non-zero on failure
+ */
+int update_output(int index, float volume, int mute);
+
+/**
+ * @brief Update mixer parameters and notify observers
+ *
+ * @param input Input channel index
+ * @param output Output channel index
+ * @param volume New volume value (negative to leave unchanged)
+ * @param pan New pan value (negative to leave unchanged)
+ * @return 0 on success, non-zero on failure
+ */
+int update_mixer(int input, int output, float volume, float pan);
+
 #endif /* DEVICE_STATE_H */

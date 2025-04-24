@@ -22,6 +22,16 @@
 int setreg(unsigned reg, unsigned val);
 
 /**
+ * @brief Register OSC observers for device state changes
+ *
+ * This function sets up callbacks that send OSC messages
+ * when device state changes occur.
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int register_osc_observers(void);
+
+/**
  * @brief Sets an audio level parameter value in the device
  *
  * @param reg The register address

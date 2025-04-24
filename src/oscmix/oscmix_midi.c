@@ -157,50 +157,95 @@ void oscsend(const char *addr, const char *type, ...)
     unsigned char *len;
     va_list ap;
 
-    assert(addr[0] == '/');
-    assert(type[0] == ',');
-
-    if (!oscmsg.buf)
+    // Initialize the OSC message structure
+    if (oscinit(&oscmsg, oscbuf, sizeof oscbuf) != 0)
     {
-        oscmsg.buf = (unsigned char *)oscbuf;
-        oscmsg.end = (unsigned char *)oscbuf + sizeof oscbuf;
-        oscmsg.type = NULL;
-        oscputstr(&oscmsg, "#bundle");
-        oscputint(&oscmsg, 0);
-        oscputint(&oscmsg, 1);
+        log_error("Failed to initialize OSC message for %s", addr);
+        return;
     }
 
+    // Copy the address string
     len = oscmsg.buf;
-    oscmsg.type = NULL;
-    oscputint(&oscmsg, 0);
-    oscputstr(&oscmsg, addr);
-    oscputstr(&oscmsg, type);
-    oscmsg.type = type + 1;
+    if (strlen(addr) + 1 > sizeof(oscbuf) - (len - oscbuf))
+    {
+        log_error("OSC address too long: %s", addr);
+        return;
+    }
 
+    strcpy((char *)len, addr);
+    len += ((strlen(addr) + 4) & ~3);
+
+    // Copy the type tag string with leading comma
+    if (strlen(type) + 2 > sizeof(oscbuf) - (len - oscbuf))
+    {
+        log_error("OSC type tag too long: %s", type);
+        return;
+    }
+
+    strcpy((char *)len, ",");
+    strcat((char *)len, type);
+    len += ((strlen((char *)len) + 4) & ~3);
+
+    // Set the buffer position
+    oscmsg.buf = len;
+    oscmsg.type = type;
+
+    // Process the variable arguments according to type tags
     va_start(ap, type);
-    for (const char *t = type + 1; *t; t++)
+    for (const char *t = type; *t; t++)
     {
         switch (*t)
         {
-        case 'f':
-            oscputfloat(&oscmsg, va_arg(ap, double)); // Note: float is promoted to double in var args
-            break;
         case 'i':
-            oscputint(&oscmsg, va_arg(ap, int));
-            break;
+        {
+            int val = va_arg(ap, int);
+            oscputint(&oscmsg, val);
+        }
+        break;
+
+        case 'f':
+        {
+            // va_arg promotes float to double, so we need to cast
+            float val = (float)va_arg(ap, double);
+            oscputfloat(&oscmsg, val);
+        }
+        break;
+
         case 's':
-            oscputstr(&oscmsg, va_arg(ap, const char *));
-            break;
-        case 'T':
-        case 'F':
-            // No argument for boolean tags
-            break;
+        {
+            const char *val = va_arg(ap, const char *);
+            oscputstr(&oscmsg, val);
+        }
+        break;
+
+            // Add other types as needed
+
         default:
-            fprintf(stderr, "unsupported osc type: %c\n", *t);
+            log_warning("Unsupported OSC type: %c", *t);
+            break;
+        }
+
+        if (oscmsg.err)
+        {
+            log_error("OSC message error: %s", oscmsg.err);
+            va_end(ap);
+            return;
         }
     }
     va_end(ap);
-    putbe32(len, oscmsg.buf - len - 4);
+
+    // Calculate the message length
+    size_t msglen = oscmsg.buf - (unsigned char *)oscbuf;
+
+    // Send the message
+    if (msglen > 0)
+    {
+        writeosc(oscbuf, msglen);
+    }
+    else
+    {
+        log_error("Empty OSC message for %s", addr);
+    }
 }
 
 /**
@@ -280,6 +325,38 @@ void handleregs(uint_least32_t *payload, size_t len)
 #ifdef DEBUG
         fprintf(stderr, "Received register 0x%04x = 0x%04x\n", reg, val);
 #endif
+
+        switch (reg)
+        {
+        case REG_SAMPLE_RATE:
+            update_sample_rate(val);
+            break;
+
+        case REG_DSP_STATUS:
+            update_dsp_status(val);
+            break;
+
+        case REG_DUREC_STATUS:
+            update_durec_status(val);
+            break;
+
+            // Handle other registers
+
+        default:
+            // Handle input/output/mixer registers
+            if (reg < 0x0800)
+            {
+                int ch = reg >> 6;
+                int param = reg & 0x3F;
+                update_input_parameter(ch, param, val);
+            }
+            else if (reg >= 0x1000 && reg < 0x1800)
+            {
+                // Handle output registers
+            }
+            // etc.
+            break;
+        }
 
         // Lookup the node in the tree and notify clients of changes
         const char *components[8];
@@ -874,13 +951,15 @@ int newsamplerate(const struct oscnode *path[], const char *addr, int reg, int v
  */
 int newdspload(const struct oscnode *path[], const char *addr, int reg, int val)
 {
-    int load, vers;
-
-    load = val & 0xff;
-    vers = val >> 8;
-
     // Update device state
-    set_dsp_state(vers, load);
+    if (update_dsp_status(val) != 0)
+    {
+        return -1;
+    }
+
+    // Extract values for OSC notification
+    int load = val & 0xff;
+    int vers = val >> 8;
 
     // Send OSC messages
     oscsend(addr, ",i", load);
@@ -1167,4 +1246,259 @@ int refreshdone(const struct oscnode *path[], const char *addr, int reg, int val
     // Send notification
     oscsend(addr, ",T");
     return 0;
+}
+
+/* OSC observer callbacks */
+static void osc_dsp_state_changed(int version, int load, void *user_data)
+{
+    oscsend("/hardware/dspload", ",i", load);
+    oscsend("/hardware/dspversion", ",i", version);
+    oscflush();
+}
+
+static void osc_durec_status_changed(int status, int position, void *user_data)
+{
+    oscsend("/durec/status", ",i", status);
+    oscsend("/durec/position", ",i", position);
+    oscflush();
+}
+
+static void osc_samplerate_changed(int samplerate, void *user_data)
+{
+    oscsend("/system/samplerate", ",i", samplerate);
+    oscflush();
+}
+
+static void osc_input_changed(int index, float gain, bool phantom, bool hiz, bool mute, void *user_data)
+{
+    char addr[256];
+
+    snprintf(addr, sizeof(addr), "/input/%d/gain", index);
+    oscsend(addr, ",f", gain);
+
+    snprintf(addr, sizeof(addr), "/input/%d/phantom", index);
+    oscsend(addr, ",i", phantom ? 1 : 0);
+
+    snprintf(addr, sizeof(addr), "/input/%d/hiz", index);
+    oscsend(addr, ",i", hiz ? 1 : 0);
+
+    snprintf(addr, sizeof(addr), "/input/%d/mute", index);
+    oscsend(addr, ",i", mute ? 1 : 0);
+
+    oscflush();
+}
+
+static void osc_output_changed(int index, float volume, bool mute, void *user_data)
+{
+    char addr[256];
+
+    snprintf(addr, sizeof(addr), "/output/%d/volume", index);
+    oscsend(addr, ",f", volume);
+
+    snprintf(addr, sizeof(addr), "/output/%d/mute", index);
+    oscsend(addr, ",i", mute ? 1 : 0);
+
+    oscflush();
+}
+
+static void osc_mixer_changed(int input, int output, float volume, float pan, void *user_data)
+{
+    char addr[256];
+
+    snprintf(addr, sizeof(addr), "/mixer/%d/%d/volume", input, output);
+    oscsend(addr, ",f", volume);
+
+    snprintf(addr, sizeof(addr), "/mixer/%d/%d/pan", input, output);
+    oscsend(addr, ",f", pan);
+
+    oscflush();
+}
+
+/* Registration function */
+int register_osc_observers(void)
+{
+    int result = 0;
+
+    // Attempt to register all observers, tracking any failures
+    if (register_dsp_observer(osc_dsp_state_changed, NULL) != 0)
+    {
+        log_error("Failed to register DSP state observer");
+        result = -1;
+    }
+
+    if (register_durec_observer(osc_durec_status_changed, NULL) != 0)
+    {
+        log_error("Failed to register DURec status observer");
+        result = -1;
+    }
+
+    if (register_samplerate_observer(osc_samplerate_changed, NULL) != 0)
+    {
+        log_error("Failed to register sample rate observer");
+        result = -1;
+    }
+
+    if (register_input_observer(osc_input_changed, NULL) != 0)
+    {
+        log_error("Failed to register input observer");
+        result = -1;
+    }
+
+    if (register_output_observer(osc_output_changed, NULL) != 0)
+    {
+        log_error("Failed to register output observer");
+        result = -1;
+    }
+
+    if (register_mixer_observer(osc_mixer_changed, NULL) != 0)
+    {
+        log_error("Failed to register mixer observer");
+        result = -1;
+    }
+
+    if (result == 0)
+    {
+        log_info("All OSC observers registered successfully");
+    }
+
+    return result;
+}
+
+/**
+ * @brief Register only essential OSC observers
+ *
+ * This is a fallback function that registers only the most critical
+ * observers for basic GUI functionality.
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int register_essential_osc_observers(void)
+{
+    int result = 0;
+
+    // Only register the most critical observers
+    if (register_durec_observer(osc_durec_status_changed, NULL) != 0)
+    {
+        log_error("Failed to register essential DURec observer");
+        result = -1;
+    }
+
+    if (register_input_observer(osc_input_changed, NULL) != 0)
+    {
+        log_error("Failed to register essential input observer");
+        result = -1;
+    }
+
+    if (register_output_observer(osc_output_changed, NULL) != 0)
+    {
+        log_error("Failed to register essential output observer");
+        result = -1;
+    }
+
+    return result;
+}
+
+/**
+ * @brief Send complete device state via OSC
+ *
+ * This function sends the entire device state to OSC clients,
+ * useful for GUI initialization or reconnection.
+ */
+void send_full_device_state(void)
+{
+    log_info("Sending full device state via OSC");
+
+    // Send DSP state
+    int dsp_version, dsp_load;
+    if (get_dsp_state(&dsp_version, &dsp_load) == 0)
+    {
+        oscsend("/hardware/dspload", ",i", dsp_load);
+        oscsend("/hardware/dspversion", ",i", dsp_version);
+    }
+
+    // Send DURec state
+    int status, position;
+    if (get_durec_status(&status, &position) == 0)
+    {
+        oscsend("/durec/status", ",i", status);
+        oscsend("/durec/position", ",i", position);
+    }
+
+    // Send sample rate
+    int samplerate;
+    if (get_sample_rate(&samplerate) == 0)
+    {
+        oscsend("/system/samplerate", ",i", samplerate);
+    }
+
+    // Send all input states
+    if (cur_device)
+    {
+        int i;
+        for (i = 0; i < cur_device->inputslen; i++)
+        {
+            float gain;
+            bool phantom, hiz, mute;
+
+            if (get_input_state(i, &gain, &phantom, &hiz, &mute) == 0)
+            {
+                char addr[256];
+
+                snprintf(addr, sizeof(addr), "/input/%d/gain", i);
+                oscsend(addr, ",f", gain);
+
+                snprintf(addr, sizeof(addr), "/input/%d/phantom", i);
+                oscsend(addr, ",i", phantom ? 1 : 0);
+
+                snprintf(addr, sizeof(addr), "/input/%d/hiz", i);
+                oscsend(addr, ",i", hiz ? 1 : 0);
+
+                snprintf(addr, sizeof(addr), "/input/%d/mute", i);
+                oscsend(addr, ",i", mute ? 1 : 0);
+            }
+        }
+
+        // Send all output states
+        for (i = 0; i < cur_device->outputslen; i++)
+        {
+            float volume;
+            bool mute;
+
+            if (get_output_state(i, &volume, &mute) == 0)
+            {
+                char addr[256];
+
+                snprintf(addr, sizeof(addr), "/output/%d/volume", i);
+                oscsend(addr, ",f", volume);
+
+                snprintf(addr, sizeof(addr), "/output/%d/mute", i);
+                oscsend(addr, ",i", mute ? 1 : 0);
+            }
+        }
+
+        // Send mixer states
+        // (This could be a lot of messages, might want to batch them)
+        int input, output;
+        for (input = 0; input < cur_device->inputslen; input++)
+        {
+            for (output = 0; output < cur_device->outputslen; output++)
+            {
+                float volume, pan;
+
+                if (get_mixer_state(input, output, &volume, &pan) == 0)
+                {
+                    char addr[256];
+
+                    snprintf(addr, sizeof(addr), "/mixer/%d/%d/volume", input, output);
+                    oscsend(addr, ",f", volume);
+
+                    snprintf(addr, sizeof(addr), "/mixer/%d/%d/pan", input, output);
+                    oscsend(addr, ",f", pan);
+                }
+            }
+        }
+    }
+
+    oscflush();
+    log_info("Full device state sent");
 }

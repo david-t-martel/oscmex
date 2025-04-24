@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "logging.h"
 
 /* Project includes */
 #include "socket.h"
@@ -209,6 +210,9 @@ static void signal_handler(int sig)
  */
 static void cleanup_handler(void)
 {
+    // Close logging system
+    log_cleanup();
+
     // Final cleanup actions that should happen regardless of exit path
     platform_midi_cleanup();
     platform_socket_cleanup();
@@ -236,6 +240,14 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "Socket initialization failed\n");
         return 1;
+    }
+
+    // Initialize logging system
+    char log_filename[256];
+    snprintf(log_filename, sizeof(log_filename), "oscmix_%d.log", (int)time(NULL));
+    if (log_init(log_filename, dflag, NULL) != 0)
+    {
+        fprintf(stderr, "Warning: Failed to initialize logging system\n");
     }
 
     // Set up signal handling
@@ -331,6 +343,22 @@ int main(int argc, char *argv[])
         platform_midi_cleanup();
         platform_socket_cleanup();
         return 1;
+    }
+
+    if (register_osc_observers() != 0)
+    {
+        log_error("Failed to register OSC observers - GUI state updates may be unreliable");
+
+        // Attempt fallback for essential observers
+        log_warning("Attempting to register essential observers only");
+        if (register_essential_osc_observers() != 0)
+        {
+            log_error("Critical failure: Cannot register any OSC observers");
+        }
+        else
+        {
+            log_warning("Essential observers registered, but some features may be limited");
+        }
     }
 
     // Create thread for reading MIDI messages
