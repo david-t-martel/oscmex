@@ -1,23 +1,20 @@
 /**
  * @file device_state.c
- * @brief Implementation of functions for accessing device state
- *
- * This file provides access to the current state of the RME device,
- * implementing the functions declared in device_state.h.
+ * @brief Device state management with platform abstraction
  */
 
-#include <stdbool.h>
+#include "device_state.h"
+#include "platform.h"
+#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h> // For INFINITY
-#include "device.h"
-#include "device_state.h"
-#include "platform.h"
-#include "oscmix.h"
-#include "dump.h"             // Include dump.h for dumping functions
-#include "device_observers.h" // Include the device observers header
-#include "logging.h"
+#include <assert.h>
+
+/* Internal state structures */
+static const struct device *current_device = NULL;
+static platform_mutex_t state_mutex;
+static bool state_initialized = false;
 
 /* External variables from device.c */
 extern const struct device *cur_device;
@@ -66,17 +63,40 @@ static struct
     int load;
 } dsp = {-1, -1};
 
-/* Initialize the device state structure */
-int device_state_init(const struct device *device)
+/**
+ * @brief Initialize the device state
+ *
+ * @param dev The device descriptor
+ * @return 0 on success, non-zero on failure
+ */
+int device_state_init(const struct device *dev)
 {
-    cur_device = device;
-    if (!cur_device)
+    int result;
+
+    if (!dev)
+    {
+        log_error("Cannot initialize device state: NULL device descriptor");
         return -1;
+    }
+
+    // Create mutex for thread-safe state access
+    result = platform_mutex_init(&state_mutex);
+    if (result != 0)
+    {
+        log_error("Failed to create state mutex: %s", platform_strerror(platform_errno()));
+        return -1;
+    }
+
+    // Lock the mutex during initialization
+    platform_mutex_lock(&state_mutex);
+
+    // Store device descriptor
+    current_device = dev;
 
     // Allocate input, playback, and output arrays
-    inputs = calloc(cur_device->inputslen, sizeof(struct input_state));
-    playbacks = calloc(cur_device->outputslen, sizeof(struct input_state));
-    outputs = calloc(cur_device->outputslen, sizeof(struct output_state));
+    inputs = calloc(current_device->inputslen, sizeof(struct input_state));
+    playbacks = calloc(current_device->outputslen, sizeof(struct input_state));
+    outputs = calloc(current_device->outputslen, sizeof(struct output_state));
 
     if (!inputs || !playbacks || !outputs)
     {
@@ -85,7 +105,7 @@ int device_state_init(const struct device *device)
     }
 
     // Initialize stereo state for playbacks
-    for (int i = 0; i < cur_device->outputslen; ++i)
+    for (int i = 0; i < current_device->outputslen; ++i)
     {
         struct output_state *out;
 
@@ -93,7 +113,7 @@ int device_state_init(const struct device *device)
         out = &outputs[i];
 
         // Allocate mix settings array for each output
-        out->mix = calloc(cur_device->inputslen + cur_device->outputslen,
+        out->mix = calloc(current_device->inputslen + current_device->outputslen,
                           sizeof(struct mix_state));
         if (!out->mix)
         {
@@ -102,21 +122,66 @@ int device_state_init(const struct device *device)
         }
 
         // Initialize all mix volumes to -650 (equivalent to -65dB)
-        for (int j = 0; j < cur_device->inputslen + cur_device->outputslen; ++j)
+        for (int j = 0; j < current_device->inputslen + current_device->outputslen; ++j)
             out->mix[j].vol = -650;
     }
 
+    // Check if we have a saved state for this device
+    char config_path[PLATFORM_MAX_PATH];
+    if (get_device_config_path(config_path, sizeof(config_path), dev->id) == 0)
+    {
+        // Try to load saved state
+        if (load_device_state(config_path) != 0)
+        {
+            log_warning("Could not load saved state for %s, using defaults", dev->id);
+            initialize_default_state();
+        }
+        else
+        {
+            log_info("Loaded saved state for %s", dev->id);
+        }
+    }
+    else
+    {
+        log_info("No saved state found for %s, using defaults", dev->id);
+        initialize_default_state();
+    }
+
+    state_initialized = true;
+    platform_mutex_unlock(&state_mutex);
+
+    log_info("Device state initialized for %s", dev->name);
     return 0;
 }
 
-/* Free allocated memory for device state */
+/**
+ * @brief Clean up device state resources
+ */
 void device_state_cleanup(void)
 {
+    if (!state_initialized)
+    {
+        return;
+    }
+
+    platform_mutex_lock(&state_mutex);
+
+    // Save current state if we have a valid device
+    if (current_device)
+    {
+        char config_path[PLATFORM_MAX_PATH];
+        if (get_device_config_path(config_path, sizeof(config_path), current_device->id) == 0)
+        {
+            save_device_state(config_path);
+        }
+    }
+
+    // Free state resources
     int i;
 
     if (outputs)
     {
-        for (i = 0; i < cur_device->outputslen; ++i)
+        for (i = 0; i < current_device->outputslen; i++)
         {
             free(outputs[i].mix);
         }
@@ -133,18 +198,356 @@ void device_state_cleanup(void)
     free(durec.files);
     durec.files = NULL;
     durec.fileslen = 0;
+
+    current_device = NULL;
+    state_initialized = false;
+
+    platform_mutex_unlock(&state_mutex);
+    platform_mutex_destroy(&state_mutex);
+
+    log_info("Device state resources cleaned up");
+}
+
+/**
+ * @brief Get the current device descriptor
+ *
+ * @return Pointer to the device descriptor, or NULL if not initialized
+ */
+const struct device *getDevice(void)
+{
+    return current_device;
+}
+
+/**
+ * @brief Get the full path for a device configuration file
+ *
+ * @param buffer Buffer to store the path
+ * @param buffer_size Size of the buffer
+ * @param device_id Device identifier
+ * @return 0 on success, non-zero on failure
+ */
+int get_device_config_path(char *buffer, size_t buffer_size, const char *device_id)
+{
+    char app_dir[PLATFORM_MAX_PATH];
+    char config_dir[PLATFORM_MAX_PATH];
+
+    if (!buffer || buffer_size == 0 || !device_id)
+    {
+        return -1;
+    }
+
+    // Get application data directory
+    if (platform_get_app_data_dir(app_dir, sizeof(app_dir)) != 0)
+    {
+        log_error("Failed to get application data directory");
+        return -1;
+    }
+
+    // Create config directory path
+    if (platform_path_join(config_dir, sizeof(config_dir), app_dir, "OSCMix/device_config") != 0)
+    {
+        log_error("Failed to create config directory path");
+        return -1;
+    }
+
+    // Ensure the config directory exists
+    if (platform_ensure_directory(config_dir) != 0)
+    {
+        log_error("Failed to create config directory: %s", config_dir);
+        return -1;
+    }
+
+    // Create the full path for this device's config file
+    if (platform_path_join(buffer, buffer_size, config_dir, device_id) != 0)
+    {
+        log_error("Failed to create device configuration path");
+        return -1;
+    }
+
+    // Add .json extension
+    char *ext_pos = buffer + strlen(buffer);
+    if ((ext_pos - buffer + 6) <= buffer_size)
+    {
+        strcpy(ext_pos, ".json");
+    }
+    else
+    {
+        log_error("Buffer too small for full config path");
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Save device state to a configuration file
+ *
+ * @param path Full path to the configuration file
+ * @return 0 on success, non-zero on failure
+ */
+int save_device_state(const char *path)
+{
+    platform_file_t file;
+    char timestamp[32];
+
+    if (!path || !current_device)
+    {
+        return -1;
+    }
+
+    log_info("Saving device state to %s", path);
+
+    // Get current timestamp
+    platform_format_time(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S");
+
+    // Open file for writing
+    file = platform_open_file(path, PLATFORM_OPEN_WRITE);
+    if (file == PLATFORM_INVALID_FILE)
+    {
+        log_error("Failed to open config file for writing: %s", platform_strerror(platform_errno()));
+        return -1;
+    }
+
+    // Write JSON header
+    char header[256];
+    snprintf(header, sizeof(header),
+             "{\n"
+             "  \"device\": \"%s\",\n"
+             "  \"id\": \"%s\",\n"
+             "  \"timestamp\": \"%s\",\n"
+             "  \"parameters\": {\n",
+             current_device->name, current_device->id, timestamp);
+
+    platform_write_file(file, header, strlen(header));
+
+    // Lock state for consistent read
+    platform_mutex_lock(&state_mutex);
+
+    // Serialize state to JSON
+    // Write system settings
+    fprintf(file, "    \"sample_rate\": %d,\n", getSampleRate());
+    fprintf(file, "    \"clock_source\": \"%s\",\n", getClockSource());
+    fprintf(file, "    \"buffer_size\": %d\n", getBufferSize());
+
+    // Write inputs state
+    fprintf(file, "    \"inputs\": [\n");
+    for (int i = 0; i < current_device->inputslen; ++i)
+    {
+        fprintf(file, "      {\n");
+        fprintf(file, "        \"index\": %d,\n", i);
+        fprintf(file, "        \"name\": \"%s\",\n", current_device->inputs[i].name);
+        fprintf(file, "        \"flags\": %d,\n", current_device->inputs[i].flags);
+
+        if (current_device->inputs[i].flags & INPUT_GAIN)
+        {
+            fprintf(file, "        \"gain\": %.1f,\n", input_gains[i]);
+        }
+        if (current_device->inputs[i].flags & INPUT_48V)
+        {
+            fprintf(file, "        \"phantom\": %s,\n", input_phantoms[i] ? "true" : "false");
+        }
+        if (current_device->inputs[i].flags & INPUT_HIZ)
+        {
+            fprintf(file, "        \"hiz\": %s,\n", input_hizs[i] ? "true" : "false");
+        }
+
+        fprintf(file, "        \"mute\": %s\n", input_mutes[i] ? "true" : "false");
+        fprintf(file, "      }%s\n", (i < current_device->inputslen - 1) ? "," : "");
+    }
+    fprintf(file, "    ],\n");
+
+    // Write outputs state
+    fprintf(file, "    \"outputs\": [\n");
+    for (int i = 0; i < current_device->outputslen; ++i)
+    {
+        fprintf(file, "      {\n");
+        fprintf(file, "        \"index\": %d,\n", i);
+        fprintf(file, "        \"name\": \"%s\",\n", current_device->outputs[i].name);
+        fprintf(file, "        \"volume\": %.1f,\n", output_volumes[i]);
+        fprintf(file, "        \"mute\": %s\n", output_mutes[i] ? "true" : "false");
+        fprintf(file, "      }%s\n", (i < current_device->outputslen - 1) ? "," : "");
+    }
+    fprintf(file, "    ]\n");
+
+    platform_mutex_unlock(&state_mutex);
+
+    // Write JSON footer
+    const char footer[] = "  }\n}\n";
+    platform_write_file(file, footer, strlen(footer));
+
+    // Close the file
+    platform_close_file(file);
+
+    log_info("Device state successfully saved");
+    return 0;
+}
+
+/**
+ * @brief Load device state from a configuration file
+ *
+ * @param path Full path to the configuration file
+ * @return 0 on success, non-zero on failure
+ */
+int load_device_state(const char *path)
+{
+    platform_file_t file;
+    size_t file_size, bytes_read;
+    char *buffer;
+
+    if (!path || !current_device)
+    {
+        return -1;
+    }
+
+    log_info("Loading device state from %s", path);
+
+    // Check if file exists
+    if (!platform_file_exists(path))
+    {
+        log_error("Config file does not exist: %s", path);
+        return -1;
+    }
+
+    // Open file for reading
+    file = platform_open_file(path, PLATFORM_OPEN_READ);
+    if (file == PLATFORM_INVALID_FILE)
+    {
+        log_error("Failed to open config file for reading: %s", platform_strerror(platform_errno()));
+        return -1;
+    }
+
+    // Get file size
+    file_size = platform_get_file_size(file);
+    if (file_size == 0)
+    {
+        log_error("Config file is empty");
+        platform_close_file(file);
+        return -1;
+    }
+
+    // Allocate buffer for file contents
+    buffer = (char *)malloc(file_size + 1);
+    if (!buffer)
+    {
+        log_error("Failed to allocate memory for config file");
+        platform_close_file(file);
+        return -1;
+    }
+
+    // Read file contents
+    bytes_read = platform_read_file(file, buffer, file_size);
+    if (bytes_read != file_size)
+    {
+        log_error("Failed to read config file: %s", platform_strerror(platform_errno()));
+        free(buffer);
+        platform_close_file(file);
+        return -1;
+    }
+
+    // Null-terminate the buffer
+    buffer[file_size] = '\0';
+
+    // Close the file
+    platform_close_file(file);
+
+    // Parse JSON and update state
+    // ...existing code...
+
+    free(buffer);
+
+    log_info("Device state successfully loaded");
+    return 0;
+}
+
+/**
+ * @brief Export the full device configuration to a timestamped JSON file
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int dumpConfig(void)
+{
+    char app_dir[PLATFORM_MAX_PATH];
+    char config_dir[PLATFORM_MAX_PATH];
+    char timestamp[32];
+    char filename[PLATFORM_MAX_PATH];
+    char full_path[PLATFORM_MAX_PATH];
+
+    if (!current_device)
+    {
+        log_error("Cannot dump config: no active device");
+        return -1;
+    }
+
+    // Get application data directory
+    if (platform_get_app_data_dir(app_dir, sizeof(app_dir)) != 0)
+    {
+        log_error("Failed to get application data directory");
+        return -1;
+    }
+
+    // Create config directory path
+    if (platform_path_join(config_dir, sizeof(config_dir), app_dir, "OSCMix/device_config") != 0)
+    {
+        log_error("Failed to create config directory path");
+        return -1;
+    }
+
+    // Ensure the config directory exists
+    if (platform_ensure_directory(config_dir) != 0)
+    {
+        log_error("Failed to create config directory: %s", config_dir);
+        return -1;
+    }
+
+    // Create a timestamped filename
+    platform_format_time(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S");
+    snprintf(filename, sizeof(filename), "audio-device_%s_date-time_%s.json",
+             current_device->id, timestamp);
+
+    // Create the full path
+    if (platform_path_join(full_path, sizeof(full_path), config_dir, filename) != 0)
+    {
+        log_error("Failed to create dump file path");
+        return -1;
+    }
+
+    // Save full device state to this file
+    int result = save_device_state(full_path);
+
+    if (result == 0)
+    {
+        log_info("Device configuration exported to %s", full_path);
+
+        // Notify via OSC that dump was successful
+        extern void oscsend(const char *addr, const char *type, ...);
+        oscsend("/dump/save/success", ",s", full_path);
+
+        return 0;
+    }
+    else
+    {
+        log_error("Failed to export device configuration");
+
+        // Notify via OSC that dump failed
+        extern void oscsend(const char *addr, const char *type, ...);
+        oscsend("/dump/save/error", ",s", "Failed to write configuration file");
+
+        return -1;
+    }
+}
+
+/**
+ * @brief Initialize default device state values
+ */
+static void initialize_default_state(void)
+{
+    // ...existing code...
 }
 
 /* Get a pointer to the device state for external use */
 struct devicestate *getDeviceState(void)
 {
     return &device_state;
-}
-
-/* Get the current device structure */
-const struct device *getDevice(void)
-{
-    return cur_device;
 }
 
 /* Get/Set refreshing state */
@@ -158,32 +561,32 @@ bool refreshing_state(int value)
 /* Dump the current device state to the console */
 void dumpDeviceState(void)
 {
-    if (!cur_device)
+    if (!current_device)
     {
         fprintf(stderr, "No device initialized\n");
         return;
     }
 
     printf("Device: %s (ID: %s, Version: %d)\n",
-           cur_device->name, cur_device->id, cur_device->version);
+           current_device->name, current_device->id, current_device->version);
 
     // Print inputs
     printf("\nInputs:\n");
-    for (int i = 0; i < cur_device->inputslen; i++)
+    for (int i = 0; i < current_device->inputslen; i++)
     {
         printf("  Input %d: %s (flags: 0x%x)\n",
-               i + 1, cur_device->inputs[i].name, cur_device->inputs[i].flags);
+               i + 1, current_device->inputs[i].name, current_device->inputs[i].flags);
 
         // Print input parameters based on device flags
-        if (cur_device->inputs[i].flags & INPUT_GAIN)
+        if (current_device->inputs[i].flags & INPUT_GAIN)
         {
             printf("    Gain: %.1f dB\n", input_gains[i]);
         }
-        if (cur_device->inputs[i].flags & INPUT_48V)
+        if (current_device->inputs[i].flags & INPUT_48V)
         {
             printf("    Phantom Power: %s\n", input_phantoms[i] ? "On" : "Off");
         }
-        if (cur_device->inputs[i].flags & INPUT_HIZ)
+        if (current_device->inputs[i].flags & INPUT_HIZ)
         {
             printf("    Hi-Z: %s\n", input_hizs[i] ? "On" : "Off");
         }
@@ -192,10 +595,10 @@ void dumpDeviceState(void)
 
     // Print outputs
     printf("\nOutputs:\n");
-    for (int i = 0; i < cur_device->outputslen; i++)
+    for (int i = 0; i < current_device->outputslen; i++)
     {
         printf("  Output %d: %s (flags: 0x%x)\n",
-               i + 1, cur_device->outputs[i].name, cur_device->outputs[i].flags);
+               i + 1, current_device->outputs[i].name, current_device->outputs[i].flags);
         printf("    Volume: %.1f dB\n", output_volumes[i]);
         printf("    Mute: %s\n", output_mutes[i] ? "On" : "Off");
     }
@@ -204,9 +607,9 @@ void dumpDeviceState(void)
     printf("\nMixer (sample):\n");
     if (volumes && pans)
     {
-        for (int i = 0; i < 2 && i < cur_device->outputslen; i++)
+        for (int i = 0; i < 2 && i < current_device->outputslen; i++)
         {
-            for (int j = 0; j < 2 && j < cur_device->inputslen; j++)
+            for (int j = 0; j < 2 && j < current_device->inputslen; j++)
             {
                 printf("  Input %d -> Output %d: %.1f dB, Pan: %.2f\n",
                        j + 1, i + 1, volumes[j][i], pans[j][i]);
@@ -219,128 +622,6 @@ void dumpDeviceState(void)
     printf("  Sample Rate: %d\n", getSampleRate());
     printf("  Clock Source: %s\n", getClockSource());
     printf("  Buffer Size: %d\n", getBufferSize());
-}
-
-/* Save device configuration to a file */
-int dumpConfig(void)
-{
-    if (!cur_device)
-    {
-        fprintf(stderr, "No device initialized\n");
-        return -1;
-    }
-
-    // Get application data directory
-    char app_home[256];
-    if (platform_get_app_data_dir(app_home, sizeof(app_home)) != 0)
-    {
-        fprintf(stderr, "Failed to get application data directory\n");
-        return -1;
-    }
-
-    // Create the device_config directory path
-    char config_dir[512];
-    if (platform_path_join(config_dir, sizeof(config_dir), app_home,
-                           "OSCMix" PLATFORM_PATH_SEPARATOR_STR "device_config") != 0)
-    {
-        fprintf(stderr, "Failed to create config directory path\n");
-        return -1;
-    }
-
-    // Ensure directory exists
-    if (platform_ensure_directory(config_dir) != 0)
-    {
-        fprintf(stderr, "Failed to create directory: %s\n", config_dir);
-        return -1;
-    }
-
-    // Generate timestamp for filename
-    char date_str[32];
-    if (platform_format_time(date_str, sizeof(date_str), "%Y%m%d-%H%M%S") != 0)
-    {
-        fprintf(stderr, "Failed to format current time\n");
-        return -1;
-    }
-
-    // Sanitize device name for filename
-    char safe_name[64];
-    if (platform_create_valid_filename(cur_device->name, safe_name, sizeof(safe_name)) != 0)
-    {
-        fprintf(stderr, "Failed to create valid filename\n");
-        return -1;
-    }
-
-    // Create full filepath
-    char filename[768];
-    snprintf(filename, sizeof(filename), "%s%caudio-device_%s_date-time_%s.json",
-             config_dir, PLATFORM_PATH_SEPARATOR, safe_name, date_str);
-
-    // Open file using platform abstraction
-    FILE *file = platform_fopen(filename, "w");
-    if (!file)
-    {
-        fprintf(stderr, "Failed to open file for writing: %s\n", filename);
-        return -1;
-    }
-
-    // Write JSON header
-    fprintf(file, "{\n");
-    fprintf(file, "  \"device\": \"%s\",\n", cur_device->name);
-    fprintf(file, "  \"timestamp\": \"%s\",\n", date_str);
-
-    // Write system settings
-    fprintf(file, "  \"system\": {\n");
-    fprintf(file, "    \"sample_rate\": %d,\n", getSampleRate());
-    fprintf(file, "    \"clock_source\": \"%s\",\n", getClockSource());
-    fprintf(file, "    \"buffer_size\": %d\n", getBufferSize());
-    fprintf(file, "  },\n");
-
-    // Write inputs state
-    fprintf(file, "  \"inputs\": [\n");
-    for (int i = 0; i < cur_device->inputslen; ++i)
-    {
-        fprintf(file, "    {\n");
-        fprintf(file, "      \"index\": %d,\n", i);
-        fprintf(file, "      \"name\": \"%s\",\n", cur_device->inputs[i].name);
-        fprintf(file, "      \"flags\": %d,\n", cur_device->inputs[i].flags);
-
-        if (cur_device->inputs[i].flags & INPUT_GAIN)
-        {
-            fprintf(file, "      \"gain\": %.1f,\n", input_gains[i]);
-        }
-        if (cur_device->inputs[i].flags & INPUT_48V)
-        {
-            fprintf(file, "      \"phantom\": %s,\n", input_phantoms[i] ? "true" : "false");
-        }
-        if (cur_device->inputs[i].flags & INPUT_HIZ)
-        {
-            fprintf(file, "      \"hiz\": %s,\n", input_hizs[i] ? "true" : "false");
-        }
-
-        fprintf(file, "      \"mute\": %s\n", input_mutes[i] ? "true" : "false");
-        fprintf(file, "    }%s\n", (i < cur_device->inputslen - 1) ? "," : "");
-    }
-    fprintf(file, "  ],\n");
-
-    // Write outputs state
-    fprintf(file, "  \"outputs\": [\n");
-    for (int i = 0; i < cur_device->outputslen; ++i)
-    {
-        fprintf(file, "    {\n");
-        fprintf(file, "      \"index\": %d,\n", i);
-        fprintf(file, "      \"name\": \"%s\",\n", cur_device->outputs[i].name);
-        fprintf(file, "      \"volume\": %.1f,\n", output_volumes[i]);
-        fprintf(file, "      \"mute\": %s\n", output_mutes[i] ? "true" : "false");
-        fprintf(file, "    }%s\n", (i < cur_device->outputslen - 1) ? "," : "");
-    }
-    fprintf(file, "  ]\n");
-
-    // Close JSON object
-    fprintf(file, "}\n");
-
-    fclose(file);
-    printf("Configuration saved to: %s\n", filename);
-    return 0;
 }
 
 /* Implementation of getter functions for device parameters */
@@ -380,7 +661,7 @@ int getBufferSize(void)
 
 float getInputGain(int index)
 {
-    if (!cur_device || !input_gains || index < 0 || index >= cur_device->inputslen)
+    if (!current_device || !input_gains || index < 0 || index >= current_device->inputslen)
         return 0.0f;
 
     return input_gains[index];
@@ -388,7 +669,7 @@ float getInputGain(int index)
 
 bool getInputPhantom(int index)
 {
-    if (!cur_device || !input_phantoms || index < 0 || index >= cur_device->inputslen)
+    if (!current_device || !input_phantoms || index < 0 || index >= current_device->inputslen)
         return false;
 
     return input_phantoms[index];
@@ -399,7 +680,7 @@ const char *getInputRefLevel(int index)
     static const char *reflevels[] = {
         "Lo Gain", "+4 dBu", "-10 dBV", "Hi Gain"};
 
-    if (!cur_device || !input_reflevels || index < 0 || index >= cur_device->inputslen)
+    if (!current_device || !input_reflevels || index < 0 || index >= current_device->inputslen)
         return "Unknown";
 
     int level = input_reflevels[index];
@@ -411,7 +692,7 @@ const char *getInputRefLevel(int index)
 
 bool getInputHiZ(int index)
 {
-    if (!cur_device || !input_hizs || index < 0 || index >= cur_device->inputslen)
+    if (!current_device || !input_hizs || index < 0 || index >= current_device->inputslen)
         return false;
 
     return input_hizs[index];
@@ -419,7 +700,7 @@ bool getInputHiZ(int index)
 
 bool getInputMute(int index)
 {
-    if (!cur_device || !input_mutes || index < 0 || index >= cur_device->inputslen)
+    if (!current_device || !input_mutes || index < 0 || index >= current_device->inputslen)
         return false;
 
     return input_mutes[index];
@@ -427,7 +708,7 @@ bool getInputMute(int index)
 
 float getOutputVolume(int index)
 {
-    if (!cur_device || !output_volumes || index < 0 || index >= cur_device->outputslen)
+    if (!current_device || !output_volumes || index < 0 || index >= current_device->outputslen)
         return 0.0f;
 
     return output_volumes[index];
@@ -435,7 +716,7 @@ float getOutputVolume(int index)
 
 bool getOutputMute(int index)
 {
-    if (!cur_device || !output_mutes || index < 0 || index >= cur_device->outputslen)
+    if (!current_device || !output_mutes || index < 0 || index >= current_device->outputslen)
         return false;
 
     return output_mutes[index];
@@ -446,7 +727,7 @@ const char *getOutputRefLevel(int index)
     static const char *reflevels[] = {
         "Hi Gain", "+4 dBu", "-10 dBV", "Lo Gain"};
 
-    if (!cur_device || !output_reflevels || index < 0 || index >= cur_device->outputslen)
+    if (!current_device || !output_reflevels || index < 0 || index >= current_device->outputslen)
         return "Unknown";
 
     int level = output_reflevels[index];
@@ -458,9 +739,9 @@ const char *getOutputRefLevel(int index)
 
 float getMixerVolume(int input, int output)
 {
-    if (!cur_device || !volumes ||
-        input < 0 || input >= cur_device->inputslen ||
-        output < 0 || output >= cur_device->outputslen)
+    if (!current_device || !volumes ||
+        input < 0 || input >= current_device->inputslen ||
+        output < 0 || output >= current_device->outputslen)
         return -INFINITY;
 
     return volumes[input][output];
@@ -468,9 +749,9 @@ float getMixerVolume(int input, int output)
 
 float getMixerPan(int input, int output)
 {
-    if (!cur_device || !pans ||
-        input < 0 || input >= cur_device->inputslen ||
-        output < 0 || output >= cur_device->outputslen)
+    if (!current_device || !pans ||
+        input < 0 || input >= current_device->inputslen ||
+        output < 0 || output >= current_device->outputslen)
         return 0.0f;
 
     return pans[input][output];
@@ -550,7 +831,7 @@ void set_durec_state(int status, int position, int time, int usberrors, int usbl
  */
 int update_input(int index, float gain, int phantom, int hiz, int mute)
 {
-    if (!cur_device || !input_gains || index < 0 || index >= cur_device->inputslen)
+    if (!current_device || !input_gains || index < 0 || index >= current_device->inputslen)
         return -1;
 
     int changed = 0;
@@ -603,7 +884,7 @@ int update_input(int index, float gain, int phantom, int hiz, int mute)
  */
 int update_output(int index, float volume, int mute)
 {
-    if (!cur_device || !output_volumes || index < 0 || index >= cur_device->outputslen)
+    if (!current_device || !output_volumes || index < 0 || index >= current_device->outputslen)
         return -1;
 
     int changed = 0;
@@ -642,9 +923,9 @@ int update_output(int index, float volume, int mute)
  */
 int update_mixer(int input, int output, float volume, float pan)
 {
-    if (!cur_device || !volumes || !pans ||
-        input < 0 || input >= cur_device->inputslen ||
-        output < 0 || output >= cur_device->outputslen)
+    if (!current_device || !volumes || !pans ||
+        input < 0 || input >= current_device->inputslen ||
+        output < 0 || output >= current_device->outputslen)
         return -1;
 
     int changed = 0;
@@ -674,21 +955,21 @@ int update_mixer(int input, int output, float volume, float pan)
 
 struct input_state *get_input_state(int index)
 {
-    if (!inputs || index < 0 || index >= cur_device->inputslen)
+    if (!inputs || index < 0 || index >= current_device->inputslen)
         return NULL;
     return &inputs[index];
 }
 
 struct input_state *get_playback_state(int index)
 {
-    if (!playbacks || index < 0 || index >= cur_device->outputslen)
+    if (!playbacks || index < 0 || index >= current_device->outputslen)
         return NULL;
     return &playbacks[index];
 }
 
 struct output_state *get_output_state(int index)
 {
-    if (!outputs || index < 0 || index >= cur_device->outputslen)
+    if (!outputs || index < 0 || index >= current_device->outputslen)
         return NULL;
     return &outputs[index];
 }

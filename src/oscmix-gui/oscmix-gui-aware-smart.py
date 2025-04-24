@@ -1,7 +1,5 @@
 # oscmix_gui/main.py
-# Refactored and documented version of the PySide6 GUI for oscmix control.
 # Updated based on oscmix C source, device definitions, packaging, Tabs, Web GUI elements, and Mixer Tab.
-
 import sys
 import time
 import threading
@@ -255,7 +253,6 @@ class OSCHandler(QObject):
     def _map_osc_addresses(self):
         """Sets up the OSC address mappings in the dispatcher based on constants."""
         # Print summary of mappings for verification
-        # ... (mapping print statements remain the same) ...
         print(f"Mapping Inputs : Gain={OSC_INPUT_GAIN.format(ch='<ch>')}, Stereo={OSC_INPUT_STEREO.format(ch='<ch>')}, Level={OSC_INPUT_LEVEL.format(ch='<ch>')}, Mute={OSC_INPUT_MUTE.format(ch='<ch>')}, Phase={OSC_INPUT_PHASE.format(ch='<ch>')}, 48V={OSC_INPUT_48V.format(ch='<ch>')}, HiZ={OSC_INPUT_HIZ.format(ch='<ch>')}, EQ={OSC_INPUT_EQ_ENABLE.format(ch='<ch>')}, Dyn={OSC_INPUT_DYN_ENABLE.format(ch='<ch>')}, LC={OSC_INPUT_LC_ENABLE.format(ch='<ch>')}")
         print(f"Mapping Outputs: Vol={OSC_OUTPUT_VOLUME.format(ch='<ch>')}, Stereo={OSC_OUTPUT_STEREO.format(ch='<ch>')}, Level={OSC_OUTPUT_LEVEL.format(ch='<ch>')}, Mute={OSC_OUTPUT_MUTE.format(ch='<ch>')}, Phase={OSC_OUTPUT_PHASE.format(ch='<ch>')}, EQ={OSC_OUTPUT_EQ_ENABLE.format(ch='<ch>')}, Dyn={OSC_OUTPUT_DYN_ENABLE.format(ch='<ch>')}, LC={OSC_OUTPUT_LC_ENABLE.format(ch='<ch>')}")
         print(f"Mapping Playback: Level={OSC_PLAYBACK_LEVEL.format(ch='<ch>')} (Meters only)")
@@ -557,7 +554,7 @@ class OscmixControlGUI(QMainWindow):
         """Initializes the main GUI window and its components."""
         super().__init__()
         self.setWindowTitle("oscmix GUI Control (RME UCX II)")
-        self.setGeometry(100, 100, 1250, 800) # Adjusted size
+        self.setGeometry(100, 100, 1250, 800) # Made wider for more channels
 
         # Initialize the OSC communication handler
         self.osc_handler = OSCHandler(DEFAULT_LISTEN_IP, DEFAULT_LISTEN_PORT)

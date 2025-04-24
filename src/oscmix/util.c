@@ -3,245 +3,248 @@
  * @brief Utility functions for the OSCMix application
  */
 
-#include <stdarg.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include "util.h"
 #include "platform.h"
-#include "device.h"
-#include "device_state.h"
+#include "logging.h"
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
 
-/**
- * @brief Prints a fatal error message and exits the program
- *
- * @param msg The error message format string
- * @param ... Variable arguments for the format string
- */
+/* Report a fatal error and exit */
 void fatal(const char *msg, ...)
 {
 	va_list ap;
 
 	va_start(ap, msg);
+	fprintf(stderr, "Fatal error: ");
 	vfprintf(stderr, msg, ap);
+	fprintf(stderr, "\n");
 	va_end(ap);
 
-	if (!msg)
-	{
-		perror(NULL);
-	}
-	else if (*msg && msg[strlen(msg) - 1] == ':')
-	{
-		fputc(' ', stderr);
-		perror(NULL);
-	}
-	else
-	{
-		fputc('\n', stderr);
-	}
 	exit(1);
 }
 
-/**
- * @brief Creates the specified directory if it doesn't exist
- *
- * @param path The directory path to create
- * @return 0 on success, -1 on failure
- */
+/* Create directories if they don't exist */
 int ensure_directory_exists(const char *path)
 {
-	// Use platform abstraction for directory creation
+	// Use platform function instead of custom implementation
 	return platform_ensure_directory(path);
 }
 
-/**
- * @brief Get the application home directory
- *
- * @param buffer Buffer to store the path
- * @param size Size of the buffer
- * @return 0 on success, -1 on failure
- */
+/* Get the application home directory */
 int get_app_home_directory(char *buffer, size_t size)
 {
-	// Use platform abstraction for getting app data directory
+	// Use platform function instead of custom implementation
 	return platform_get_app_data_dir(buffer, size);
 }
 
-/**
- * @brief Join multiple path components into a single path
- *
- * @param buffer Buffer to store the joined path
- * @param size Size of the buffer
- * @param components Array of path components
- * @param count Number of components
- * @return 0 on success, -1 on failure
- */
+/* Join path components */
 int path_join(char *buffer, size_t size, const char **components, int count)
 {
 	if (!buffer || size == 0 || !components || count <= 0)
 		return -1;
 
-	// Start with empty string
-	buffer[0] = '\0';
+	// Copy the first component
+	if (strlcpy(buffer, components[0], size) >= size)
+		return -1;
 
-	// For the first component
-	if (count > 0 && components[0])
-	{
-		strncpy(buffer, components[0], size - 1);
-		buffer[size - 1] = '\0';
-	}
-
-	// Join the rest of the components using platform_path_join
+	// Join with the remaining components
 	for (int i = 1; i < count; i++)
 	{
-		if (components[i])
-		{
-			char temp[1024];
-			strncpy(temp, buffer, sizeof(temp) - 1);
-			temp[sizeof(temp) - 1] = '\0';
-
-			if (platform_path_join(buffer, size, temp, components[i]) != 0)
-			{
-				return -1;
-			}
-		}
+		if (platform_path_join(buffer, size, buffer, components[i]) != 0)
+			return -1;
 	}
 
 	return 0;
 }
 
-/**
- * @brief Sanitize a filename by replacing invalid characters with underscores
- *
- * @param input The input filename
- * @param output The sanitized output filename
- * @param output_size Size of the output buffer
- * @return 0 on success, -1 on failure
- */
+/* Convert a string to a valid filename */
 int sanitize_filename(const char *input, char *output, size_t output_size)
 {
-	// Use platform abstraction for creating valid filenames
+	// Use the platform function for filename sanitization
 	return platform_create_valid_filename(input, output, output_size);
 }
 
-/**
- * @brief Exports device configuration to a JSON file
- * @return 0 on success, negative value on error
- */
+/* Dump configuration to a file */
 int dumpConfig(void)
 {
-	const struct device *cur_device = getDevice();
-
-	if (!cur_device)
+	const struct device *device = getDevice();
+	if (!device)
 	{
-		fprintf(stderr, "No device initialized\n");
+		log_error("No device available for configuration dump");
 		return -1;
 	}
 
-	// Get application config directory
-	char config_dir[512];
-	if (platform_get_device_config_dir(config_dir, sizeof(config_dir)) != 0)
+	char app_dir[PLATFORM_MAX_PATH];
+	char config_dir[PLATFORM_MAX_PATH];
+	char timestamp[64];
+	char safe_device_name[256];
+	char filename[256];
+	char filepath[PLATFORM_MAX_PATH];
+
+	// Get application data directory
+	if (platform_get_app_data_dir(app_dir, sizeof(app_dir)) != 0)
 	{
-		fprintf(stderr, "Failed to get configuration directory\n");
+		log_error("Failed to get application data directory");
 		return -1;
 	}
 
-	// Ensure directory exists
+	// Create path for device_config directory
+	if (platform_path_join(config_dir, sizeof(config_dir), app_dir, "OSCMix/device_config") != 0)
+	{
+		log_error("Failed to create config directory path");
+		return -1;
+	}
+
+	// Create directory if it doesn't exist
 	if (platform_ensure_directory(config_dir) != 0)
 	{
-		fprintf(stderr, "Failed to create directory: %s\n", config_dir);
+		log_error("Failed to create config directory: %s", config_dir);
 		return -1;
 	}
 
-	// Generate timestamp for filename
-	char date_str[32];
-	if (platform_format_time(date_str, sizeof(date_str), "%Y%m%d-%H%M%S") != 0)
+	// Format current date and time
+	if (platform_format_time(timestamp, sizeof(timestamp), "%Y-%m-%d_%H-%M-%S") != 0)
 	{
-		fprintf(stderr, "Failed to format current time\n");
-		return -1;
+		// Fallback to a basic timestamp
+		time_t now = time(NULL);
+		struct tm *tm_info = localtime(&now);
+		strftime(timestamp, sizeof(timestamp), "%Y-%m-%d_%H-%M-%S", tm_info);
 	}
 
-	// Sanitize device name for filename
-	char safe_name[64];
-	if (platform_create_valid_filename(cur_device->name, safe_name, sizeof(safe_name)) != 0)
+	// Sanitize device name
+	if (platform_create_valid_filename(device->name, safe_device_name, sizeof(safe_device_name)) != 0)
 	{
-		fprintf(stderr, "Failed to create valid filename\n");
-		return -1;
+		// Fallback to simple name if function fails
+		strncpy(safe_device_name, "device", sizeof(safe_device_name) - 1);
+		safe_device_name[sizeof(safe_device_name) - 1] = '\0';
 	}
 
-	// Create full filepath
-	char filename[768];
-	char *parts[] = {config_dir, "audio-device_", safe_name, "_date-time_", date_str, ".json"};
+	// Create filename
+	snprintf(filename, sizeof(filename), "audio-device_%s_date-time_%s.json",
+			 safe_device_name, timestamp);
 
-	// Join parts to form the filename
-	if (path_join(filename, sizeof(filename), (const char **)parts, 6) != 0)
+	// Create full file path
+	if (platform_path_join(filepath, sizeof(filepath), config_dir, filename) != 0)
 	{
-		fprintf(stderr, "Failed to create config filename\n");
+		log_error("Failed to create complete file path");
 		return -1;
 	}
 
-	// Open file using platform abstraction
-	FILE *file = platform_fopen(filename, "w");
-	if (!file)
+	// Generate JSON configuration
+	char *config_json = generateDeviceConfigJson(device);
+	if (!config_json)
 	{
-		fprintf(stderr, "Failed to open file for writing: %s\n", filename);
+		log_error("Failed to generate device configuration JSON");
 		return -1;
 	}
 
-	// Write device state as JSON - real implementation would have more fields
-	fprintf(file, "{\n");
-	fprintf(file, "  \"device\": {\n");
-	fprintf(file, "    \"name\": \"%s\",\n", cur_device->name);
-	fprintf(file, "    \"id\": \"%s\",\n", cur_device->id);
-	fprintf(file, "    \"version\": %d,\n", cur_device->version);
-	fprintf(file, "    \"flags\": %d,\n", cur_device->flags);
-	fprintf(file, "    \"timestamp\": \"%s\"\n", date_str);
-	fprintf(file, "  }\n");
-	fprintf(file, "}\n");
+	// Write state to file using platform function
+	FILE *fp = platform_fopen(filepath, "w");
+	if (!fp)
+	{
+		log_error("Failed to open file for writing: %s", filepath);
+		free(config_json);
+		return -1;
+	}
 
-	fclose(file);
-	printf("Device configuration saved to: %s\n", filename);
+	fputs(config_json, fp);
+	fclose(fp);
+	free(config_json);
 
+	log_info("Device configuration saved to: %s", filepath);
 	return 0;
 }
 
-/**
- * @brief Dumps the current device state to the console
- */
+/* Display complete device state */
 void dumpDeviceState(void)
 {
-	const struct device *current = getDevice();
-
-	if (!current)
+	const struct device *device = getDevice();
+	if (!device)
 	{
-		fprintf(stderr, "No device initialized\n");
+		printf("No device available.\n");
 		return;
 	}
 
-	printf("Device: %s (ID: %s, Version: %d)\n",
-		   current->name, current->id, current->version);
-	printf("Inputs: %d, Outputs: %d\n",
-		   current->inputslen, current->outputslen);
+	printf("Device: %s\n", device->name);
+	printf("Inputs: %d\n", device->inputslen);
+	printf("Outputs: %d\n", device->outputslen);
+	printf("Playback: %d\n", device->playbacklen);
+	printf("Mixer: %d\n", device->mixerlen);
 
-	// Print more device state information if needed
-	printf("Flags: 0x%X\n", current->flags);
-
-	// List input and output names
-	printf("\nInput channels:\n");
-	for (int i = 0; i < current->inputslen; i++)
+	printf("\nInput Channels:\n");
+	for (int i = 0; i < device->inputslen; i++)
 	{
-		printf("  %2d: %s (flags: 0x%X)\n",
-			   i + 1, current->inputs[i].name, current->inputs[i].flags);
+		const struct inputinfo *input = &device->inputs[i];
+		struct input_state *state = get_input_state_struct(i);
+
+		printf("  %2d: %-20s [", i + 1, input->name);
+
+		if (input->flags & INPUT_GAIN)
+			printf(" Gain");
+		if (input->flags & INPUT_48V)
+			printf(" 48V");
+		if (input->flags & INPUT_REFLEVEL)
+			printf(" RefLevel");
+		if (input->flags & INPUT_HIZ)
+			printf(" HiZ");
+		if (input->flags & INPUT_PAD)
+			printf(" Pad");
+
+		printf(" ]\n");
+
+		if (state)
+		{
+			printf("      Gain: %.1f dB\n", state->gain);
+			if (input->flags & INPUT_48V)
+				printf("      Phantom: %s\n", state->phantom ? "On" : "Off");
+			if (input->flags & INPUT_HIZ)
+				printf("      HiZ: %s\n", state->hiz ? "On" : "Off");
+			printf("      Mute: %s\n", state->mute ? "On" : "Off");
+			printf("      Stereo: %s\n", state->stereo ? "Yes" : "No");
+			if (input->flags & INPUT_REFLEVEL)
+				printf("      Ref Level: %d\n", state->reflevel);
+		}
 	}
 
-	printf("\nOutput channels:\n");
-	for (int i = 0; i < current->outputslen; i++)
+	printf("\nOutput Channels:\n");
+	for (int i = 0; i < device->outputslen; i++)
 	{
-		printf("  %2d: %s (flags: 0x%X)\n",
-			   i + 1, current->outputs[i].name, current->outputs[i].flags);
+		const struct outputinfo *output = &device->outputs[i];
+		struct output_state *state = get_output_state_struct(i);
+
+		printf("  %2d: %-20s [", i + 1, output->name);
+
+		if (output->flags & OUTPUT_VOLUME)
+			printf(" Volume");
+		if (output->flags & OUTPUT_MUTE)
+			printf(" Mute");
+		if (output->flags & OUTPUT_REFLEVEL)
+			printf(" RefLevel");
+		if (output->flags & OUTPUT_DITHER)
+			printf(" Dither");
+
+		printf(" ]\n");
+
+		if (state)
+		{
+			printf("      Volume: %.1f dB\n", state->volume);
+			printf("      Mute: %s\n", state->mute ? "On" : "Off");
+			printf("      Stereo: %s\n", state->stereo ? "Yes" : "No");
+			if (output->flags & OUTPUT_REFLEVEL)
+				printf("      Ref Level: %d\n", state->reflevel);
+		}
 	}
 
-	// Save state to file
-	printf("\nSaving state to file...\n");
-	dumpConfig();
+	// Save configuration to file
+	int result = dumpConfig();
+	if (result == 0)
+	{
+		printf("\nConfiguration saved to file.\n");
+	}
+	else
+	{
+		printf("\nFailed to save configuration to file.\n");
+	}
 }

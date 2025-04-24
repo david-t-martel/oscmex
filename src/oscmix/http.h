@@ -2,16 +2,21 @@
 #ifndef HTTP_H
 #define HTTP_H
 
-struct http_request {
-	enum {
+#include "platform.h" // Include platform definitions
+
+struct http_request
+{
+	enum
+	{
 		HTTP_GET,
 		HTTP_POST,
-		HTTP_MSEARCH,  /* M-SEARCH, used for SSDP */
+		HTTP_MSEARCH, /* M-SEARCH, used for SSDP */
 	} method;
 	char *uri;
 };
 
-struct http_header {
+struct http_header
+{
 	char *name;
 	size_t name_len;
 	char *value;
@@ -20,6 +25,6 @@ struct http_header {
 
 int http_request(char *, size_t, struct http_request *);
 int http_header(char *, size_t, struct http_header *);
-void http_error(FILE *, int, const char *, const char *[], size_t);
+void http_error(platform_stream_t *, int, const char *, const char *[], size_t);
 
 #endif

@@ -1187,14 +1187,14 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
     midi_callback_info *info = (midi_callback_info *)calloc(1, sizeof(midi_callback_info));
     if (!info)
     {
-        log_error("Failed to allocate MIDI callback info");
+        log_error("Failed to allocate memory for MIDI callback: %s", platform_strerror(errno));
         return -1;
     }
 
     info->callback = callback;
     info->user_data = user_data;
 
-    // Close and reopen with callback
+    // Get device ID before stopping the device
     UINT deviceId;
     if (midiInGetID(handle, &deviceId) != MMSYSERR_NOERROR)
     {
@@ -1203,12 +1203,35 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
         return -1;
     }
 
-    midiInStop(handle);
-    midiInReset(handle);
-    midiInClose(handle);
+    // Stop and reset before closing
+    MMRESULT result = midiInStop(handle);
+    if (result != MMSYSERR_NOERROR)
+    {
+        log_error("Failed to stop MIDI input: %u", result);
+        free(info);
+        return -1;
+    }
 
-    MMRESULT result = midiInOpen(&handle, deviceId, (DWORD_PTR)midi_input_callback,
-                                 (DWORD_PTR)info, CALLBACK_FUNCTION);
+    result = midiInReset(handle);
+    if (result != MMSYSERR_NOERROR)
+    {
+        log_error("Failed to reset MIDI input: %u", result);
+        free(info);
+        return -1;
+    }
+
+    result = midiInClose(handle);
+    if (result != MMSYSERR_NOERROR)
+    {
+        log_error("Failed to close MIDI input: %u", result);
+        free(info);
+        return -1;
+    }
+
+    // Now reopen with callback
+    platform_midiin_t new_handle;
+    result = midiInOpen(&new_handle, deviceId, (DWORD_PTR)midi_input_callback,
+                        (DWORD_PTR)info, CALLBACK_FUNCTION);
     if (result != MMSYSERR_NOERROR)
     {
         log_error("Failed to reopen MIDI device with callback: %u", result);
@@ -1216,11 +1239,15 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
         return -1;
     }
 
-    result = midiInStart(handle);
+    // Update caller's handle
+    *handle = new_handle;
+
+    // Start the device
+    result = midiInStart(new_handle);
     if (result != MMSYSERR_NOERROR)
     {
         log_error("Failed to start MIDI input: %u", result);
-        midiInClose(handle);
+        midiInClose(new_handle);
         free(info);
         return -1;
     }
@@ -1433,158 +1460,34 @@ const char *platform_strerror(int errnum)
 #endif
 }
 
-/**
- * @brief Open a socket
- *
- * @param address Address string in the format "udp!host!port"
- * @param server 1 for server (bind), 0 for client (connect)
- * @return Socket handle or PLATFORM_INVALID_SOCKET on error
- */
-platform_socket_t platform_socket_open(const char *address, int server)
+/* Safe String Functions */
+
+size_t strlcpy(char *dst, const char *src, size_t size)
 {
-    char proto[16], host[256], *port_str;
-    int port, ret;
-    struct sockaddr_in addr;
-    platform_socket_t sock = PLATFORM_INVALID_SOCKET;
+    size_t srclen = strlen(src);
 
-    // Initialize socket system if needed
-    static int socket_initialized = 0;
-    if (!socket_initialized)
+    if (size > 0)
     {
-        platform_socket_init();
-        socket_initialized = 1;
+        size_t copylen = srclen < size - 1 ? srclen : size - 1;
+        memcpy(dst, src, copylen);
+        dst[copylen] = '\0';
     }
 
-    // Parse the address string (format: "udp!host!port")
-    if (sscanf(address, "%15[^!]!%255[^!]!%ms", proto, host, &port_str) != 3)
-    {
-        log_error("Invalid address format: %s (expected proto!host!port)", address);
-        return PLATFORM_INVALID_SOCKET;
-    }
-
-    port = atoi(port_str);
-    free(port_str);
-
-    // Only UDP is supported for now
-    if (strcmp(proto, "udp") != 0)
-    {
-        log_error("Unsupported protocol: %s (only udp is supported)", proto);
-        return PLATFORM_INVALID_SOCKET;
-    }
-
-    // Create socket
-    sock = platform_socket_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sock == PLATFORM_INVALID_SOCKET)
-    {
-        log_error("Failed to create socket: %s", platform_strerror(platform_errno()));
-        return PLATFORM_INVALID_SOCKET;
-    }
-
-    // Set up address structure
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-
-    if (server)
-    {
-        // For server (receiver), bind to the port
-        int optval = 1;
-
-        // Allow address reuse
-        if (platform_socket_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
-                                       (const char *)&optval, sizeof(optval)) != 0)
-        {
-            log_warning("Failed to set SO_REUSEADDR: %s", platform_strerror(platform_errno()));
-        }
-
-        // Check if this is a multicast address
-        if (strncmp(host, "224.", 4) == 0 || strncmp(host, "239.", 4) == 0)
-        {
-            struct ip_mreq mreq;
-
-            // Set up the multicast group
-            mreq.imr_multiaddr.s_addr = inet_addr(host);
-            mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-
-            // Join the multicast group
-            if (platform_socket_setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-                                           (const char *)&mreq, sizeof(mreq)) != 0)
-            {
-                log_error("Failed to join multicast group: %s", platform_strerror(platform_errno()));
-                platform_socket_close(sock);
-                return PLATFORM_INVALID_SOCKET;
-            }
-
-            log_info("Joined multicast group: %s", host);
-            addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        }
-        else if (strcmp(host, "0.0.0.0") == 0 || strcmp(host, "*") == 0)
-        {
-            // Bind to all interfaces
-            addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        }
-        else
-        {
-            // Bind to specific interface
-            addr.sin_addr.s_addr = inet_addr(host);
-        }
-
-        // Bind to the address
-        if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-        {
-            log_error("Failed to bind socket: %s", platform_strerror(platform_errno()));
-            platform_socket_close(sock);
-            return PLATFORM_INVALID_SOCKET;
-        }
-
-        log_info("Socket bound to %s:%d", host, port);
-    }
-    else
-    {
-        // For client (sender), connect to the destination
-        addr.sin_addr.s_addr = inet_addr(host);
-
-        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-        {
-            log_error("Failed to connect socket: %s", platform_strerror(platform_errno()));
-            platform_socket_close(sock);
-            return PLATFORM_INVALID_SOCKET;
-        }
-
-        log_info("Socket connected to %s:%d", host, port);
-    }
-
-    return sock;
+    return srclen;
 }
 
-/**
- * @brief Get standard input stream
- *
- * @return Standard input stream
- */
+/* Stream Functions */
+
 platform_stream_t *platform_get_stdin(void)
 {
     return stdin;
 }
 
-/**
- * @brief Get standard output stream
- *
- * @return Standard output stream
- */
 platform_stream_t *platform_get_stdout(void)
 {
     return stdout;
 }
 
-/**
- * @brief Read line from stream
- *
- * @param buf Buffer to read into
- * @param size Buffer size
- * @param stream Input stream
- * @return Buffer pointer or NULL on error or EOF
- */
 char *platform_gets(char *buf, size_t size, platform_stream_t *stream)
 {
     if (!buf || !stream || size == 0)
@@ -1601,14 +1504,6 @@ char *platform_gets(char *buf, size_t size, platform_stream_t *stream)
     return buf;
 }
 
-/**
- * @brief Write formatted string to stream
- *
- * @param stream Output stream
- * @param format Format string
- * @param ... Format arguments
- * @return Number of characters written or negative on error
- */
 int platform_printf(platform_stream_t *stream, const char *format, ...)
 {
     if (!stream || !format)
@@ -1624,14 +1519,6 @@ int platform_printf(platform_stream_t *stream, const char *format, ...)
     return ret;
 }
 
-/**
- * @brief Write data to stream
- *
- * @param buf Data buffer
- * @param size Data size
- * @param stream Output stream
- * @return Number of items written
- */
 size_t platform_write(const void *buf, size_t size, platform_stream_t *stream)
 {
     if (!buf || !stream || size == 0)
@@ -1640,14 +1527,6 @@ size_t platform_write(const void *buf, size_t size, platform_stream_t *stream)
     return fwrite(buf, 1, size, stream);
 }
 
-/**
- * @brief Read data from stream
- *
- * @param buf Buffer to read into
- * @param size Item size
- * @param stream Input stream
- * @return Number of items read
- */
 size_t platform_read(void *buf, size_t size, platform_stream_t *stream)
 {
     if (!buf || !stream || size == 0)
@@ -1656,12 +1535,6 @@ size_t platform_read(void *buf, size_t size, platform_stream_t *stream)
     return fread(buf, 1, size, stream);
 }
 
-/**
- * @brief Flush stream output
- *
- * @param stream Output stream
- * @return 0 on success, non-zero on failure
- */
 int platform_flush(platform_stream_t *stream)
 {
     if (!stream)
@@ -1670,70 +1543,10 @@ int platform_flush(platform_stream_t *stream)
     return fflush(stream);
 }
 
-/**
- * @brief Check if stream has error
- *
- * @param stream Stream to check
- * @return Non-zero if error, 0 otherwise
- */
 int platform_error(platform_stream_t *stream)
 {
     if (!stream)
         return -1;
 
     return ferror(stream);
-}
-
-/**
- * @brief Create a thread
- *
- * @param thread Pointer to thread handle
- * @param start_routine Thread entry point
- * @param arg Thread argument
- * @return 0 on success, error code on failure
- */
-int platform_thread_create(platform_thread_t *thread, void *(*start_routine)(void *), void *arg)
-{
-    if (!thread || !start_routine)
-        return -1;
-
-#if defined(PLATFORM_WINDOWS)
-    unsigned thread_id;
-    *thread = (HANDLE)_beginthreadex(NULL, 0,
-                                     (unsigned(__stdcall *)(void *))start_routine,
-                                     arg, 0, &thread_id);
-    return (*thread == NULL) ? GetLastError() : 0;
-#else
-    return pthread_create(thread, NULL, start_routine, arg);
-#endif
-}
-
-/**
- * @brief Join a thread
- *
- * @param thread Thread handle
- * @param retval Pointer to store return value
- * @return 0 on success, error code on failure
- */
-int platform_thread_join(platform_thread_t thread, void **retval)
-{
-#if defined(PLATFORM_WINDOWS)
-    DWORD result = WaitForSingleObject(thread, INFINITE);
-    if (result != WAIT_OBJECT_0)
-    {
-        return GetLastError();
-    }
-
-    if (retval)
-    {
-        DWORD exit_code;
-        GetExitCodeThread(thread, &exit_code);
-        *retval = (void *)(uintptr_t)exit_code;
-    }
-
-    CloseHandle(thread);
-    return 0;
-#else
-    return pthread_join(thread, retval);
-#endif
 }
