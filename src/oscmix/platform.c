@@ -1,8 +1,15 @@
+/**
+ * @file platform.c
+ * @brief Implementation of platform abstraction layer
+ */
+
 #include "platform.h"
 
-#if defined(PLATFORM_WINDOWS)
+#ifdef PLATFORM_WINDOWS
 #include <shlobj.h> // For SHGetFolderPath
 #endif
+
+/* Directory and path functions */
 
 int platform_get_app_data_dir(char *buffer, size_t size)
 {
@@ -34,6 +41,20 @@ int platform_get_app_data_dir(char *buffer, size_t size)
 #endif
 }
 
+int platform_get_device_config_dir(char *buffer, size_t size)
+{
+    char app_dir[256];
+    int result;
+
+    result = platform_get_app_data_dir(app_dir, sizeof(app_dir));
+    if (result != 0)
+    {
+        return result;
+    }
+
+    return platform_path_join(buffer, size, app_dir, "OSCMix" PLATFORM_PATH_SEPARATOR_STR "device_config");
+}
+
 int platform_ensure_directory(const char *path)
 {
     if (!path || strlen(path) == 0)
@@ -44,6 +65,15 @@ int platform_ensure_directory(const char *path)
     strncpy(dir_path, path, sizeof(dir_path) - 1);
     dir_path[sizeof(dir_path) - 1] = '\0';
 
+    // Ensure the directory exists
+    int result = platform_access(dir_path, 0);
+    if (result == 0)
+    {
+        // Directory already exists
+        return 0;
+    }
+
+    // Directory doesn't exist, create it
     char *p = dir_path;
 
     // Skip leading slashes
@@ -93,6 +123,36 @@ int platform_ensure_directory(const char *path)
     return 0;
 }
 
+int platform_create_valid_filename(const char *input, char *output, size_t output_size)
+{
+    size_t i, j = 0;
+    size_t input_len;
+
+    if (!input || !output || output_size == 0)
+    {
+        return -1;
+    }
+
+    input_len = strlen(input);
+
+    for (i = 0; i < input_len && j < output_size - 1; i++)
+    {
+        char c = input[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') || c == '-')
+        {
+            output[j++] = c;
+        }
+        else if (c == ' ' || c == '.' || c == ',')
+        {
+            output[j++] = '_';
+        }
+    }
+
+    output[j] = '\0';
+    return 0;
+}
+
 int platform_format_time(char *buffer, size_t size, const char *format)
 {
     if (!buffer || size == 0 || !format)
@@ -109,6 +169,114 @@ int platform_format_time(char *buffer, size_t size, const char *format)
 
     return 0;
 }
+
+/* Path manipulation functions */
+
+int platform_path_join(char *buffer, size_t size, const char *part1, const char *part2)
+{
+    if (!buffer || size == 0 || !part1 || !part2)
+        return -1;
+
+    size_t len1 = strlen(part1);
+    size_t len2 = strlen(part2);
+
+    // Check if part1 ends with a separator
+    bool has_separator = (len1 > 0 && part1[len1 - 1] == PLATFORM_PATH_SEPARATOR);
+
+    // Check if part2 starts with a separator
+    bool skip_separator = (len2 > 0 && part2[0] == PLATFORM_PATH_SEPARATOR);
+
+    if (has_separator && skip_separator)
+    {
+        // Both have separators, skip one
+        snprintf(buffer, size, "%s%s", part1, part2 + 1);
+    }
+    else if (!has_separator && !skip_separator)
+    {
+        // Neither has a separator, add one
+        snprintf(buffer, size, "%s%c%s", part1, PLATFORM_PATH_SEPARATOR, part2);
+    }
+    else
+    {
+        // One has a separator, use as is
+        snprintf(buffer, size, "%s%s", part1, part2);
+    }
+
+    // Create the directory
+    return platform_ensure_directory(buffer);
+}
+
+int platform_path_is_absolute(const char *path)
+{
+    if (!path)
+        return 0;
+
+#if defined(PLATFORM_WINDOWS)
+    // Windows: X:\ or \\server
+    return (
+        (strlen(path) >= 3 && path[1] == ':' && path[2] == PLATFORM_PATH_SEPARATOR) ||
+        (strlen(path) >= 2 && path[0] == PLATFORM_PATH_SEPARATOR && path[1] == PLATFORM_PATH_SEPARATOR));
+#else
+    // POSIX: /path
+    return (strlen(path) >= 1 && path[0] == PLATFORM_PATH_SEPARATOR);
+#endif
+}
+
+int platform_path_basename(const char *path, char *buffer, size_t size)
+{
+    if (!path || !buffer || size == 0)
+        return -1;
+
+    const char *last_separator = strrchr(path, PLATFORM_PATH_SEPARATOR);
+    if (last_separator)
+    {
+        // Skip the separator
+        last_separator++;
+
+        // Copy basename to buffer
+        strncpy(buffer, last_separator, size);
+        buffer[size - 1] = '\0';
+    }
+    else
+    {
+        // No separator, copy the whole path
+        strncpy(buffer, path, size);
+        buffer[size - 1] = '\0';
+    }
+
+    return 0;
+}
+
+int platform_path_dirname(const char *path, char *buffer, size_t size)
+{
+    if (!path || !buffer || size == 0)
+        return -1;
+
+    const char *last_separator = strrchr(path, PLATFORM_PATH_SEPARATOR);
+    if (last_separator)
+    {
+        // Calculate length of dirname
+        size_t len = last_separator - path;
+
+        // Ensure buffer is big enough
+        if (len >= size)
+            len = size - 1;
+
+        // Copy dirname to buffer
+        memcpy(buffer, path, len);
+        buffer[len] = '\0';
+    }
+    else
+    {
+        // No separator, use current directory
+        buffer[0] = '.';
+        buffer[1] = '\0';
+    }
+
+    return 0;
+}
+
+/* Socket functions */
 
 #if defined(PLATFORM_WINDOWS)
 int platform_socket_init(void)
@@ -135,11 +303,7 @@ void platform_socket_cleanup(void)
 
 platform_socket_t platform_socket_create(int domain, int type, int protocol)
 {
-#if defined(PLATFORM_WINDOWS)
     return socket(domain, type, protocol);
-#else
-    return socket(domain, type, protocol);
-#endif
 }
 
 int platform_socket_close(platform_socket_t socket)
@@ -151,48 +315,556 @@ int platform_socket_close(platform_socket_t socket)
 #endif
 }
 
-// In platform.c
-int platform_get_device_config_dir(char *buffer, size_t size)
+int platform_socket_setsockopt(platform_socket_t socket, int level, int optname,
+                               const void *optval, socklen_t optlen)
 {
-    char app_dir[256];
-    int result;
-
-    result = platform_get_app_data_dir(app_dir, sizeof(app_dir));
-    if (result != 0)
-    {
-        return result;
-    }
-
-    snprintf(buffer, size, "%s%cOSCMix%cdevice_config",
-             app_dir, PLATFORM_PATH_SEPARATOR, PLATFORM_PATH_SEPARATOR);
-
-    return platform_ensure_directory(buffer);
+#if defined(PLATFORM_WINDOWS)
+    return setsockopt(socket, level, optname, (const char *)optval, optlen);
+#else
+    return setsockopt(socket, level, optname, optval, optlen);
+#endif
 }
 
-int platform_create_valid_filename(const char *input, char *output, size_t output_size)
+int platform_socket_bind(platform_socket_t socket, const char *address, int port)
 {
-    size_t i, j = 0;
-    size_t input_len = strlen(input);
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
 
-    if (!output || output_size == 0)
+    if (address)
+    {
+        inet_pton(AF_INET, address, &addr.sin_addr);
+    }
+    else
+    {
+        addr.sin_addr.s_addr = INADDR_ANY;
+    }
+
+    return bind(socket, (struct sockaddr *)&addr, sizeof(addr));
+}
+
+int platform_socket_connect(platform_socket_t socket, const char *address, int port)
+{
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    if (!address || inet_pton(AF_INET, address, &addr.sin_addr) != 1)
     {
         return -1;
     }
 
-    for (i = 0; i < input_len && j < output_size - 1; i++)
+    return connect(socket, (struct sockaddr *)&addr, sizeof(addr));
+}
+
+int platform_socket_send(platform_socket_t socket, const void *data, size_t len)
+{
+#if defined(PLATFORM_WINDOWS)
+    return send(socket, (const char *)data, (int)len, 0);
+#else
+    return send(socket, data, len, 0);
+#endif
+}
+
+int platform_socket_recv(platform_socket_t socket, void *buffer, size_t size)
+{
+#if defined(PLATFORM_WINDOWS)
+    return recv(socket, (char *)buffer, (int)size, 0);
+#else
+    return recv(socket, buffer, size, 0);
+#endif
+}
+
+/* File functions */
+
+FILE *platform_fopen(const char *filename, const char *mode)
+{
+#if defined(PLATFORM_WINDOWS)
+    FILE *fp;
+    if (fopen_s(&fp, filename, mode) != 0)
     {
-        char c = input[i];
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-            (c >= '0' && c <= '9') || c == '-')
+        return NULL;
+    }
+    return fp;
+#else
+    return fopen(filename, mode);
+#endif
+}
+
+int platform_remove(const char *filename)
+{
+    return remove(filename);
+}
+
+int platform_rename(const char *oldname, const char *newname)
+{
+    return rename(oldname, newname);
+}
+
+/* Thread functions */
+
+int platform_thread_create(platform_thread_t *thread, platform_thread_func_t func, void *arg)
+{
+#if defined(PLATFORM_WINDOWS)
+    *thread = (platform_thread_t)_beginthreadex(NULL, 0, func, arg, 0, NULL);
+    return (*thread == 0) ? -1 : 0;
+#else
+    return pthread_create(thread, NULL, func, arg);
+#endif
+}
+
+int platform_thread_join(platform_thread_t thread)
+{
+#if defined(PLATFORM_WINDOWS)
+    DWORD result = WaitForSingleObject(thread, INFINITE);
+    CloseHandle(thread);
+    return (result == WAIT_OBJECT_0) ? 0 : -1;
+#else
+    return pthread_join(thread, NULL);
+#endif
+}
+
+void platform_sleep_ms(unsigned long ms)
+{
+#if defined(PLATFORM_WINDOWS)
+    Sleep(ms);
+#else
+    usleep(ms * 1000);
+#endif
+}
+
+/* Signal handling functions */
+
+#if defined(PLATFORM_WINDOWS)
+static BOOL WINAPI win32_signal_handler(DWORD ctrlType);
+static void (*global_signal_handler)(int) = NULL;
+
+int platform_set_signal_handler(void (*handler)(int))
+{
+    global_signal_handler = handler;
+    if (!SetConsoleCtrlHandler(win32_signal_handler, TRUE))
+    {
+        return -1;
+    }
+    return 0;
+}
+
+static BOOL WINAPI win32_signal_handler(DWORD ctrlType)
+{
+    int sig = 0;
+
+    switch (ctrlType)
+    {
+    case CTRL_C_EVENT:
+        sig = SIGINT;
+        break;
+    case CTRL_BREAK_EVENT:
+        sig = SIGTERM;
+        break;
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        sig = SIGTERM;
+        break;
+    default:
+        return FALSE;
+    }
+
+    if (global_signal_handler)
+    {
+        global_signal_handler(sig);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+#else
+int platform_set_signal_handler(void (*handler)(int))
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handler;
+    sigfillset(&sa.sa_mask); // Block all signals during handler
+
+    if (sigaction(SIGINT, &sa, NULL) != 0)
+        return -1;
+    if (sigaction(SIGTERM, &sa, NULL) != 0)
+        return -1;
+
+    return 0;
+}
+#endif
+
+int platform_set_cleanup_handler(void (*cleanup_func)(void))
+{
+    if (!cleanup_func)
+        return -1;
+
+    atexit(cleanup_func);
+    return 0;
+}
+
+/* MIDI functions */
+
+#if defined(PLATFORM_WINDOWS)
+
+typedef struct
+{
+    platform_midi_callback_t callback;
+    void *user_data;
+} midi_callback_info;
+
+static void CALLBACK midi_input_callback(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance,
+                                         DWORD_PTR dwParam1, DWORD_PTR dwParam2)
+{
+    midi_callback_info *info = (midi_callback_info *)dwInstance;
+
+    if (!info || !info->callback)
+        return;
+
+    if (wMsg == MIM_DATA)
+    {
+        // Short MIDI message
+        DWORD message = (DWORD)dwParam1;
+        unsigned char data[3];
+        data[0] = (unsigned char)(message & 0xFF);
+        data[1] = (unsigned char)((message >> 8) & 0xFF);
+        data[2] = (unsigned char)((message >> 16) & 0xFF);
+
+        info->callback(data, 3, info->user_data);
+    }
+    else if (wMsg == MIM_LONGDATA)
+    {
+        // SysEx message
+        MIDIHDR *header = (MIDIHDR *)dwParam1;
+
+        if (header && header->dwBytesRecorded > 0)
         {
-            output[j++] = c;
+            info->callback(header->lpData, header->dwBytesRecorded, info->user_data);
+
+            // Prepare the buffer for reuse
+            midiInPrepareHeader(hMidiIn, header, sizeof(MIDIHDR));
+            midiInAddBuffer(hMidiIn, header, sizeof(MIDIHDR));
         }
-        else if (c == ' ' || c == '.' || c == ',')
+    }
+}
+
+int platform_midi_init(void)
+{
+    return 0; // No global initialization needed for Windows MIDI
+}
+
+void platform_midi_cleanup(void)
+{
+    // No global cleanup needed for Windows MIDI
+}
+
+int platform_midi_open_input(const char *device_name, platform_midiin_t *handle)
+{
+    if (!device_name || !handle)
+        return -1;
+
+    UINT numDevs = midiInGetNumDevs();
+    MIDIINCAPS caps;
+    MMRESULT result;
+    UINT deviceId = MIDI_MAPPER; // Default
+
+    // Try to find device by name substring
+    for (UINT i = 0; i < numDevs; i++)
+    {
+        if (midiInGetDevCaps(i, &caps, sizeof(MIDIINCAPS)) == MMSYSERR_NOERROR)
         {
-            output[j++] = '_';
+            if (strstr(caps.szPname, device_name) != NULL)
+            {
+                deviceId = i;
+                break;
+            }
         }
     }
 
-    output[j] = '\0';
+    // If not found by name, try as a device ID number
+    if (deviceId == MIDI_MAPPER)
+    {
+        char *endptr;
+        long num = strtol(device_name, &endptr, 10);
+        if (*device_name != '\0' && *endptr == '\0' && num >= 0 && num < numDevs)
+        {
+            deviceId = (UINT)num;
+        }
+    }
+
+    // Open the device
+    result = midiInOpen(handle, deviceId, NULL, 0, CALLBACK_NULL);
+    if (result != MMSYSERR_NOERROR)
+    {
+        return -1;
+    }
+
     return 0;
 }
+
+int platform_midi_open_output(const char *device_name, platform_midiout_t *handle)
+{
+    if (!device_name || !handle)
+        return -1;
+
+    UINT numDevs = midiOutGetNumDevs();
+    MIDIOUTCAPS caps;
+    MMRESULT result;
+    UINT deviceId = MIDI_MAPPER; // Default
+
+    // Try to find device by name substring
+    for (UINT i = 0; i < numDevs; i++)
+    {
+        if (midiOutGetDevCaps(i, &caps, sizeof(MIDIOUTCAPS)) == MMSYSERR_NOERROR)
+        {
+            if (strstr(caps.szPname, device_name) != NULL)
+            {
+                deviceId = i;
+                break;
+            }
+        }
+    }
+
+    // If not found by name, try as a device ID number
+    if (deviceId == MIDI_MAPPER)
+    {
+        char *endptr;
+        long num = strtol(device_name, &endptr, 10);
+        if (*device_name != '\0' && *endptr == '\0' && num >= 0 && num < numDevs)
+        {
+            deviceId = (UINT)num;
+        }
+    }
+
+    // Open the device
+    result = midiOutOpen(handle, deviceId, 0, 0, CALLBACK_NULL);
+    if (result != MMSYSERR_NOERROR)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+int platform_midi_close_input(platform_midiin_t handle)
+{
+    if (handle)
+    {
+        midiInStop(handle);
+        midiInReset(handle);
+        midiInClose(handle);
+    }
+    return 0;
+}
+
+int platform_midi_close_output(platform_midiout_t handle)
+{
+    if (handle)
+    {
+        midiOutReset(handle);
+        midiOutClose(handle);
+    }
+    return 0;
+}
+
+int platform_midi_send(platform_midiout_t handle, const void *data, size_t len)
+{
+    const unsigned char *pos = (const unsigned char *)data;
+    MMRESULT result;
+
+    if (!handle || !data || len == 0)
+        return -1;
+
+    // Check if it's a SysEx message (starts with 0xF0)
+    if (pos[0] == 0xF0)
+    {
+        MIDIHDR midiHdr;
+
+        // Set up the MIDI output header
+        ZeroMemory(&midiHdr, sizeof(MIDIHDR));
+        midiHdr.lpData = (LPSTR)data;
+        midiHdr.dwBufferLength = len;
+        midiHdr.dwFlags = 0;
+
+        result = midiOutPrepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
+        if (result != MMSYSERR_NOERROR)
+            return -1;
+
+        result = midiOutLongMsg(handle, &midiHdr, sizeof(MIDIHDR));
+        if (result != MMSYSERR_NOERROR)
+        {
+            midiOutUnprepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
+            return -1;
+        }
+
+        // Wait for the message to be sent
+        while (!(midiHdr.dwFlags & MHDR_DONE))
+        {
+            Sleep(1);
+        }
+
+        result = midiOutUnprepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
+        if (result != MMSYSERR_NOERROR)
+            return -1;
+    }
+    else
+    {
+        // Short MIDI message
+        DWORD message = 0;
+        size_t copy_len = (len > 4) ? 4 : len;
+
+        // Copy data to DWORD (little-endian)
+        for (size_t i = 0; i < copy_len; i++)
+        {
+            message |= ((DWORD)pos[i]) << (8 * i);
+        }
+
+        result = midiOutShortMsg(handle, message);
+        if (result != MMSYSERR_NOERROR)
+            return -1;
+    }
+
+    return 0;
+}
+
+int platform_midi_add_buffer(platform_midiin_t handle, void *buffer, size_t len)
+{
+    MIDIHDR *midiHdr = (MIDIHDR *)calloc(1, sizeof(MIDIHDR));
+    if (!midiHdr)
+        return -1;
+
+    midiHdr->lpData = buffer;
+    midiHdr->dwBufferLength = len;
+    midiHdr->dwFlags = 0;
+
+    MMRESULT result = midiInPrepareHeader(handle, midiHdr, sizeof(MIDIHDR));
+    if (result != MMSYSERR_NOERROR)
+    {
+        free(midiHdr);
+        return -1;
+    }
+
+    result = midiInAddBuffer(handle, midiHdr, sizeof(MIDIHDR));
+    if (result != MMSYSERR_NOERROR)
+    {
+        midiInUnprepareHeader(handle, midiHdr, sizeof(MIDIHDR));
+        free(midiHdr);
+        return -1;
+    }
+
+    return 0;
+}
+
+int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_t callback, void *user_data)
+{
+    midi_callback_info *info = (midi_callback_info *)calloc(1, sizeof(midi_callback_info));
+    if (!info)
+        return -1;
+
+    info->callback = callback;
+    info->user_data = user_data;
+
+    // Close and reopen with callback
+    UINT deviceId;
+    if (midiInGetID(handle, &deviceId) != MMSYSERR_NOERROR)
+    {
+        free(info);
+        return -1;
+    }
+
+    midiInStop(handle);
+    midiInReset(handle);
+    midiInClose(handle);
+
+    MMRESULT result = midiInOpen(&handle, deviceId, (DWORD_PTR)midi_input_callback,
+                                 (DWORD_PTR)info, CALLBACK_FUNCTION);
+    if (result != MMSYSERR_NOERROR)
+    {
+        free(info);
+        return -1;
+    }
+
+    result = midiInStart(handle);
+    if (result != MMSYSERR_NOERROR)
+    {
+        midiInClose(handle);
+        free(info);
+        return -1;
+    }
+
+    return 0;
+}
+
+#else
+// POSIX MIDI implementations would go here
+// Basic stubs for Linux/macOS - would need to be expanded with platform-specific MIDI APIs
+
+int platform_midi_init(void)
+{
+    return 0; // Not implemented
+}
+
+void platform_midi_cleanup(void)
+{
+    // Not implemented
+}
+
+int platform_midi_open_input(const char *device_name, platform_midiin_t *handle)
+{
+    if (!device_name || !handle)
+        return -1;
+
+    // For POSIX, we might open a device like /dev/midi
+    *handle = open(device_name, O_RDONLY | O_NONBLOCK);
+    return (*handle < 0) ? -1 : 0;
+}
+
+int platform_midi_open_output(const char *device_name, platform_midiout_t *handle)
+{
+    if (!device_name || !handle)
+        return -1;
+
+    // For POSIX, we might open a device like /dev/midi
+    *handle = open(device_name, O_WRONLY);
+    return (*handle < 0) ? -1 : 0;
+}
+
+int platform_midi_close_input(platform_midiin_t handle)
+{
+    if (handle >= 0)
+        close(handle);
+    return 0;
+}
+
+int platform_midi_close_output(platform_midiout_t handle)
+{
+    if (handle >= 0)
+        close(handle);
+    return 0;
+}
+
+int platform_midi_send(platform_midiout_t handle, const void *data, size_t len)
+{
+    if (handle < 0 || !data || len == 0)
+        return -1;
+
+    // Simple write to the file descriptor
+    ssize_t written = write(handle, data, len);
+    return (written == len) ? 0 : -1;
+}
+
+int platform_midi_add_buffer(platform_midiin_t handle, void *buffer, size_t len)
+{
+    // Not directly applicable to POSIX, would depend on the specific MIDI library
+    return -1;
+}
+
+int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_t callback, void *user_data)
+{
+    // Not directly applicable to POSIX, would depend on the specific MIDI library
+    return -1;
+}
+#endif
