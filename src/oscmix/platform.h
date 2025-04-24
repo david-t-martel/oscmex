@@ -59,6 +59,7 @@ typedef SOCKET platform_socket_t;
 /* Path handling */
 #define PLATFORM_PATH_SEPARATOR '\\'
 #define PLATFORM_PATH_SEPARATOR_STR "\\"
+#define PLATFORM_MAX_PATH MAX_PATH
 
 /* MIDI-specific functions */
 typedef HMIDIIN platform_midiin_t;
@@ -107,6 +108,7 @@ typedef int platform_socket_t;
 /* Path handling */
 #define PLATFORM_PATH_SEPARATOR '/'
 #define PLATFORM_PATH_SEPARATOR_STR "/"
+#define PLATFORM_MAX_PATH 4096
 
 /* MIDI-specific functions - generic types for POSIX */
 typedef int platform_midiin_t;
@@ -122,10 +124,24 @@ typedef void *(*platform_thread_func_t)(void *);
  */
 typedef FILE platform_stream_t;
 
-/* Forward declaration for logging functions */
-struct log_handle;
-
 /* Function prototypes */
+
+/*------------------------------------------------------------------------------
+ * Safe String Functions
+ *----------------------------------------------------------------------------*/
+
+/**
+ * @brief A safer version of strcpy
+ *
+ * Copies the source string to the destination buffer, ensuring null termination.
+ * The copy will be truncated if the source string is longer than size-1 bytes.
+ *
+ * @param dst Destination buffer
+ * @param src Source string
+ * @param size Size of the destination buffer
+ * @return Length of the source string (regardless of truncation)
+ */
+size_t strlcpy(char *dst, const char *src, size_t size);
 
 /*------------------------------------------------------------------------------
  * File System Functions
@@ -166,6 +182,10 @@ int platform_ensure_directory(const char *path);
 
 /**
  * @brief Creates a valid filename from potentially invalid input
+ *
+ * Removes characters that are not allowed in filenames on most filesystems.
+ * Allowed characters are: alphanumeric, dash, underscore, and period.
+ * Other characters are replaced with underscores or omitted.
  *
  * @param input Input string that may contain invalid characters
  * @param output Buffer to receive the valid filename
@@ -216,6 +236,9 @@ int platform_rename(const char *oldname, const char *newname);
 
 /**
  * @brief Joins two path components with the correct separator
+ *
+ * Handles cases where the first component ends with a separator or the second
+ * component starts with a separator, ensuring only one separator is used.
  *
  * @param buffer Buffer to store the joined path
  * @param size Size of the buffer
@@ -332,6 +355,9 @@ int platform_mutex_unlock(platform_mutex_t *mutex);
 
 /**
  * @brief Sets a signal handler for common termination signals
+ *
+ * Sets up a handler for SIGINT (Ctrl+C) and SIGTERM on both Windows and POSIX
+ * platforms, making signal handling consistent across platforms.
  *
  * @param handler Function to call when a signal is received
  * @return 0 on success, -1 on failure

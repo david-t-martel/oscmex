@@ -25,7 +25,7 @@
         "**/out/**": true
     },
     // CMake configurations with Intel oneAPI
-    "cmake.sourceDirectory": "C:/codedev/auricleinc/oscmex",
+    "cmake.sourceDirectory": "C:/codedev/auricleinc/oscmex/src/oscmix",
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
     "cmake.configureOnOpen": true,
     "cmake.configureArgs": [
