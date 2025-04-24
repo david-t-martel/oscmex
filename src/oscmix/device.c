@@ -12,6 +12,33 @@ extern const struct device ffucxii;
 extern const struct device ff802;
 extern const struct device ufxii;
 
+/* Enumeration names */
+const char *const CLOCK_SOURCE_NAMES[] = {
+    "Internal", "AES", "ADAT", "Sync In"};
+
+const char *const BUFFER_SIZE_NAMES[] = {
+    "32", "64", "128", "256", "512", "1024"};
+
+const char *const DUREC_STATUS_NAMES[] = {
+    "No Media", "FS Error", "Initializing", "Reinitializing",
+    "Unknown", "Stopped", "Recording", "Unknown",
+    "Unknown", "Unknown", "Playing", "Paused"};
+
+const char *const DUREC_PLAYMODE_NAMES[] = {
+    "Single", "Repeat", "Sequence", "Random"};
+
+const char *const INPUT_REF_LEVEL_NAMES[] = {
+    "-10 dBV", "+4 dBu", "HiZ", "LoGain"};
+
+const char *const OUTPUT_REF_LEVEL_NAMES[] = {
+    "-10 dBV", "+4 dBu", "HiGain", "LoGain"};
+
+const char *const DITHER_NAMES[] = {
+    "Off", "16 bit", "20 bit"};
+
+const char *const LOG_LEVEL_NAMES[] = {
+    "Error", "Warning", "Info", "Debug"};
+
 /* Storage for device states - these variables should be initialized in device_init() */
 float **volumes = NULL;       // 2D array: [input][output]
 float **pans = NULL;          // 2D array: [input][output]
@@ -31,27 +58,6 @@ int buffer_size = 0;          // Current buffer size index
 const long SAMPLE_RATES[SAMPLE_RATE_COUNT] = {
     44100, 48000, 88200, 96000, 176400, 192000,
     352800, 384000, 705600, 768000};
-
-const char *const DUREC_STATUS_NAMES[] = {
-    "No Media",
-    "Filesystem Error",
-    "Initializing",
-    "Reinitializing",
-    NULL,
-    "Stopped",
-    "Recording",
-    NULL, NULL, NULL,
-    "Playing",
-    "Paused"};
-
-const char *const DUREC_PLAYMODE_NAMES[] = {
-    "Single", "Repeat", "Sequence", "Random"};
-
-const char *const INPUT_REF_LEVEL_NAMES[] = {
-    "Lo Gain", "+4 dBu", "-10 dBV", "Hi Gain"};
-
-const char *const OUTPUT_REF_LEVEL_NAMES[] = {
-    "Hi Gain", "+4 dBu", "-10 dBV", "Lo Gain"};
 
 /* RME Fireface UCX II definitions */
 static const struct inputinfo ffucxii_inputs[] = {
@@ -117,85 +123,39 @@ static const struct device *known_devices[] = {
  *
  * @return 0 on success, non-zero on failure
  */
-int device_init(void)
+int device_init(const char *name)
 {
-    /* For now, just use the first device in the list */
-    cur_device = known_devices[0];
-
-    if (!cur_device)
+    if (!name)
     {
-        fprintf(stderr, "No device available\n");
-        return -1;
+        /* Default to first device if none specified */
+        cur_device = &ffucxii;
+        return 0;
     }
 
-    /* Allocate memory for device state storage */
-    int num_inputs = cur_device->inputslen;
-    int num_outputs = cur_device->outputslen;
-
-    volumes = calloc(num_inputs, sizeof(float *));
-    pans = calloc(num_inputs, sizeof(float *));
-
-    if (!volumes || !pans)
+    if (strcmp(name, "ffucxii") == 0 ||
+        strcmp(name, "ucx2") == 0 ||
+        strcmp(name, "ucxii") == 0)
     {
-        fprintf(stderr, "Memory allocation failed\n");
-        device_cleanup();
-        return -1;
+        cur_device = &ffucxii;
+        return 0;
     }
 
-    for (int i = 0; i < num_inputs; i++)
+    if (strcmp(name, "ff802") == 0 ||
+        strcmp(name, "fireface802") == 0)
     {
-        volumes[i] = calloc(num_outputs, sizeof(float));
-        pans[i] = calloc(num_outputs, sizeof(float));
-
-        if (!volumes[i] || !pans[i])
-        {
-            fprintf(stderr, "Memory allocation failed\n");
-            device_cleanup();
-            return -1;
-        }
-
-        /* Initialize mixer values to defaults */
-        for (int j = 0; j < num_outputs; j++)
-        {
-            volumes[i][j] = -90.0f; /* -inf dB (muted) */
-            pans[i][j] = 0.0f;      /* Center pan */
-        }
+        cur_device = &ff802;
+        return 0;
     }
 
-    /* Allocate and initialize other state arrays */
-    output_volumes = calloc(num_outputs, sizeof(float));
-    output_mutes = calloc(num_outputs, sizeof(bool));
-    output_reflevels = calloc(num_outputs, sizeof(int));
-
-    input_mutes = calloc(num_inputs, sizeof(bool));
-    input_gains = calloc(num_inputs, sizeof(float));
-    input_phantoms = calloc(num_inputs, sizeof(bool));
-    input_reflevels = calloc(num_inputs, sizeof(int));
-    input_hizs = calloc(num_inputs, sizeof(bool));
-
-    if (!output_volumes || !output_mutes || !output_reflevels ||
-        !input_mutes || !input_gains || !input_phantoms ||
-        !input_reflevels || !input_hizs)
+    if (strcmp(name, "ufxii") == 0 ||
+        strcmp(name, "ufx2") == 0)
     {
-        fprintf(stderr, "Memory allocation failed\n");
-        device_cleanup();
-        return -1;
+        cur_device = &ufxii;
+        return 0;
     }
 
-    /* Set default values for system settings */
-    sample_rate = 1;  /* 44.1 kHz */
-    clock_source = 0; /* Internal */
-    buffer_size = 3;  /* 256 samples */
-
-    /* Initialize the devicestate structure */
-    if (initDeviceState(cur_device) != 0)
-    {
-        fprintf(stderr, "Failed to initialize device state\n");
-        device_cleanup();
-        return -1;
-    }
-
-    return 0;
+    /* Unknown device */
+    return -1;
 }
 
 /**
@@ -310,6 +270,112 @@ int update_durec_status(uint16_t reg_value)
     set_durec_state(status, position, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
 
     return 0;
+}
+
+/* Gets the DSP status (version and load) */
+int get_dsp_state(int *version, int *load)
+{
+    // Add implementation
+    if (version)
+        *version = 123; // Example value
+    if (load)
+        *load = 25; // Example value (25%)
+    return 0;
+}
+
+/* Gets the DURec status */
+int get_durec_status(int *status, int *position)
+{
+    // Add implementation
+    if (status)
+        *status = 5; // Stopped
+    if (position)
+        *position = 0; // 0%
+    return 0;
+}
+
+/* Gets the current sample rate */
+int get_sample_rate(int *rate)
+{
+    // Add implementation
+    if (rate)
+        *rate = 48000; // 48 kHz
+    return 0;
+}
+
+/* Gets input channel state */
+int get_input_params(int channel, float *gain, bool *phantom, bool *hiz, bool *mute)
+{
+    // Implementation of getting input parameters
+    if (gain)
+        *gain = 0.75f; // 75%
+    if (phantom)
+        *phantom = true;
+    if (hiz)
+        *hiz = false;
+    if (mute)
+        *mute = false;
+    return 0;
+}
+
+/* Gets output channel state */
+int get_output_params(int channel, float *volume, bool *mute)
+{
+    // Implementation of getting output parameters
+    if (volume)
+        *volume = 0.8f; // 80%
+    if (mute)
+        *mute = false;
+    return 0;
+}
+
+/* Gets mixer matrix state */
+int get_mixer_state(int input, int output, float *volume, float *pan)
+{
+    // Add implementation
+    if (volume)
+        *volume = 0.5f; // 50%
+    if (pan)
+        *pan = 0.5f; // Center
+    return 0;
+}
+
+// Return the full input state struct
+struct input_state *get_input_state_struct(int index)
+{
+    static struct input_state state;
+    // Fill in state with appropriate values
+    state.gain = 0.75f;
+    state.phantom = true;
+    state.hiz = false;
+    state.pad = false;
+    state.mute = false;
+    state.stereo = false;
+    state.reflevel = 0;
+    return &state;
+}
+
+// Return the full output state struct
+struct output_state *get_output_state_struct(int index)
+{
+    static struct output_state state;
+    // Fill in state with appropriate values
+    state.volume = 0.8f;
+    state.mute = false;
+    state.stereo = true;
+    state.reflevel = 0;
+    return &state;
+}
+
+// Refreshing state function
+int refreshing_state(int new_state)
+{
+    static int is_refreshing = 0;
+
+    if (new_state >= 0)
+        is_refreshing = new_state;
+
+    return is_refreshing;
 }
 
 // Additional parameter update functions...

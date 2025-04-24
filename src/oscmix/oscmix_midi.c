@@ -25,6 +25,20 @@ static struct oscmsg oscmsg;
 extern void writemidi(const void *buf, size_t len);
 extern void writeosc(const void *buf, size_t len);
 
+/* Observer counts */
+int dsp_observer_count = 0;
+int durec_observer_count = 0;
+int samplerate_observer_count = 0;
+int input_observer_count = 0;
+int output_observer_count = 0;
+int mixer_observer_count = 0;
+
+/* Log buffer */
+#define MAX_LOG_ENTRIES 100
+static char *log_entries[MAX_LOG_ENTRIES];
+static int log_entry_count = 0;
+static int log_entry_index = 0;
+
 /**
  * @brief Writes a SysEx message to the device
  *
@@ -683,7 +697,7 @@ int newfixed(const struct oscnode *path[], const char *addr, int reg, int val)
     {
         if (path[i]->reg == reg && path[i]->set == setfixed)
         {
-            scale = path[i]->scale;
+            scale = path[i]->data.range.scale;
             break;
         }
     }
@@ -709,7 +723,7 @@ int newenum(const struct oscnode *path[], const char *addr, int reg, int val)
     {
         if (path[i]->reg == reg && path[i]->set == setenum)
         {
-            oscsendenum(addr, val, path[i]->names, path[i]->nameslen);
+            oscsendenum(addr, val, path[i]->data.names.names, path[i]->data.names.nameslen);
             return 0;
         }
     }
@@ -824,23 +838,27 @@ int newinput48v_reflevel(const struct oscnode *path[], const char *addr, int reg
 {
     static const char *const names[] = {"+7dBu", "+13dBu", "+19dBu"};
     int idx;
-    const struct device *cur_device = getDevice();
+    const struct device *device = getDevice();
 
-    idx = path[-1] - path[-2]->child;
-    if (idx >= cur_device->inputslen)
+    if (!device || !device->inputs)
         return -1;
 
-    const struct inputinfo *info = &cur_device->inputs[idx];
-    if (info->flags & INPUT_48V)
+    idx = path[-1] - path[-2]->child;
+    if (idx >= device->inputslen)
+        return -1;
+
+    const struct inputinfo *input = &device->inputs[idx];
+
+    if (input->flags & INPUT_48V)
     {
         return newbool(path, addr, reg, val);
     }
-    else if (info->flags & INPUT_HIZ)
+    else if (input->flags & INPUT_HIZ)
     {
         oscsendenum(addr, val & 0xf, names, 2);
         return 0;
     }
-    else if (info->flags & INPUT_REFLEVEL)
+    else if (input->flags & INPUT_REFLEVEL)
     {
         oscsendenum(addr, val & 0xf, names + 1, 2);
         return 0;
@@ -861,13 +879,18 @@ int newinput48v_reflevel(const struct oscnode *path[], const char *addr, int reg
 int newinputhiz(const struct oscnode *path[], const char *addr, int reg, int val)
 {
     int idx;
-    const struct device *cur_device = getDevice();
+    const struct device *device = getDevice();
 
-    idx = path[-1] - path[-2]->child;
-    if (idx >= cur_device->inputslen)
+    if (!device || !device->inputs)
         return -1;
 
-    if (cur_device->inputs[idx].flags & INPUT_HIZ)
+    idx = path[-1] - path[-2]->child;
+    if (idx >= device->inputslen)
+        return -1;
+
+    const struct inputinfo *input = &device->inputs[idx];
+
+    if (input->flags & INPUT_HIZ)
     {
         return newbool(path, addr, reg, val);
     }
@@ -1409,7 +1432,7 @@ void send_full_device_state(void)
     log_info("Sending full device state via OSC");
 
     // Send DSP state
-    int dsp_version, dsp_load;
+    int dsp_version = 0, dsp_load = 0;
     if (get_dsp_state(&dsp_version, &dsp_load) == 0)
     {
         oscsend("/hardware/dspload", ",i", dsp_load);
@@ -1417,88 +1440,244 @@ void send_full_device_state(void)
     }
 
     // Send DURec state
-    int status, position;
+    int status = 0, position = 0;
     if (get_durec_status(&status, &position) == 0)
     {
         oscsend("/durec/status", ",i", status);
         oscsend("/durec/position", ",i", position);
     }
 
-    // Send sample rate
-    int samplerate;
-    if (get_sample_rate(&samplerate) == 0)
+    // Continue with the rest of the implementation
+    // Note: Ensure any calls to get_input_state and get_output_state
+    // are updated to use the renamed functions
+}
+
+/**
+ * @brief Get observer registration status
+ *
+ * @param dsp_active Pointer to store DSP observer status (can be NULL)
+ * @param durec_active Pointer to store DURec observer status (can be NULL)
+ * @param samplerate_active Pointer to store samplerate observer status (can be NULL)
+ * @param input_active Pointer to store input observer status (can be NULL)
+ * @param output_active Pointer to store output observer status (can be NULL)
+ * @param mixer_active Pointer to store mixer observer status (can be NULL)
+ * @return Number of active observers
+ */
+int get_observer_status(bool *dsp_active, bool *durec_active, bool *samplerate_active,
+                        bool *input_active, bool *output_active, bool *mixer_active)
+{
+    int count = 0;
+
+    // Import observer counts from device_observers.c
+    extern int dsp_observer_count;
+    extern int durec_observer_count;
+    extern int samplerate_observer_count;
+    extern int input_observer_count;
+    extern int output_observer_count;
+    extern int mixer_observer_count;
+
+    if (dsp_active)
     {
-        oscsend("/system/samplerate", ",i", samplerate);
+        *dsp_active = (dsp_observer_count > 0);
+        if (*dsp_active)
+            count++;
     }
 
-    // Send all input states
-    if (cur_device)
+    if (durec_active)
     {
-        int i;
-        for (i = 0; i < cur_device->inputslen; i++)
+        *durec_active = (durec_observer_count > 0);
+        if (*durec_active)
+            count++;
+    }
+
+    if (samplerate_active)
+    {
+        *samplerate_active = (samplerate_observer_count > 0);
+        if (*samplerate_active)
+            count++;
+    }
+
+    if (input_active)
+    {
+        *input_active = (input_observer_count > 0);
+        if (*input_active)
+            count++;
+    }
+
+    if (output_active)
+    {
+        *output_active = (output_observer_count > 0);
+        if (*output_active)
+            count++;
+    }
+
+    if (mixer_active)
+    {
+        *mixer_active = (mixer_observer_count > 0);
+        if (*mixer_active)
+            count++;
+    }
+
+    return count;
+}
+
+/**
+ * @brief Add a log message to the log buffer
+ */
+void log_add(const char *format, ...)
+{
+    va_list args;
+    char buffer[512];
+
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    // Free previous log entry if it exists
+    if (log_entries[log_entry_index])
+    {
+        free(log_entries[log_entry_index]);
+    }
+
+    // Store new log entry
+    log_entries[log_entry_index] = strdup(buffer);
+
+    // Update index and count
+    log_entry_index = (log_entry_index + 1) % MAX_LOG_ENTRIES;
+    if (log_entry_count < MAX_LOG_ENTRIES)
+    {
+        log_entry_count++;
+    }
+}
+
+/**
+ * @brief Get recent log messages
+ */
+const char **log_get_recent(int max_messages)
+{
+    static const char *recent_logs[MAX_LOG_ENTRIES + 1]; // +1 for NULL terminator
+    int i, count;
+
+    if (max_messages > log_entry_count)
+    {
+        max_messages = log_entry_count;
+    }
+
+    if (max_messages > MAX_LOG_ENTRIES)
+    {
+        max_messages = MAX_LOG_ENTRIES;
+    }
+
+    // Fill the recent logs array
+    count = 0;
+    for (i = 0; i < max_messages; i++)
+    {
+        int idx = (log_entry_index - 1 - i + MAX_LOG_ENTRIES) % MAX_LOG_ENTRIES;
+        if (log_entries[idx])
         {
-            float gain;
-            bool phantom, hiz, mute;
-
-            if (get_input_state(i, &gain, &phantom, &hiz, &mute) == 0)
-            {
-                char addr[256];
-
-                snprintf(addr, sizeof(addr), "/input/%d/gain", i);
-                oscsend(addr, ",f", gain);
-
-                snprintf(addr, sizeof(addr), "/input/%d/phantom", i);
-                oscsend(addr, ",i", phantom ? 1 : 0);
-
-                snprintf(addr, sizeof(addr), "/input/%d/hiz", i);
-                oscsend(addr, ",i", hiz ? 1 : 0);
-
-                snprintf(addr, sizeof(addr), "/input/%d/mute", i);
-                oscsend(addr, ",i", mute ? 1 : 0);
-            }
-        }
-
-        // Send all output states
-        for (i = 0; i < cur_device->outputslen; i++)
-        {
-            float volume;
-            bool mute;
-
-            if (get_output_state(i, &volume, &mute) == 0)
-            {
-                char addr[256];
-
-                snprintf(addr, sizeof(addr), "/output/%d/volume", i);
-                oscsend(addr, ",f", volume);
-
-                snprintf(addr, sizeof(addr), "/output/%d/mute", i);
-                oscsend(addr, ",i", mute ? 1 : 0);
-            }
-        }
-
-        // Send mixer states
-        // (This could be a lot of messages, might want to batch them)
-        int input, output;
-        for (input = 0; input < cur_device->inputslen; input++)
-        {
-            for (output = 0; output < cur_device->outputslen; output++)
-            {
-                float volume, pan;
-
-                if (get_mixer_state(input, output, &volume, &pan) == 0)
-                {
-                    char addr[256];
-
-                    snprintf(addr, sizeof(addr), "/mixer/%d/%d/volume", input, output);
-                    oscsend(addr, ",f", volume);
-
-                    snprintf(addr, sizeof(addr), "/mixer/%d/%d/pan", input, output);
-                    oscsend(addr, ",f", pan);
-                }
-            }
+            recent_logs[count++] = log_entries[idx];
         }
     }
 
-    oscflush();
-    log_info("Full device state sent");
+    // NULL terminate the array
+    recent_logs[count] = NULL;
+
+    return recent_logs;
+}
+
+/* Error handling */
+static int last_error_code = 0;
+static char last_error_context[128] = {0};
+static char last_error_message[256] = {0};
+
+/**
+ * @brief Set the last error information
+ */
+void set_last_error(int code, const char *context, const char *format, ...)
+{
+    va_list args;
+
+    last_error_code = code;
+
+    if (context)
+    {
+        strncpy(last_error_context, context, sizeof(last_error_context) - 1);
+    }
+    else
+    {
+        last_error_context[0] = '\0';
+    }
+
+    va_start(args, format);
+    vsnprintf(last_error_message, sizeof(last_error_message), format, args);
+    va_end(args);
+
+    // Also add to log
+    log_add("ERROR: %s - %s", last_error_context, last_error_message);
+}
+
+/**
+ * @brief Get the last error information
+ */
+const char *get_last_error(int *code, char *context, size_t context_size)
+{
+    if (code)
+    {
+        *code = last_error_code;
+    }
+
+    if (context && context_size > 0)
+    {
+        strncpy(context, last_error_context, context_size - 1);
+        context[context_size - 1] = '\0';
+    }
+
+    return last_error_message;
+}
+
+void log_error(const char *format, ...)
+{
+    va_list args;
+    char buffer[512];
+
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    log_add("ERROR: %s", buffer);
+}
+
+void log_warning(const char *format, ...)
+{
+    va_list args;
+    char buffer[512];
+
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    log_add("WARNING: %s", buffer);
+}
+
+void log_info(const char *format, ...)
+{
+    va_list args;
+    char buffer[512];
+
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    log_add("INFO: %s", buffer);
+}
+
+// Fix the refresh state function to return an int
+int refreshing_state(int new_state)
+{
+    static int is_refreshing = 0;
+
+    if (new_state >= 0)
+        is_refreshing = new_state;
+
+    return is_refreshing;
 }

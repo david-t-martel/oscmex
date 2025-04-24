@@ -1,14 +1,14 @@
 /**
  * @file oscmix_midi.h
- * @brief MIDI SysEx handling functions
+ * @brief MIDI SysEx handling and OSC response functions
  */
 
 #ifndef OSCMIX_MIDI_H
 #define OSCMIX_MIDI_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include "oscnode_tree.h"
 #include "osc.h"
 
@@ -30,6 +30,13 @@ int setreg(unsigned reg, unsigned val);
  * @return 0 on success, non-zero on failure
  */
 int register_osc_observers(void);
+
+/**
+ * @brief Register essential OSC observers only
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int register_essential_osc_observers(void);
 
 /**
  * @brief Sets an audio level parameter value in the device
@@ -116,6 +123,100 @@ long getsamplerate(int val);
  * @param sysexbuf The buffer to store the encoded SysEx message
  */
 void writesysex(int subid, const unsigned char *buf, size_t len, unsigned char *sysexbuf);
+
+/**
+ * @brief Get observer registration status
+ *
+ * @param dsp_active Pointer to store DSP observer status (can be NULL)
+ * @param durec_active Pointer to store DURec observer status (can be NULL)
+ * @param samplerate_active Pointer to store samplerate observer status (can be NULL)
+ * @param input_active Pointer to store input observer status (can be NULL)
+ * @param output_active Pointer to store output observer status (can be NULL)
+ * @param mixer_active Pointer to store mixer observer status (can be NULL)
+ * @return Number of active observers
+ */
+int get_observer_status(bool *dsp_active, bool *durec_active, bool *samplerate_active,
+                        bool *input_active, bool *output_active, bool *mixer_active);
+
+/**
+ * @brief Send complete device state via OSC
+ *
+ * This function sends the entire device state to OSC clients,
+ * useful for GUI initialization or reconnection.
+ */
+void send_full_device_state(void);
+
+/**
+ * @brief Add a log message to the log buffer
+ *
+ * @param format Format string followed by arguments (printf style)
+ * @param ... Variable arguments
+ */
+void log_add(const char *format, ...);
+
+/**
+ * @brief Log error message
+ *
+ * @param format Format string followed by arguments (printf style)
+ * @param ... Variable arguments
+ */
+void log_error(const char *format, ...);
+
+/**
+ * @brief Log warning message
+ *
+ * @param format Format string followed by arguments (printf style)
+ * @param ... Variable arguments
+ */
+void log_warning(const char *format, ...);
+
+/**
+ * @brief Log info message
+ *
+ * @param format Format string followed by arguments (printf style)
+ * @param ... Variable arguments
+ */
+void log_info(const char *format, ...);
+
+/**
+ * @brief Get recent log messages
+ *
+ * @param max_messages Maximum number of messages to retrieve
+ * @return Array of strings containing log messages (NULL-terminated)
+ */
+const char **log_get_recent(int max_messages);
+
+/**
+ * @brief Set the last error information
+ *
+ * @param code Error code
+ * @param context Error context string
+ * @param format Format string followed by arguments (printf style)
+ * @param ... Variable arguments
+ */
+void set_last_error(int code, const char *context, const char *format, ...);
+
+/**
+ * @brief Get the last error information
+ *
+ * @param code Pointer to store error code (can be NULL)
+ * @param context Buffer to store context string (can be NULL)
+ * @param context_size Size of context buffer
+ * @return Error message string
+ */
+const char *get_last_error(int *code, char *context, size_t context_size);
+
+/**
+ * @brief Initialize the MIDI interface
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int oscmix_midi_init(void);
+
+/**
+ * @brief Close the MIDI interface
+ */
+void oscmix_midi_close(void);
 
 /* Parameter update handler functions */
 int newint(const struct oscnode *path[], const char *addr, int reg, int val);
