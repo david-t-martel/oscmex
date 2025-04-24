@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "oscnode_tree.h"
+#include "osc.h"
 
 /**
  * @brief Sets a register value in the device

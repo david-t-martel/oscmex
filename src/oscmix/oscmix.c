@@ -114,17 +114,25 @@ void handlesysex(const unsigned char *buf, size_t len, uint_least32_t *payload)
  */
 int handleosc(const void *buf, size_t len)
 {
+	const char *addr, *next;
+	const struct oscnode *path[8], *node;
+	size_t pathlen;
 	struct oscmsg msg;
-	const struct oscnode *path[16];
-	const char *components[16];
-	int ncomponents, npath;
-	const char *addr;
+	int reg;
 
-	// Parse the OSC message
-	addr = oscmsg_parse(buf, len, &msg);
-	if (!addr)
+	if (len % 4 != 0)
+		return -1;
+
+	msg.err = NULL;
+	msg.buf = (unsigned char *)buf;
+	msg.end = (unsigned char *)buf + len;
+	msg.type = "ss";
+
+	addr = oscgetstr(&msg);
+	msg.type = oscgetstr(&msg);
+	if (msg.err)
 	{
-		fprintf(stderr, "Failed to parse OSC message\n");
+		fprintf(stderr, "invalid osc message: %s\n", msg.err);
 		return -1;
 	}
 
@@ -148,47 +156,113 @@ int handleosc(const void *buf, size_t len)
 		return 0;
 	}
 
-	// Split the address into components
-	ncomponents = 0;
-	for (const char *p = addr; *p; p++)
+	// Regular command processing
+	msg.argc = 0;
+	msg.argv = NULL;
+	if (*msg.type)
 	{
-		if (*p == '/')
+		// Parse arguments for this message
+		const char *typestr = msg.type;
+		int count = strlen(typestr);
+
+		// Allocate argument array
+		msg.argv = malloc(count * sizeof(struct oscarg));
+		if (!msg.argv)
 		{
-			if (ncomponents < 16)
+			fprintf(stderr, "memory allocation failed\n");
+			return -1;
+		}
+
+		// Parse arguments based on type tags
+		for (int i = 0; i < count; i++)
+		{
+			msg.argv[msg.argc].type = *typestr++;
+
+			switch (msg.argv[msg.argc].type)
 			{
-				components[ncomponents++] = p + 1;
+			case 'i':
+				msg.argv[msg.argc].i = oscgetint(&msg);
+				break;
+			case 'f':
+				msg.argv[msg.argc].f = oscgetfloat(&msg);
+				break;
+			case 's':
+				msg.argv[msg.argc].s = oscgetstr(&msg);
+				break;
+			case 'T':
+				break;
+			case 'F':
+				break;
+			default:
+				fprintf(stderr, "unsupported argument type: %c\n", msg.argv[msg.argc].type);
+				free(msg.argv);
+				return -1;
 			}
+
+			msg.argc++;
 		}
 	}
 
 	// Find the node in the tree
-	npath = oscnode_find(components, ncomponents, path, 16);
-	if (npath <= 0)
-	{
-		fprintf(stderr, "Unknown OSC address: %s\n", addr);
-		return -1;
-	}
+	reg = 0;
+	pathlen = 0;
+	node = &tree[0];
 
-	// Handle GET requests (no arguments)
-	if (msg.argc == 0)
+	while (node)
 	{
-		const struct oscnode *node = path[npath - 1];
-		if (node->new)
+		if (*addr == '/' || *addr == '\0')
 		{
-			// Call the appropriate new* function to send current value
-			node->new(path, addr, node->reg, 0); // Placeholder value - real impl would get actual value
+			addr++;
+			for (node = node->child; node && node->name; node++)
+			{
+				next = match(node->name, addr);
+				if (next)
+				{
+					addr = next;
+					path[pathlen++] = node;
+					reg += node->reg;
+
+					if (*addr == '\0')
+					{
+						// We found the target node
+						if (msg.argc == 0 && node->new)
+						{
+							// This is a GET request
+							node->new(path, addr, reg, 0);
+						}
+						else if (node->set)
+						{
+							// This is a SET request
+							node->set(path, reg, &msg);
+						}
+
+						if (msg.argv)
+							free(msg.argv);
+						return 0;
+					}
+
+					if (node->child)
+						break;
+				}
+			}
+
+			if (!node || !node->name)
+			{
+				fprintf(stderr, "unknown osc address: %s\n", addr);
+				if (msg.argv)
+					free(msg.argv);
+				return -1;
+			}
 		}
-		return 0;
+		else
+		{
+			addr++;
+		}
 	}
 
-	// Handle SET requests (with arguments)
-	const struct oscnode *node = path[npath - 1];
-	if (node->set)
-	{
-		return node->set(path, node->reg, &msg);
-	}
-
-	return -1;
+	if (msg.argv)
+		free(msg.argv);
+	return 0;
 }
 
 /**

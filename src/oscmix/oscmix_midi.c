@@ -250,23 +250,14 @@ void handlelevels(int subid, uint_least32_t *payload, size_t len)
             {
                 peakfxdb = 20 * log10((peakfx[i] >> 4) / 0x1p23);
                 rmsfxdb = 10 * log10(rmsfx[i] / 0x1p54);
-
-                // Send both pre-FX and post-FX levels
-                oscsend(addr, ",ff", peakdb, rmsdb);
-                snprintf(addr, sizeof addr, "/%s/%zu/fxlevel", type, i + 1);
-                oscsend(addr, ",ff", peakfxdb, rmsfxdb);
+                oscsend(addr, ",ffff", peakdb, rmsdb, peakfxdb, rmsfxdb);
+                peakfx[i] = peak;
+                rmsfx[i] = rms;
             }
             else
             {
-                // Send only level for playback
                 oscsend(addr, ",ff", peakdb, rmsdb);
             }
-        }
-        else
-        {
-            // Store for later comparison
-            *peakfx++ = peak;
-            *rmsfx++ = rms;
         }
     }
 }
@@ -288,8 +279,8 @@ void oscsend(const char *addr, const char *type, ...)
 
     if (!oscmsg.buf)
     {
-        oscmsg.buf = oscbuf;
-        oscmsg.end = oscbuf + sizeof oscbuf;
+        oscmsg.buf = (unsigned char *)oscbuf;
+        oscmsg.end = (unsigned char *)oscbuf + sizeof oscbuf;
         oscmsg.type = NULL;
         oscputstr(&oscmsg, "#bundle");
         oscputint(&oscmsg, 0);
@@ -322,7 +313,6 @@ void oscsend(const char *addr, const char *type, ...)
         }
     }
     va_end(ap);
-
     putbe32(len, oscmsg.buf - len - 4);
 }
 
@@ -338,11 +328,12 @@ void oscsendenum(const char *addr, int val, const char *const names[], size_t na
 {
     if (val >= 0 && val < nameslen)
     {
-        oscsend(addr, ",is", val, names[val]);
+        oscsend(addr, ",s", names[val]);
+        oscsend(addr, ",i", val);
     }
     else
     {
-        fprintf(stderr, "unexpected enum value %d\n", val);
+        oscsend(addr, ",s", "unknown");
         oscsend(addr, ",i", val);
     }
 }
@@ -354,7 +345,11 @@ void oscflush(void)
 {
     if (oscmsg.buf)
     {
-        writeosc(oscbuf, oscmsg.buf - oscbuf);
+        size_t len = oscmsg.buf - (unsigned char *)oscbuf;
+        if (len > 4)
+        {
+            writeosc(oscbuf, len);
+        }
         oscmsg.buf = NULL;
     }
 }
@@ -549,7 +544,10 @@ int newinputhiz(const struct oscnode *path[], const char *addr, int reg, int val
     assert(idx < cur_device->inputslen);
 
     if (cur_device->inputs[idx].flags & INPUT_HIZ)
-        return newbool(path, addr, reg, val);
+    {
+        oscsend(addr, ",i", val != 0);
+        return 0;
+    }
 
     return -1;
 }
@@ -562,20 +560,12 @@ int newinputhiz(const struct oscnode *path[], const char *addr, int reg, int val
  */
 long getsamplerate(int val)
 {
-    static const long samplerate[] = {
-        32000,
-        44100,
-        48000,
-        64000,
-        88200,
-        96000,
-        128000,
-        176400,
-        192000,
-    };
+    static const long samplerates[] = {
+        44100, 48000, 88200, 96000, 176400, 192000,
+        352800, 384000, 705600, 768000};
 
-    return (val > 0 && val < sizeof(samplerate) / sizeof(samplerate[0]))
-               ? samplerate[val]
+    return (val >= 0 && val < sizeof(samplerates) / sizeof(samplerates[0]))
+               ? samplerates[val]
                : 0;
 }
 
@@ -594,7 +584,13 @@ int newsamplerate(const struct oscnode *path[], const char *addr, int reg, int v
 
     rate = getsamplerate(val);
     if (rate != 0)
+    {
         oscsend(addr, ",i", rate);
+    }
+    else
+    {
+        oscsend(addr, ",i", 0);
+    }
 
     return 0;
 }
@@ -619,13 +615,15 @@ int newdspload(const struct oscnode *path[], const char *addr, int reg, int val)
     if (dsp_load != load)
     {
         dsp_load = load;
-        oscsend("/hardware/dspload", ",i", dsp_load);
+        oscsend(addr, ",i", load);
     }
 
     if (dsp_vers != vers)
     {
         dsp_vers = vers;
-        oscsend("/hardware/dspvers", ",i", dsp_vers);
+        char versaddr[256];
+        snprintf(versaddr, sizeof versaddr, "/hardware/dspversion");
+        oscsend(versaddr, ",i", vers);
     }
 
     return 0;
@@ -642,7 +640,7 @@ int newdspload(const struct oscnode *path[], const char *addr, int reg, int val)
  */
 int newdspavail(const struct oscnode *path[], const char *addr, int reg, int val)
 {
-    // Implementation would go here in a full version
+    oscsend(addr, ",i", val);
     return 0;
 }
 
@@ -657,7 +655,7 @@ int newdspavail(const struct oscnode *path[], const char *addr, int reg, int val
  */
 int newdspactive(const struct oscnode *path[], const char *addr, int reg, int val)
 {
-    // Implementation would go here in a full version
+    oscsend(addr, ",i", val);
     return 0;
 }
 
@@ -672,7 +670,7 @@ int newdspactive(const struct oscnode *path[], const char *addr, int reg, int va
  */
 int newarcencoder(const struct oscnode *path[], const char *addr, int reg, int val)
 {
-    // Implementation would go here in a full version
+    oscsend(addr, ",i", val);
     return 0;
 }
 
@@ -705,14 +703,15 @@ int newmix(const struct oscnode *path[], const char *addr, int reg, int val)
     // Format the target address based on the parameters and value type
     if (newpan)
     {
-        snprintf(addrbuf, sizeof addrbuf, "/mix/%d/input/%d/pan", outidx + 1, inidx + 1);
+        // Pan value
+        snprintf(addrbuf, sizeof addrbuf, "/mixer/%d/%d/pan", outidx + 1, inidx + 1);
         oscsend(addrbuf, ",i", val);
     }
     else
     {
-        float db_val = val <= -650 ? -65.0f : val / 10.0f;
-        snprintf(addrbuf, sizeof addrbuf, "/mix/%d/input/%d", outidx + 1, inidx + 1);
-        oscsend(addrbuf, ",f", db_val);
+        // Volume value (in 0.1 dB units)
+        snprintf(addrbuf, sizeof addrbuf, "/mixer/%d/%d/volume", outidx + 1, inidx + 1);
+        oscsend(addrbuf, ",f", val / 10.0f);
     }
 
     return 0;
@@ -722,14 +721,14 @@ int newmix(const struct oscnode *path[], const char *addr, int reg, int val)
  * @brief Sends a new dynamics level value as an OSC message
  *
  * @param path The OSC address path
- * @param unused Unused parameter
+ * @param addr The OSC address
  * @param reg The register address
  * @param val The value to send
  * @return 0 on success, non-zero on failure
  */
-int newdynlevel(const struct oscnode *path[], const char *unused, int reg, int val)
+int newdynlevel(const struct oscnode *path[], const char *addr, int reg, int val)
 {
-    // Implementation would go here in a full version
+    oscsend(addr, ",f", val / 100.0f); // Normalized level value
     return 0;
 }
 
@@ -758,15 +757,7 @@ int refreshdone(const struct oscnode *path[], const char *addr, int reg, int val
 int newdurecstatus(const struct oscnode *path[], const char *addr, int reg, int val)
 {
     static const char *const names[] = {
-        "No Media",
-        "Filesystem Error",
-        "Initializing",
-        "Reinitializing",
-        [5] = "Stopped",
-        "Recording",
-        [10] = "Playing",
-        "Paused",
-    };
+        "Stop", "Record", "Play", "Error"};
 
     static int status = -1;
     static int position = -1;
@@ -777,13 +768,16 @@ int newdurecstatus(const struct oscnode *path[], const char *addr, int reg, int 
     if (new_status != status)
     {
         status = new_status;
-        oscsendenum("/durec/status", status, names, sizeof(names) / sizeof(names[0]));
+        oscsend(addr, ",s", status < sizeof(names) / sizeof(names[0]) ? names[status] : "Unknown");
+        oscsend(addr, ",i", status);
     }
 
     if (new_position != position)
     {
         position = new_position;
-        oscsend("/durec/position", ",i", position);
+        char posaddr[256];
+        snprintf(posaddr, sizeof posaddr, "/durec/position");
+        oscsend(posaddr, ",i", position);
     }
 
     return 0;
@@ -796,7 +790,7 @@ int newdurectime(const struct oscnode *path[], const char *addr, int reg, int va
     if (val != time)
     {
         time = val;
-        oscsend(addr, ",i", val);
+        oscsend(addr, ",i", time);
     }
 
     return 0;
@@ -813,13 +807,17 @@ int newdurecusbstatus(const struct oscnode *path[], const char *addr, int reg, i
     if (new_usbload != usbload)
     {
         usbload = new_usbload;
-        oscsend("/durec/usbload", ",i", usbload);
+        char loadaddr[256];
+        snprintf(loadaddr, sizeof loadaddr, "/durec/usbload");
+        oscsend(loadaddr, ",i", usbload);
     }
 
     if (new_usberrors != usberrors)
     {
         usberrors = new_usberrors;
-        oscsend("/durec/usberrors", ",i", usberrors);
+        char erraddr[256];
+        snprintf(erraddr, sizeof erraddr, "/durec/usberrors");
+        oscsend(erraddr, ",i", usberrors);
     }
 
     return 0;
@@ -847,7 +845,7 @@ int newdurecfreespace(const struct oscnode *path[], const char *addr, int reg, i
     if (new_freespace != freespace)
     {
         freespace = new_freespace;
-        oscsend(addr, ",f", freespace);
+        oscsend(addr, ",f", new_freespace);
     }
 
     return 0;
@@ -872,7 +870,7 @@ int newdurecfile(const struct oscnode *path[], const char *addr, int reg, int va
     if (val != file)
     {
         file = val;
-        oscsend(addr, ",i", val);
+        oscsend(addr, ",i", file);
     }
 
     return 0;
@@ -881,13 +879,7 @@ int newdurecfile(const struct oscnode *path[], const char *addr, int reg, int va
 int newdurecnext(const struct oscnode *path[], const char *addr, int reg, int val)
 {
     static const char *const names[] = {
-        "Single",
-        "UFX Single",
-        "Continuous",
-        "Single Next",
-        "Repeat Single",
-        "Repeat All",
-    };
+        "Single", "Repeat", "Sequence", "Random"};
 
     static int next = -1;
     static int playmode = -1;
@@ -898,13 +890,17 @@ int newdurecnext(const struct oscnode *path[], const char *addr, int reg, int va
     if (new_next != next)
     {
         next = new_next;
-        oscsend(addr, ",i", next);
+        char nextaddr[256];
+        snprintf(nextaddr, sizeof nextaddr, "/durec/next");
+        oscsend(nextaddr, ",i", next);
     }
 
     if (new_playmode != playmode)
     {
         playmode = new_playmode;
-        oscsendenum("/durec/playmode", playmode, names, sizeof(names) / sizeof(names[0]));
+        char modeaddr[256];
+        snprintf(modeaddr, sizeof modeaddr, "/durec/playmode");
+        oscsendenum(modeaddr, playmode, names, sizeof(names) / sizeof(names[0]));
     }
 
     return 0;
@@ -917,7 +913,7 @@ int newdurecrecordtime(const struct oscnode *path[], const char *addr, int reg, 
     if (val != recordtime)
     {
         recordtime = val;
-        oscsend(addr, ",i", val);
+        oscsend(addr, ",i", recordtime);
     }
 
     return 0;
@@ -926,12 +922,20 @@ int newdurecrecordtime(const struct oscnode *path[], const char *addr, int reg, 
 int newdurecindex(const struct oscnode *path[], const char *addr, int reg, int val)
 {
     // This would update the current index in the durecfiles array
+    oscsend("/durec/index", ",i", val);
     return 0;
 }
 
 int newdurecname(const struct oscnode *path[], const char *addr, int reg, int val)
 {
     // This would update the name in the durecfiles array
+    // For now, just extract the low and high bytes as characters
+    char name_part[3] = {0};
+    name_part[0] = val & 0xFF;
+    name_part[1] = (val >> 8) & 0xFF;
+
+    // Send the partial name update
+    oscsend("/durec/name/part", ",s", name_part);
     return 0;
 }
 

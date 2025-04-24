@@ -1,3 +1,8 @@
+/**
+ * @file device_state.h
+ * @brief Device state tracking functionality for OSCMix
+ */
+
 #ifndef DEVICE_STATE_H
 #define DEVICE_STATE_H
 
@@ -79,5 +84,89 @@ void setBufferSize(int size);
 
 /* Save current device state to a file */
 int saveDeviceState(void);
+
+/**
+ * @brief Initialize device state tracking
+ * @param device Pointer to the device structure
+ * @return 0 on success, non-zero on failure
+ */
+int device_state_init(const struct device *device);
+
+/**
+ * @brief Get input channel volume
+ * @param channel The input channel index (0-based)
+ * @return Volume in dB
+ */
+float getInputVolume(int channel);
+
+/**
+ * @brief Get input channel mute state
+ * @param channel The input channel index (0-based)
+ * @return true if muted, false otherwise
+ */
+bool getInputMute(int channel);
+
+/**
+ * @brief Get input channel gain
+ * @param channel The input channel index (0-based)
+ * @return Gain in dB
+ */
+float getInputGain(int channel);
+
+/**
+ * @brief Get input phantom power state
+ * @param channel The input channel index (0-based)
+ * @return true if phantom power is on, false otherwise
+ */
+bool getInputPhantom(int channel);
+
+/**
+ * @brief Get output channel volume
+ * @param channel The output channel index (0-based)
+ * @return Volume in dB
+ */
+float getOutputVolume(int channel);
+
+/**
+ * @brief Get output channel mute state
+ * @param channel The output channel index (0-based)
+ * @return true if muted, false otherwise
+ */
+bool getOutputMute(int channel);
+
+/**
+ * @brief Get output channel reference level
+ * @param channel The output channel index (0-based)
+ * @return Reference level string
+ */
+const char *getOutputRefLevel(int channel);
+
+/**
+ * @brief Get mixer volume level
+ * @param inputChannel The input channel index (0-based)
+ * @param outputChannel The output channel index (0-based)
+ * @return Volume in dB
+ */
+float getMixerVolume(int inputChannel, int outputChannel);
+
+/**
+ * @brief Get mixer pan value
+ * @param inputChannel The input channel index (0-based)
+ * @param outputChannel The output channel index (0-based)
+ * @return Pan value from -100 (left) to 100 (right)
+ */
+float getMixerPan(int inputChannel, int outputChannel);
+
+/**
+ * @brief Dump the current device state to a file
+ * @return 0 on success, non-zero on failure
+ */
+int dumpDeviceState(void);
+
+/**
+ * @brief Dump device configuration to a file
+ * @return 0 on success, non-zero on failure
+ */
+int dumpConfig(void);
 
 #endif /* DEVICE_STATE_H */
