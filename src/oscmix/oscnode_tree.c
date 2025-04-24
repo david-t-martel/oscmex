@@ -66,8 +66,12 @@ int newfixed(const struct oscnode *path[], const char *addr, int reg, int val);
 int newenum(const struct oscnode *path[], const char *addr, int reg, int val);
 int newbool(const struct oscnode *path[], const char *addr, int reg, int val);
 
-/* This is where we would paste the entire OSC node tree declaration from oscmix.c */
-/* For brevity, I'll include a small example of what this would look like */
+/* OSC node tree definition */
+
+/* System-level nodes */
+static const struct oscnode refresh_nodes[] = {
+    {"", 0x8000, setrefresh, NULL, {}, NULL},
+    {NULL}};
 
 static const struct oscnode samplerate_nodes[] = {
     {"44100", 0, NULL, newint, {}, NULL},
@@ -80,13 +84,98 @@ static const struct oscnode system_nodes[] = {
     {"samplerate", 0x8000, setint, newint, {.names = (const char *const[]){"44.1 kHz", "48 kHz", "88.2 kHz", "96 kHz"}, .nameslen = 4}, &samplerate_nodes[0]},
     {"clocksource", 0x8002, setenum, newenum, {.names = (const char *const[]){"Internal", "AES", "ADAT", "Sync In"}, .nameslen = 4}, NULL},
     {"buffersize", 0x8004, setenum, newenum, {.names = (const char *const[]){"32", "64", "128", "256", "512", "1024"}, .nameslen = 6}, NULL},
+    {"phantompower", 0x8006, setbool, newbool, {}, NULL},
+    {"mastervol", 0x8008, setfixed, newfixed, {.min = 0, .max = 65535, .scale = 65535.0f}, NULL},
+    {"mastermute", 0x800A, setbool, newbool, {}, NULL},
+    {"digitalgain", 0x800C, setfixed, newfixed, {.min = 0, .max = 65535, .scale = 65535.0f}, NULL},
     {NULL}};
 
-/* More nodes would be defined here - inputs, outputs, mixer, etc. */
+/* Input channel nodes */
+static const struct oscnode input_channel_nodes[] = {
+    {"gain", 0x0100, setfixed, newfixed, {.min = 0, .max = 65535, .scale = 65535.0f}, NULL},
+    {"phantom", 0x0102, setbool, newbool, {}, NULL},
+    {"pad", 0x0104, setbool, newbool, {}, NULL},
+    {"reflevel", 0x0106, setenum, newenum, {.names = (const char *const[]){"-10 dBV", "+4 dBu", "HiZ"}, .nameslen = 3}, NULL},
+    {"mute", 0x0108, setbool, newbool, {}, NULL},
+    {"hiz", 0x010A, setbool, newbool, {}, NULL},
+    {"aeb", 0x010C, setbool, newbool, {}, NULL},
+    {"locut", 0x010E, setbool, newbool, {}, NULL},
+    {"ms", 0x0110, setbool, newbool, {}, NULL},
+    {"autoset", 0x0112, setbool, newbool, {}, NULL},
+    {NULL}};
 
+static const struct oscnode input_nodes[] = {
+    {"*", 0, NULL, NULL, {}, &input_channel_nodes[0]},
+    {NULL}};
+
+/* Output channel nodes */
+static const struct oscnode output_channel_nodes[] = {
+    {"volume", 0x0200, setfixed, newfixed, {.min = 0, .max = 65535, .scale = 65535.0f}, NULL},
+    {"mute", 0x0202, setbool, newbool, {}, NULL},
+    {"reflevel", 0x0204, setenum, newenum, {.names = (const char *const[]){"-10 dBV", "+4 dBu", "HiZ"}, .nameslen = 3}, NULL},
+    {"dither", 0x0206, setenum, newenum, {.names = (const char *const[]){"Off", "16 bit", "20 bit"}, .nameslen = 3}, NULL},
+    {"phase", 0x0208, setbool, newbool, {}, NULL},
+    {"mono", 0x020A, setbool, newbool, {}, NULL},
+    {"loopback", 0x020C, setbool, newbool, {}, NULL},
+    {NULL}};
+
+static const struct oscnode output_nodes[] = {
+    {"*", 0, NULL, NULL, {}, &output_channel_nodes[0]},
+    {NULL}};
+
+/* Playback (DAW) channel nodes */
+static const struct oscnode playback_channel_nodes[] = {
+    {"volume", 0x0300, setfixed, newfixed, {.min = 0, .max = 65535, .scale = 65535.0f}, NULL},
+    {"mute", 0x0302, setbool, newbool, {}, NULL},
+    {"phase", 0x0304, setbool, newbool, {}, NULL},
+    {NULL}};
+
+static const struct oscnode playback_nodes[] = {
+    {"*", 0, NULL, NULL, {}, &playback_channel_nodes[0]},
+    {NULL}};
+
+/* Mixer matrix nodes */
+static const struct oscnode mixer_channel_nodes[] = {
+    {"volume", 0x0400, setfixed, newfixed, {.min = 0, .max = 65535, .scale = 65535.0f}, NULL},
+    {"pan", 0x0402, setfixed, newfixed, {.min = 0, .max = 65535, .scale = 65535.0f}, NULL},
+    {"mute", 0x0404, setbool, newbool, {}, NULL},
+    {"solo", 0x0406, setbool, newbool, {}, NULL},
+    {"phase", 0x0408, setbool, newbool, {}, NULL},
+    {NULL}};
+
+static const struct oscnode mixer_dest_nodes[] = {
+    {"*", 0, NULL, NULL, {}, &mixer_channel_nodes[0]},
+    {NULL}};
+
+static const struct oscnode mixer_source_nodes[] = {
+    {"*", 0, NULL, NULL, {}, &mixer_dest_nodes[0]},
+    {NULL}};
+
+static const struct oscnode mixer_nodes[] = {
+    {"input", 0, NULL, NULL, {}, &mixer_source_nodes[0]},
+    {"playback", 0, NULL, NULL, {}, &mixer_source_nodes[0]},
+    {NULL}};
+
+/* TotalMix nodes */
+static const struct oscnode totalmix_snapshot_nodes[] = {
+    {"load", 0x7000, setint, NULL, {.min = 1, .max = 8, .scale = 1.0f}, NULL},
+    {"save", 0x7002, setint, NULL, {.min = 1, .max = 8, .scale = 1.0f}, NULL},
+    {NULL}};
+
+static const struct oscnode totalmix_nodes[] = {
+    {"snapshot", 0, NULL, NULL, {}, &totalmix_snapshot_nodes[0]},
+    {"clearall", 0x7004, setbool, NULL, {}, NULL},
+    {NULL}};
+
+/* Root nodes */
 static const struct oscnode root_nodes[] = {
     {"system", 0, NULL, NULL, {}, &system_nodes[0]},
-    /* Other top-level nodes would be here */
+    {"input", 0, NULL, NULL, {}, &input_nodes[0]},
+    {"output", 0, NULL, NULL, {}, &output_nodes[0]},
+    {"playback", 0, NULL, NULL, {}, &playback_nodes[0]},
+    {"mixer", 0, NULL, NULL, {}, &mixer_nodes[0]},
+    {"totalmix", 0, NULL, NULL, {}, &totalmix_nodes[0]},
+    {"refresh", 0, NULL, NULL, {}, &refresh_nodes[0]},
     {NULL}};
 
 // Make the root node accessible via the header

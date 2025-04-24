@@ -1,5 +1,7 @@
 # OSCMix: Open Sound Control Interface for RME Audio Devices
 
+OSCMix provides a bridge between OSC (Open Sound Control) and RME audio interfaces, allowing remote control of device parameters using standard OSC messages.
+
 ## Overview
 
 `oscmix` is a command-line application that acts as a bridge between OSC (Open Sound Control) messages and RME audio interfaces. It enables remote control of RME mixer functionality via network communications, translating OSC messages into MIDI SysEx commands that RME devices understand.
@@ -13,6 +15,15 @@ The application allows for:
 - Controlling recording functions on supported devices
 
 ## Architecture
+
+OSCMix follows a modular architecture with these key components:
+
+- **oscmix**: Core coordination module that handles message routing and main application flow
+- **oscnode_tree**: Parameter tree definition and lookup functionality
+- **oscmix_commands**: Command handlers for setting device parameters
+- **oscmix_midi**: MIDI SysEx communication with the device
+- **device_state**: Internal state tracking for all device parameters
+- **device**: Device-specific definitions and capabilities
 
 The application follows a message-based architecture:
 
@@ -174,7 +185,61 @@ For a full list of available OSC commands and their parameters, see the detailed
 
 ### Device State Management
 
-* `/dump` - Prints the current device state to the console (for debugging)
-* `/dump/save` - Exports the current device configuration to a JSON file in the app's home directory
-  * File is saved to `~/device_config/audio-device_DEVICENAME_date-time_DATETIME.json` (Windows: `%APPDATA%\OSCMix\device_config\...`)
-  * JSON format is machine-readable and can be used to restore device state or analyze configuration
+- `/dump` - Prints the current device state to the console (for debugging)
+- `/dump/save` - Exports the current device configuration to a JSON file in the app's home directory
+  - File is saved to `~/device_config/audio-device_DEVICENAME_date-time_DATETIME.json` (Windows: `%APPDATA%\OSCMix\device_config\...`)
+  - JSON format is machine-readable and can be used to restore device state or analyze configuration
+
+For example:
+
+- `/system/samplerate` - Get/set the device sample rate
+- `/input/1/gain` - Get/set the gain of input channel 1
+- `/output/2/volume` - Get/set the volume of output channel 2
+
+### Device State Management
+
+- `/refresh` - Request a full device state refresh
+- `/dump` - Prints the current device state to the console (for debugging)
+- `/dump/save` - Exports the current device configuration to a JSON file in the app's home directory
+  - File is saved to `~/device_config/audio-device_DEVICENAME_date-time_DATETIME.json` (Windows: `%APPDATA%\OSCMix\device_config\...`)
+  - JSON format is machine-readable and can be used to restore device state or analyze configuration
+
+### System Parameters
+
+- `/system/samplerate` - Current sample rate (44100, 48000, 88200, 96000, etc.)
+- `/system/clocksource` - Clock source selection ("Internal", "AES", "ADAT", etc.)
+- `/system/buffersize` - Device buffer size (32, 64, 128, 256, 512, 1024)
+- `/system/phantompower` - Global phantom power (1 = on, 0 = off)
+- `/system/mastervol` - Master volume level (0.0 to 1.0)
+- `/system/mastermute` - Master mute state (1 = muted, 0 = unmuted)
+
+### Input Channel Parameters
+
+- `/input/N/gain` - Input gain in dB (0.0 to 75.0 for mic inputs, 0.0 to 24.0 for line)
+- `/input/N/phantom` - 48V phantom power for channel N (1 = on, 0 = off)
+- `/input/N/pad` - Pad for channel N (1 = enabled, 0 = disabled)
+- `/input/N/reflevel` - Reference level ("-10 dBV", "+4 dBu", "HiZ")
+- `/input/N/mute` - Mute state (1 = muted, 0 = unmuted)
+- `/input/N/stereo` - Stereo link with adjacent channel (1 = linked, 0 = mono)
+
+### Output Channel Parameters
+
+- `/output/N/volume` - Output volume level (0.0 to 1.0)
+- `/output/N/mute` - Mute state (1 = muted, 0 = unmuted)
+- `/output/N/reflevel` - Reference level ("-10 dBV", "+4 dBu", "HiZ")
+- `/output/N/dither` - Dither setting ("Off", "16 bit", "20 bit")
+- `/output/N/phase` - Phase inversion (1 = inverted, 0 = normal)
+- `/output/N/mono` - Mono mode (1 = mono, 0 = stereo)
+
+### Mixer Parameters
+
+- `/mixer/out/in/volume` - Mixer volume from input to output (-65.0 to 6.0 dB)
+- `/mixer/out/in/pan` - Panning from input to output (-100 to 100)
+
+## Building
+
+See the BUILDING.md file for detailed build instructions for various platforms.
+
+## License
+
+OSCMix is licensed under the MIT License. See LICENSE file for details.

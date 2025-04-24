@@ -6,11 +6,14 @@
 #include "oscmix_commands.h"
 #include "oscnode_tree.h"
 #include "oscmix_midi.h"
+#include "device.h"
+#include "device_state.h"
 #include "util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 
 /**
  * @brief Set an integer parameter value in the device
@@ -227,5 +230,453 @@ int setrefresh(const struct oscnode *path[], int reg, struct oscmsg *msg)
     // Magic value to trigger a device refresh
     setreg(reg, 0xFFFFFFFF);
 
+    return 0;
+}
+
+/**
+ * @brief Set the name of an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the name string
+ * @return 0 on success, non-zero on failure
+ */
+int setinputname(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    const char *name;
+    char namebuf[12];
+    int i, ch, val;
+
+    ch = path[-1] - path[-2]->child;
+    if (ch >= 20)
+        return -1;
+
+    name = msg->argv[0].s;
+    if (msg->argc != 1 || msg->argv[0].type != 's')
+        return -1;
+
+    strncpy(namebuf, name, sizeof(namebuf));
+    namebuf[sizeof(namebuf) - 1] = '\0';
+
+    reg = 0x3200 + ch * 8;
+    for (i = 0; i < sizeof(namebuf); i += 2, ++reg)
+    {
+        // Pack two bytes of name into one register
+        val = (namebuf[i] & 0xFF) | ((namebuf[i + 1] & 0xFF) << 8);
+        setreg(reg, val);
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Set the gain for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the gain value
+ * @return 0 on success, non-zero on failure
+ */
+int setinputgain(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    float val;
+    bool mic;
+
+    if (msg->argc != 1 || (msg->argv[0].type != 'f' && msg->argv[0].type != 'i'))
+        return -1;
+
+    if (msg->argv[0].type == 'f')
+        val = msg->argv[0].f;
+    else
+        val = (float)msg->argv[0].i;
+
+    mic = (path[-1] - path[-2]->child) <= 1;
+    if (val < 0 || val > 75 || (!mic && val > 24))
+        return -1;
+
+    setreg(reg, val * 10);
+    return 0;
+}
+
+/**
+ * @brief Set the 48V phantom power state for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the state value
+ * @return 0 on success, non-zero on failure
+ */
+int setinput48v(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    int idx;
+    const struct device *dev = getDevice();
+
+    idx = path[-1] - path[-2]->child;
+    assert(idx < dev->inputslen);
+
+    if (dev->inputs[idx].flags & INPUT_48V)
+        return setbool(path, reg, msg);
+
+    return -1;
+}
+
+/**
+ * @brief Set the Hi-Z state for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the state value
+ * @return 0 on success, non-zero on failure
+ */
+int setinputhiz(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    int idx;
+    const struct device *dev = getDevice();
+
+    idx = path[-1] - path[-2]->child;
+    assert(idx < dev->inputslen);
+
+    if (dev->inputs[idx].flags & INPUT_HIZ)
+        return setbool(path, reg, msg);
+
+    return -1;
+}
+
+/**
+ * @brief Set the stereo status for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the stereo state
+ * @return 0 on success, non-zero on failure
+ */
+int setinputstereo(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    int idx;
+    bool val;
+
+    if (msg->argc != 1 || (msg->argv[0].type != 'i' &&
+                           msg->argv[0].type != 'f' &&
+                           msg->argv[0].type != 'T' &&
+                           msg->argv[0].type != 'F'))
+        return -1;
+
+    // Convert to boolean
+    if (msg->argv[0].type == 'i')
+        val = msg->argv[0].i != 0;
+    else if (msg->argv[0].type == 'f')
+        val = msg->argv[0].f != 0.0f;
+    else if (msg->argv[0].type == 'T')
+        val = 1;
+    else
+        val = 0;
+
+    idx = (path[-1] - path[-2]->child) & -2;
+
+    // Set stereo state for both channels of the stereo pair
+    setreg(idx << 6 | 2, val);
+    setreg((idx + 1) << 6 | 2, val);
+
+    return 0;
+}
+
+/**
+ * @brief Set the mute state for an input channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the mute state
+ * @return 0 on success, non-zero on failure
+ */
+int setinputmute(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    bool val;
+
+    if (msg->argc != 1 || (msg->argv[0].type != 'i' &&
+                           msg->argv[0].type != 'f' &&
+                           msg->argv[0].type != 'T' &&
+                           msg->argv[0].type != 'F'))
+        return -1;
+
+    // Convert to boolean
+    if (msg->argv[0].type == 'i')
+        val = msg->argv[0].i != 0;
+    else if (msg->argv[0].type == 'f')
+        val = msg->argv[0].f != 0.0f;
+    else if (msg->argv[0].type == 'T')
+        val = 1;
+    else
+        val = 0;
+
+    // Set mute state
+    setreg(reg, val);
+
+    return 0;
+}
+
+/**
+ * @brief Set the loopback state for an output channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the loopback state
+ * @return 0 on success, non-zero on failure
+ */
+int setoutputloopback(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    bool val;
+    unsigned char buf[4];
+    int idx;
+
+    if (msg->argc != 1 || (msg->argv[0].type != 'i' &&
+                           msg->argv[0].type != 'f' &&
+                           msg->argv[0].type != 'T' &&
+                           msg->argv[0].type != 'F'))
+        return -1;
+
+    // Convert to boolean
+    if (msg->argv[0].type == 'i')
+        val = msg->argv[0].i != 0;
+    else if (msg->argv[0].type == 'f')
+        val = msg->argv[0].f != 0.0f;
+    else if (msg->argv[0].type == 'T')
+        val = 1;
+    else
+        val = 0;
+
+    idx = path[-1] - path[-2]->child;
+    if (val)
+        idx |= 0x80;
+
+    // Use special format for loopback command
+    // This will be sent via writesysex in the MIDI module
+    reg = 0x80 | idx;
+    setreg(reg, 0);
+
+    return 0;
+}
+
+/**
+ * @brief Set EQD record state
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the EQD state
+ * @return 0 on success, non-zero on failure
+ */
+int seteqdrecord(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    bool val;
+
+    if (msg->argc != 1 || (msg->argv[0].type != 'i' &&
+                           msg->argv[0].type != 'f' &&
+                           msg->argv[0].type != 'T' &&
+                           msg->argv[0].type != 'F'))
+        return -1;
+
+    // Convert to boolean
+    if (msg->argv[0].type == 'i')
+        val = msg->argv[0].i != 0;
+    else if (msg->argv[0].type == 'f')
+        val = msg->argv[0].f != 0.0f;
+    else if (msg->argv[0].type == 'T')
+        val = 1;
+    else
+        val = 0;
+
+    // This will be sent via a special SysEx command
+    reg = 0x90 | (val ? 1 : 0);
+    setreg(reg, 0);
+
+    return 0;
+}
+
+/**
+ * @brief Set the mix parameters for a channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the mix parameters
+ * @return 0 on success, non-zero on failure
+ */
+int setmix(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    float vol, width = 1.0f;
+    int pan = 0;
+
+    // First argument must be volume (dB)
+    if (msg->argc < 1 || (msg->argv[0].type != 'f' && msg->argv[0].type != 'i'))
+        return -1;
+
+    if (msg->argv[0].type == 'f')
+        vol = msg->argv[0].f;
+    else
+        vol = (float)msg->argv[0].i;
+
+    // If volume is <= -65dB, treat as -infinity
+    if (vol <= -65)
+        vol = -INFINITY;
+
+    // Optional second argument is pan (-100..100)
+    if (msg->argc > 1 && (msg->argv[1].type == 'i' || msg->argv[1].type == 'f'))
+    {
+        if (msg->argv[1].type == 'i')
+            pan = msg->argv[1].i;
+        else
+            pan = (int)msg->argv[1].f;
+
+        // Clamp pan value to valid range
+        if (pan < -100)
+            pan = -100;
+        if (pan > 100)
+            pan = 100;
+    }
+
+    // Optional third argument is width (0..2)
+    if (msg->argc > 2 && (msg->argv[2].type == 'f' || msg->argv[2].type == 'i'))
+    {
+        if (msg->argv[2].type == 'f')
+            width = msg->argv[2].f;
+        else
+            width = (float)msg->argv[2].i;
+
+        // Clamp width value to valid range
+        if (width < 0)
+            width = 0;
+        if (width > 2)
+            width = 2;
+    }
+
+    // Calculate and set the mix values in the device
+    // Convert from dB to linear
+    float level = vol > -INFINITY ? powf(10.0f, vol / 20.0f) : 0.0f;
+
+    // Calculate left-right balance based on pan and width
+    float left, right;
+    if (pan <= 0)
+    {
+        // Pan center to left
+        left = level;
+        right = level * (1.0f + pan / 100.0f);
+    }
+    else
+    {
+        // Pan center to right
+        left = level * (1.0f - pan / 100.0f);
+        right = level;
+    }
+
+    // Apply width (only meaningful for stereo channels)
+    if (width != 1.0f)
+    {
+        // Center content is preserved, sides are adjusted
+        float mono = (left + right) / 2.0f;
+        float sides = (left - right) / 2.0f;
+        sides *= width;
+        left = mono + sides;
+        right = mono - sides;
+    }
+
+    // Convert to device values and send to the mixer
+    int db_val = vol > -INFINITY ? (int)(vol * 10.0f) : -650;
+    int pan_val = pan;
+
+    // First register: volume/level as fixed point
+    setreg(reg, db_val);
+
+    // Second register: pan as signed integer with flag bit
+    setreg(reg + 1, pan_val | 0x8000); // Set high bit to indicate pan value
+
+    return 0;
+}
+
+/**
+ * @brief Command to handle durec stop
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecstop(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    (void)path; // Unused
+    (void)msg;  // Unused
+
+    setreg(0x3e9a, 0x8120);
+    return 0;
+}
+
+/**
+ * @brief Command to handle durec play
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecplay(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    (void)path; // Unused
+    (void)msg;  // Unused
+
+    setreg(0x3e9a, 0x8123);
+    return 0;
+}
+
+/**
+ * @brief Command to handle durec record
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecrecord(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    (void)path; // Unused
+    (void)msg;  // Unused
+
+    setreg(0x3e9a, 0x8122);
+    return 0;
+}
+
+/**
+ * @brief Command to handle durec delete
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecdelete(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    int val;
+
+    if (msg->argc != 1 || msg->argv[0].type != 'i')
+        return -1;
+
+    val = msg->argv[0].i;
+    setreg(0x3e9b, 0x8000 | val);
+    return 0;
+}
+
+/**
+ * @brief Command to handle durec file selection
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecfile(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    int val;
+
+    if (msg->argc != 1 || msg->argv[0].type != 'i')
+        return -1;
+
+    val = msg->argv[0].i;
+    setreg(0x3e9c, val | 0x8000);
     return 0;
 }
