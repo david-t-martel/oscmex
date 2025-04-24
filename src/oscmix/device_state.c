@@ -408,3 +408,405 @@ int saveDeviceState(void)
 {
     return dumpState(cur_device, &device_state);
 }
+
+#include "device_state.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+// Device state variables
+static const struct device *cur_device = NULL;
+static struct input_state *inputs = NULL;
+static struct input_state *playbacks = NULL;
+static struct output_state *outputs = NULL;
+static struct
+{
+    int status;
+    int position;
+    int time;
+    int usberrors;
+    int usbload;
+    float totalspace;
+    float freespace;
+    struct durecfile_state *files;
+    size_t fileslen;
+    int file;
+    int recordtime;
+    int index;
+    int next;
+    int playmode;
+} durec = {.index = -1};
+static struct
+{
+    int vers;
+    int load;
+} dsp = {-1, -1};
+static bool refreshing = false;
+
+const struct device *getDevice(void)
+{
+    return cur_device;
+}
+
+bool refreshing_state(int value)
+{
+    if (value >= 0)
+        refreshing = (value != 0);
+    return refreshing;
+}
+
+void get_dsp_state(int *vers, int *load)
+{
+    if (vers)
+        *vers = dsp.vers;
+    if (load)
+        *load = dsp.load;
+}
+
+void set_dsp_state(int vers, int load)
+{
+    if (vers >= 0)
+        dsp.vers = vers;
+    if (load >= 0)
+        dsp.load = load;
+}
+
+struct input_state *get_input_state(int index)
+{
+    if (!inputs || index < 0 || index >= cur_device->inputslen)
+        return NULL;
+    return &inputs[index];
+}
+
+struct input_state *get_playback_state(int index)
+{
+    if (!playbacks || index < 0 || index >= cur_device->outputslen)
+        return NULL;
+    return &playbacks[index];
+}
+
+struct output_state *get_output_state(int index)
+{
+    if (!outputs || index < 0 || index >= cur_device->outputslen)
+        return NULL;
+    return &outputs[index];
+}
+
+void get_durec_state(int *status, int *position, int *time,
+                     int *usberrors, int *usbload,
+                     float *totalspace, float *freespace,
+                     int *file, int *recordtime, int *index,
+                     int *next, int *playmode)
+{
+    if (status)
+        *status = durec.status;
+    if (position)
+        *position = durec.position;
+    if (time)
+        *time = durec.time;
+    if (usberrors)
+        *usberrors = durec.usberrors;
+    if (usbload)
+        *usbload = durec.usbload;
+    if (totalspace)
+        *totalspace = durec.totalspace;
+    if (freespace)
+        *freespace = durec.freespace;
+    if (file)
+        *file = durec.file;
+    if (recordtime)
+        *recordtime = durec.recordtime;
+    if (index)
+        *index = durec.index;
+    if (next)
+        *next = durec.next;
+    if (playmode)
+        *playmode = durec.playmode;
+}
+
+void set_durec_state(int status, int position, int time,
+                     int usberrors, int usbload,
+                     float totalspace, float freespace,
+                     int file, int recordtime, int index,
+                     int next, int playmode)
+{
+    if (status >= 0)
+        durec.status = status;
+    if (position >= 0)
+        durec.position = position;
+    if (time >= 0)
+        durec.time = time;
+    if (usberrors >= 0)
+        durec.usberrors = usberrors;
+    if (usbload >= 0)
+        durec.usbload = usbload;
+    if (totalspace >= 0)
+        durec.totalspace = totalspace;
+    if (freespace >= 0)
+        durec.freespace = freespace;
+    if (file >= 0)
+        durec.file = file;
+    if (recordtime >= 0)
+        durec.recordtime = recordtime;
+    if (index >= 0)
+        durec.index = index;
+    if (next >= 0)
+        durec.next = next;
+    if (playmode >= 0)
+        durec.playmode = playmode;
+}
+
+struct durecfile_state *get_durec_files(size_t *fileslen)
+{
+    if (fileslen)
+        *fileslen = durec.fileslen;
+    return durec.files;
+}
+
+int set_durec_files_length(size_t fileslen)
+{
+    struct durecfile_state *new_files;
+
+    if (fileslen == durec.fileslen)
+        return 0;
+
+    new_files = realloc(durec.files, fileslen * sizeof(struct durecfile_state));
+    if (!new_files && fileslen > 0)
+        return -1;
+
+    durec.files = new_files;
+
+    if (fileslen > durec.fileslen)
+    {
+        memset(durec.files + durec.fileslen, 0,
+               (fileslen - durec.fileslen) * sizeof(struct durecfile_state));
+    }
+
+    durec.fileslen = fileslen;
+    if (durec.index >= durec.fileslen)
+        durec.index = -1;
+
+    return 0;
+}
+
+int device_state_init(const struct device *device)
+{
+    int i, j;
+
+    cur_device = device;
+    if (!cur_device)
+        return -1;
+
+    // Allocate input, playback, and output arrays
+    inputs = calloc(cur_device->inputslen, sizeof(struct input_state));
+    playbacks = calloc(cur_device->outputslen, sizeof(struct input_state));
+    outputs = calloc(cur_device->outputslen, sizeof(struct output_state));
+
+    if (!inputs || !playbacks || !outputs)
+    {
+        device_state_cleanup();
+        return -1;
+    }
+
+    // Initialize stereo state for playbacks
+    for (i = 0; i < cur_device->outputslen; ++i)
+    {
+        struct output_state *out;
+
+        playbacks[i].stereo = true;
+        out = &outputs[i];
+
+        // Allocate mix settings array for each output
+        out->mix = calloc(cur_device->inputslen + cur_device->outputslen,
+                          sizeof(struct mix_state));
+        if (!out->mix)
+        {
+            device_state_cleanup();
+            return -1;
+        }
+
+        // Initialize all mix volumes to -650 (equivalent to -65dB)
+        for (j = 0; j < cur_device->inputslen + cur_device->outputslen; ++j)
+            out->mix[j].vol = -650;
+    }
+
+    // Initialize DURec state
+    durec.index = -1;
+    dsp.vers = -1;
+    dsp.load = -1;
+
+    return 0;
+}
+
+void device_state_cleanup(void)
+{
+    int i;
+
+    if (outputs)
+    {
+        for (i = 0; i < cur_device->outputslen; ++i)
+        {
+            free(outputs[i].mix);
+        }
+        free(outputs);
+        outputs = NULL;
+    }
+
+    free(inputs);
+    inputs = NULL;
+
+    free(playbacks);
+    playbacks = NULL;
+
+    free(durec.files);
+    durec.files = NULL;
+    durec.fileslen = 0;
+}
+
+void dumpDeviceState(void)
+{
+    int i, j;
+
+    printf("Device: %s\n", cur_device->name);
+    printf("DSP: version=%d, load=%d\n", dsp.vers, dsp.load);
+
+    printf("\nInputs:\n");
+    for (i = 0; i < cur_device->inputslen; ++i)
+    {
+        printf("  Input %d: stereo=%d, mute=%d, width=%.2f\n",
+               i + 1, inputs[i].stereo, inputs[i].mute, inputs[i].width);
+    }
+
+    printf("\nOutputs:\n");
+    for (i = 0; i < cur_device->outputslen; ++i)
+    {
+        printf("  Output %d: stereo=%d\n", i + 1, outputs[i].stereo);
+
+        // Print a few mix settings as an example
+        printf("    Mix settings (sample):\n");
+        for (j = 0; j < 3 && j < cur_device->inputslen; ++j)
+        {
+            printf("      Input %d: vol=%d, pan=%d\n",
+                   j + 1, outputs[i].mix[j].vol, outputs[i].mix[j].pan);
+        }
+    }
+
+    printf("\nDURec:\n");
+    printf("  Status: %d, Position: %d, Time: %d\n",
+           durec.status, durec.position, durec.time);
+    printf("  USB: errors=%d, load=%d\n", durec.usberrors, durec.usbload);
+    printf("  Space: total=%.1f GB, free=%.1f GB\n",
+           durec.totalspace, durec.freespace);
+    printf("  Files: count=%zu, current=%d\n", durec.fileslen, durec.file);
+
+    if (durec.fileslen > 0 && durec.files)
+    {
+        printf("  File list (sample):\n");
+        for (i = 0; i < 3 && i < durec.fileslen; ++i)
+        {
+            printf("    File %d: name='%s', sr=%lu, ch=%u, len=%u\n",
+                   i, durec.files[i].name, durec.files[i].samplerate,
+                   durec.files[i].channels, durec.files[i].length);
+        }
+    }
+}
+
+int dumpConfig(void)
+{
+    char filename[256];
+    time_t now;
+    struct tm *timeinfo;
+    FILE *f;
+
+    // Get current time for filename
+    time(&now);
+    timeinfo = localtime(&now);
+
+// Create filename with date/time stamp
+#ifdef _WIN32
+    char *appdata = getenv("APPDATA");
+    if (!appdata)
+        appdata = ".";
+
+    snprintf(filename, sizeof(filename),
+             "%s\\OSCMix\\device_config\\audio-device_%s_date-time_%04d%02d%02d-%02d%02d%02d.json",
+             appdata, cur_device->name,
+             timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+             timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+    // Create directories if needed
+    char dirname[256];
+    snprintf(dirname, sizeof(dirname), "%s\\OSCMix", appdata);
+    mkdir(dirname);
+    snprintf(dirname, sizeof(dirname), "%s\\OSCMix\\device_config", appdata);
+    mkdir(dirname);
+#else
+    char *home = getenv("HOME");
+    if (!home)
+        home = ".";
+
+    snprintf(filename, sizeof(filename),
+             "%s/device_config/audio-device_%s_date-time_%04d%02d%02d-%02d%02d%02d.json",
+             home, cur_device->name,
+             timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+             timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+    // Create directories if needed
+    char dirname[256];
+    snprintf(dirname, sizeof(dirname), "%s/device_config", home);
+    mkdir(dirname, 0755);
+#endif
+
+    // Open file for writing
+    f = fopen(filename, "w");
+    if (!f)
+    {
+        perror("Failed to create config file");
+        return -1;
+    }
+
+    // Write JSON header
+    fprintf(f, "{\n");
+    fprintf(f, "  \"device\": \"%s\",\n", cur_device->name);
+    fprintf(f, "  \"timestamp\": \"%04d-%02d-%02d %02d:%02d:%02d\",\n",
+            timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+            timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+    // Write DSP state
+    fprintf(f, "  \"dsp\": {\n");
+    fprintf(f, "    \"version\": %d,\n", dsp.vers);
+    fprintf(f, "    \"load\": %d\n", dsp.load);
+    fprintf(f, "  },\n");
+
+    // Write inputs state (just a few key parameters)
+    fprintf(f, "  \"inputs\": [\n");
+    for (int i = 0; i < cur_device->inputslen; ++i)
+    {
+        fprintf(f, "    {\n");
+        fprintf(f, "      \"index\": %d,\n", i);
+        fprintf(f, "      \"stereo\": %s,\n", inputs[i].stereo ? "true" : "false");
+        fprintf(f, "      \"mute\": %s,\n", inputs[i].mute ? "true" : "false");
+        fprintf(f, "      \"width\": %.2f\n", inputs[i].width);
+        fprintf(f, "    }%s\n", (i < cur_device->inputslen - 1) ? "," : "");
+    }
+    fprintf(f, "  ],\n");
+
+    // Write outputs state
+    fprintf(f, "  \"outputs\": [\n");
+    for (int i = 0; i < cur_device->outputslen; ++i)
+    {
+        fprintf(f, "    {\n");
+        fprintf(f, "      \"index\": %d,\n", i);
+        fprintf(f, "      \"stereo\": %s\n", outputs[i].stereo ? "true" : "false");
+        fprintf(f, "    }%s\n", (i < cur_device->outputslen - 1) ? "," : "");
+    }
+    fprintf(f, "  ]\n");
+
+    // Close JSON object
+    fprintf(f, "}\n");
+
+    fclose(f);
+    printf("Configuration saved to: %s\n", filename);
+    return 0;
+}

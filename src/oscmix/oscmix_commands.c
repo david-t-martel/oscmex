@@ -680,3 +680,148 @@ int setdurecfile(const struct oscnode *path[], int reg, struct oscmsg *msg)
     setreg(0x3e9c, val | 0x8000);
     return 0;
 }
+
+/**
+ * @brief Set the stereo status for an output channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the stereo state
+ * @return 0 on success, non-zero on failure
+ */
+int setoutputstereo(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    int idx;
+    bool val;
+
+    if (msg->argc != 1 || (msg->argv[0].type != 'i' &&
+                           msg->argv[0].type != 'f' &&
+                           msg->argv[0].type != 'T' &&
+                           msg->argv[0].type != 'F'))
+        return -1;
+
+    // Convert to boolean
+    if (msg->argv[0].type == 'i')
+        val = msg->argv[0].i != 0;
+    else if (msg->argv[0].type == 'f')
+        val = msg->argv[0].f != 0.0f;
+    else if (msg->argv[0].type == 'T')
+        val = 1;
+    else
+        val = 0;
+
+    idx = (path[-1] - path[-2]->child) & -2;
+
+    // Set stereo state for both channels of the stereo pair
+    setreg((idx + 0x40) << 6 | 2, val);
+    setreg((idx + 0x41) << 6 | 2, val);
+
+    return 0;
+}
+
+/**
+ * @brief Set the playback mode for DURec
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecplaymode(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    static const char *const names[] = {"Single", "Repeat", "Sequence", "Random"};
+    int val, i;
+    const char *str;
+
+    if (msg->argc != 1)
+        return -1;
+
+    // Process string input
+    if (msg->argv[0].type == 's')
+    {
+        str = msg->argv[0].s;
+        for (val = 0; val < sizeof(names) / sizeof(names[0]); val++)
+        {
+            if (strcasecmp(str, names[val]) == 0)
+            {
+                setreg(0x3e9e, val);
+                return 0;
+            }
+        }
+        return -1;
+    }
+    // Process numeric input
+    else if (msg->argv[0].type == 'i')
+    {
+        val = msg->argv[0].i;
+        if (val >= 0 && val < sizeof(names) / sizeof(names[0]))
+        {
+            setreg(0x3e9e, val);
+            return 0;
+        }
+        return -1;
+    }
+
+    return -1;
+}
+
+/**
+ * @brief Set the next file for DURec to play
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecnext(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    int val;
+
+    if (msg->argc != 1 || msg->argv[0].type != 'i')
+        return -1;
+
+    val = msg->argv[0].i;
+
+    // The format for next file is different from the normal file selection
+    // We use a special register to set the next file
+    setreg(0x3e9d, val | 0x8000);
+
+    return 0;
+}
+
+/**
+ * @brief Set the name of an output channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the name string
+ * @return 0 on success, non-zero on failure
+ */
+int setoutputname(const struct oscnode *path[], int reg, struct oscmsg *msg)
+{
+    const char *name;
+    char namebuf[12];
+    int i, ch, val;
+
+    ch = path[-1] - path[-2]->child;
+    if (ch >= 20)
+        return -1;
+
+    name = msg->argv[0].s;
+    if (msg->argc != 1 || msg->argv[0].type != 's')
+        return -1;
+
+    strncpy(namebuf, name, sizeof(namebuf));
+    namebuf[sizeof(namebuf) - 1] = '\0';
+
+    // Output names use a different register range than inputs
+    reg = 0x3400 + ch * 8;
+    for (i = 0; i < sizeof(namebuf); i += 2, ++reg)
+    {
+        // Pack two bytes of name into one register
+        val = (namebuf[i] & 0xFF) | ((namebuf[i + 1] & 0xFF) << 8);
+        setreg(reg, val);
+    }
+
+    return 0;
+}

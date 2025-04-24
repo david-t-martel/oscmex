@@ -14,10 +14,12 @@
 #include "device_state.h"
 #include "util.h"
 #include "osc.h"
+#include "sysex.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <assert.h>
 
 /* Remaining global variables from the original oscmix.c */
 static const struct device *cur_device = NULL;
@@ -30,11 +32,36 @@ static const struct device *cur_device = NULL;
  */
 int init(const char *port)
 {
-	// Initialize the device
-	cur_device = getDevice();
-	if (!cur_device)
+	extern const struct device ffucxii;
+	static const struct device *devices[] = {
+		&ffucxii,
+	};
+	int i;
+	size_t namelen;
+
+	// Find matching device
+	for (i = 0; i < sizeof(devices) / sizeof(devices[0]); ++i)
 	{
-		fprintf(stderr, "No device available\n");
+		if (strcmp(port, devices[i]->id) == 0)
+			break;
+		namelen = strlen(devices[i]->name);
+		if (strncmp(port, devices[i]->name, namelen) == 0)
+		{
+			if (!port[namelen] || (port[namelen] == ' ' && port[namelen + 1] == '('))
+				break;
+		}
+	}
+
+	if (i == sizeof(devices) / sizeof(devices[0]))
+	{
+		fprintf(stderr, "unsupported device '%s'\n", port);
+		return -1;
+	}
+
+	// Initialize device state
+	if (device_state_init(devices[i]) != 0)
+	{
+		fprintf(stderr, "Failed to initialize device state\n");
 		return -1;
 	}
 
@@ -45,8 +72,8 @@ int init(const char *port)
 		return -1;
 	}
 
-	// Request initial device state
-	// This would trigger a refresh to populate our state with current device values
+	// Request initial device state with a refresh command
+	// This triggers a refresh to populate our state with current device values
 	const struct oscnode *path[16];
 	struct oscmsg msg = {0}; // Empty message
 
@@ -71,6 +98,8 @@ int init(const char *port)
  */
 void handlesysex(const unsigned char *buf, size_t len, uint_least32_t *payload)
 {
+	size_t payloadlen;
+
 	// Check for valid SysEx message
 	if (len < 5 || buf[0] != 0xF0)
 	{
@@ -85,20 +114,37 @@ void handlesysex(const unsigned char *buf, size_t len, uint_least32_t *payload)
 		return;
 	}
 
-	// Handle different message types
+	// Decode the SysEx payload
+	payloadlen = sysex_decode(buf + 5, len - 6, (unsigned char *)payload);
+
+	if (payloadlen % 4 != 0)
+	{
+		fprintf(stderr, "Invalid SysEx payload length: %zu\n", payloadlen);
+		return;
+	}
+
+	payloadlen /= 4;
+
+	// Handle different message types based on the subid
 	switch (buf[4])
 	{
 	case 0x01: // Register values
-		handleregs(payload, (len - 6) / 4);
+		handleregs(payload, payloadlen);
 		break;
 	case 0x02: // Input levels
-		handlelevels(1, payload, (len - 6) / 4);
+		handlelevels(1, payload, payloadlen);
 		break;
 	case 0x03: // Output levels
-		handlelevels(2, payload, (len - 6) / 4);
+		handlelevels(3, payload, payloadlen);
 		break;
 	case 0x04: // Playback levels
-		handlelevels(3, payload, (len - 6) / 4);
+		handlelevels(2, payload, payloadlen);
+		break;
+	case 0x05: // Input FX levels
+		handlelevels(4, payload, payloadlen);
+		break;
+	case 0x06: // Output FX levels
+		handlelevels(5, payload, payloadlen);
 		break;
 	default:
 		fprintf(stderr, "Unknown message type: %02x\n", buf[4]);
@@ -153,6 +199,12 @@ int handleosc(const void *buf, size_t len)
 		{
 			oscsend("/dump/save", ",s", "Failed to save configuration");
 		}
+		return 0;
+	}
+	else if (strcmp(addr, "/version") == 0)
+	{
+		// Send version information
+		oscsend("/version", ",s", "OSCMix 1.0");
 		return 0;
 	}
 
@@ -235,6 +287,10 @@ int handleosc(const void *buf, size_t len)
 							// This is a SET request
 							node->set(path, reg, &msg);
 						}
+						else
+						{
+							fprintf(stderr, "no handler for node: %s\n", addr);
+						}
 
 						if (msg.argv)
 							free(msg.argv);
@@ -272,6 +328,10 @@ int handleosc(const void *buf, size_t len)
  */
 void handletimer(bool levels)
 {
+	// If refreshing in progress, don't request new updates
+	if (refreshing_state(-1))
+		return;
+
 	// Request level updates if needed
 	if (levels)
 	{
@@ -283,5 +343,32 @@ void handletimer(bool levels)
 
 		// Request playback levels
 		setreg(0x9002, 1);
+
+		// If the device supports input/output FX levels, request those too
+		const struct device *device = getDevice();
+		if (device->flags & DEVICE_FX_LEVELS)
+		{
+			// Request input FX levels
+			setreg(0x9003, 1);
+
+			// Request output FX levels
+			setreg(0x9004, 1);
+		}
+
+		// If the device supports DURec, request status updates
+		if (device->flags & DEVICE_DUREC)
+		{
+			// Request DURec status
+			setreg(0x9010, 1);
+
+			// Request DURec time
+			setreg(0x9011, 1);
+
+			// Request DURec USB status
+			setreg(0x9012, 1);
+		}
 	}
+
+	// Flush any pending OSC messages
+	oscflush();
 }

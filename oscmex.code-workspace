@@ -15,7 +15,8 @@
 			"*.hpp": "cpp",
 			"*.c": "c",
 			"CMakeLists.txt": "cmake",
-			"*.cmake": "cmake"
+			"*.cmake": "cmake",
+			"ios": "cpp"
 		},
 		"terminal.integrated.defaultProfile.windows": "Command Prompt",
 		"terminal.integrated.profiles.windows": {

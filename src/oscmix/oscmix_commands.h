@@ -70,6 +70,16 @@ int setrefresh(const struct oscnode *path[], int reg, struct oscmsg *msg);
 int setinputname(const struct oscnode *path[], int reg, struct oscmsg *msg);
 
 /**
+ * @brief Set the name of an output channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the name string
+ * @return 0 on success, non-zero on failure
+ */
+int setoutputname(const struct oscnode *path[], int reg, struct oscmsg *msg);
+
+/**
  * @brief Set the gain for an input channel
  *
  * @param path The OSC address path
@@ -108,6 +118,16 @@ int setinputhiz(const struct oscnode *path[], int reg, struct oscmsg *msg);
  * @return 0 on success, non-zero on failure
  */
 int setinputstereo(const struct oscnode *path[], int reg, struct oscmsg *msg);
+
+/**
+ * @brief Set the stereo status for an output channel
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message containing the stereo state
+ * @return 0 on success, non-zero on failure
+ */
+int setoutputstereo(const struct oscnode *path[], int reg, struct oscmsg *msg);
 
 /**
  * @brief Set the mute state for an input channel
@@ -198,5 +218,25 @@ int setdurecdelete(const struct oscnode *path[], int reg, struct oscmsg *msg);
  * @return 0 on success, non-zero on failure
  */
 int setdurecfile(const struct oscnode *path[], int reg, struct oscmsg *msg);
+
+/**
+ * @brief Set the playback mode for DURec
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecplaymode(const struct oscnode *path[], int reg, struct oscmsg *msg);
+
+/**
+ * @brief Set the next file for DURec to play
+ *
+ * @param path The OSC address path
+ * @param reg The register address
+ * @param msg The OSC message
+ * @return 0 on success, non-zero on failure
+ */
+int setdurecnext(const struct oscnode *path[], int reg, struct oscmsg *msg);
 
 #endif /* OSCMIX_COMMANDS_H */
