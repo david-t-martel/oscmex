@@ -8,7 +8,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <math.h> // Add this for INFINITY
+#include <math.h> // For INFINITY
 #include "device.h"
 
 /* Device state representation for inputs */
@@ -41,57 +41,17 @@ struct devicestate
     int buffersize;
 };
 
-/* Device state initialization and cleanup */
-int initDeviceState(const struct device *dev);
-void cleanupDeviceState(void);
-struct devicestate *getDeviceState(void);
-
-/* Current device accessor */
-const struct device *getDevice(void);
-
-/* Input state getters/setters */
-float getInputGain(int index);
-void setInputGain(int index, float gain);
-bool getInputPhantom(int index);
-void setInputPhantom(int index, bool enabled);
-const char *getInputRefLevel(int index);
-void setInputRefLevel(int index, int level);
-bool getInputHiZ(int index);
-void setInputHiZ(int index, bool enabled);
-bool getInputMute(int index);
-void setInputMute(int index, bool muted);
-
-/* Output state getters/setters */
-float getOutputVolume(int index);
-void setOutputVolume(int index, float volume);
-bool getOutputMute(int index);
-void setOutputMute(int index, bool muted);
-const char *getOutputRefLevel(int index);
-void setOutputRefLevel(int index, int level);
-
-/* Mixer state getters/setters */
-float getMixerVolume(int input, int output);
-void setMixerVolume(int input, int output, float volume);
-float getMixerPan(int input, int output);
-void setMixerPan(int input, int output, float pan);
-
-/* System state getters/setters */
-int getSampleRate(void);
-void setSampleRate(int rate);
-const char *getClockSource(void);
-void setClockSource(const char *source);
-int getBufferSize(void);
-void setBufferSize(int size);
-
-/* Save current device state to a file */
-int saveDeviceState(void);
-
 /**
  * @brief Initialize device state tracking
  * @param device Pointer to the device structure
  * @return 0 on success, non-zero on failure
  */
 int device_state_init(const struct device *device);
+
+/**
+ * @brief Clean up device state resources
+ */
+void device_state_cleanup(void);
 
 /**
  * @brief Get or set the refreshing state
@@ -101,21 +61,37 @@ int device_state_init(const struct device *device);
 bool refreshing_state(int value);
 
 /**
+ * @brief Get a pointer to the device state for external use
+ * @return Pointer to the device state structure
+ */
+struct devicestate *getDeviceState(void);
+
+/**
  * @brief Get the current device
  * @return Pointer to the current device structure
  */
 const struct device *getDevice(void);
 
-/**
- * @brief Dump the current device state
- */
-void dumpDeviceState(void);
+/* Input state getters */
+float getInputGain(int index);
+bool getInputPhantom(int index);
+const char *getInputRefLevel(int index);
+bool getInputHiZ(int index);
+bool getInputMute(int index);
 
-/**
- * @brief Export device configuration to a file
- * @return 0 on success, non-zero on failure
- */
-int dumpConfig(void);
+/* Output state getters */
+float getOutputVolume(int index);
+bool getOutputMute(int index);
+const char *getOutputRefLevel(int index);
+
+/* Mixer state getters */
+float getMixerVolume(int input, int output);
+float getMixerPan(int input, int output);
+
+/* System state getters */
+int getSampleRate(void);
+const char *getClockSource(void);
+int getBufferSize(void);
 
 /**
  * @brief Structure for mixer settings
@@ -247,10 +223,5 @@ struct durecfile_state *get_durec_files(size_t *fileslen);
  * @return 0 on success, non-zero on failure
  */
 int set_durec_files_length(size_t fileslen);
-
-/**
- * @brief Clean up device state resources
- */
-void device_state_cleanup(void);
 
 #endif /* DEVICE_STATE_H */

@@ -1,6 +1,6 @@
 /**
  * @file oscmix_commands.c
- * @brief Implementation of command handlers for OSC messages
+ * @brief Command handlers for OSC messages
  */
 
 #include "oscmix_commands.h"
@@ -14,6 +14,134 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+#include <stdbool.h>
+
+/* Helper functions for OSC argument handling */
+
+/**
+ * @brief Get an integer from an OSC argument
+ *
+ * @param arg The OSC argument
+ * @param out_value Pointer to store the integer value
+ * @return 0 on success, -1 on type mismatch
+ */
+static int osc_get_int(const struct oscarg *arg, int *out_value)
+{
+    if (!arg || !out_value)
+        return -1;
+
+    switch (arg->type)
+    {
+    case 'i':
+        *out_value = arg->i;
+        break;
+    case 'f':
+        *out_value = (int)arg->f;
+        break;
+    case 'T':
+        *out_value = 1;
+        break;
+    case 'F':
+    case 'N':
+        *out_value = 0;
+        break;
+    default:
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Get a float from an OSC argument
+ *
+ * @param arg The OSC argument
+ * @param out_value Pointer to store the float value
+ * @return 0 on success, -1 on type mismatch
+ */
+static int osc_get_float(const struct oscarg *arg, float *out_value)
+{
+    if (!arg || !out_value)
+        return -1;
+
+    switch (arg->type)
+    {
+    case 'i':
+        *out_value = (float)arg->i;
+        break;
+    case 'f':
+        *out_value = arg->f;
+        break;
+    case 'T':
+        *out_value = 1.0f;
+        break;
+    case 'F':
+    case 'N':
+        *out_value = 0.0f;
+        break;
+    default:
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Get a boolean from an OSC argument
+ *
+ * @param arg The OSC argument
+ * @param out_value Pointer to store the boolean value
+ * @return 0 on success, -1 on type mismatch
+ */
+static int osc_get_bool(const struct oscarg *arg, bool *out_value)
+{
+    if (!arg || !out_value)
+        return -1;
+
+    switch (arg->type)
+    {
+    case 'i':
+        *out_value = (arg->i != 0);
+        break;
+    case 'f':
+        *out_value = (arg->f != 0.0f);
+        break;
+    case 'T':
+        *out_value = true;
+        break;
+    case 'F':
+        *out_value = false;
+        break;
+    case 'N':
+        *out_value = false;
+        break;
+    default:
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Get a string from an OSC argument
+ *
+ * @param arg The OSC argument
+ * @param out_value Pointer to store the string pointer
+ * @return 0 on success, -1 on type mismatch
+ */
+static int osc_get_string(const struct oscarg *arg, const char **out_value)
+{
+    if (!arg || !out_value)
+        return -1;
+
+    if (arg->type == 's')
+    {
+        *out_value = arg->s;
+        return 0;
+    }
+
+    return -1;
+}
 
 /**
  * @brief Set an integer parameter value in the device

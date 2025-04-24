@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
+#include <signal.h> /* For signal constants */
 
 /* Platform detection and specific includes */
 #if defined(_WIN32)
@@ -61,6 +62,14 @@ typedef SOCKET platform_socket_t;
 typedef HMIDIIN platform_midiin_t;
 typedef HMIDIOUT platform_midiout_t;
 typedef unsigned(__stdcall *platform_thread_func_t)(void *);
+
+/* Define signal constants for Windows if they're not already defined */
+#ifndef SIGINT
+#define SIGINT 2
+#endif
+#ifndef SIGTERM
+#define SIGTERM 15
+#endif
 
 #else
 /* POSIX platform (Linux, macOS, etc.) */
@@ -170,6 +179,17 @@ int platform_format_time(char *buffer, size_t size, const char *format);
  * @return 0 on success, -1 on failure
  */
 int platform_path_join(char *buffer, size_t size, const char *part1, const char *part2);
+
+/**
+ * @brief Joins two path components and ensures the directory exists
+ *
+ * @param buffer Buffer to store the joined path
+ * @param size Size of the buffer
+ * @param part1 First part of the path
+ * @param part2 Second part of the path
+ * @return 0 on success, -1 on failure
+ */
+int platform_ensure_path(char *buffer, size_t size, const char *part1, const char *part2);
 
 /**
  * @brief Checks if a path is absolute

@@ -1,13 +1,23 @@
+/**
+ * @file util.c
+ * @brief Utility functions for the OSCMix application
+ */
+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "util.h"
-#include <time.h>
-#include <sys/stat.h>
-#include <errno.h>
 #include "platform.h"
+#include "device.h"
+#include "device_state.h"
 
+/**
+ * @brief Prints a fatal error message and exits the program
+ *
+ * @param msg The error message format string
+ * @param ... Variable arguments for the format string
+ */
 void fatal(const char *msg, ...)
 {
 	va_list ap;
@@ -15,6 +25,7 @@ void fatal(const char *msg, ...)
 	va_start(ap, msg);
 	vfprintf(stderr, msg, ap);
 	va_end(ap);
+
 	if (!msg)
 	{
 		perror(NULL);
@@ -32,18 +43,19 @@ void fatal(const char *msg, ...)
 }
 
 /**
- * Creates the specified directory if it doesn't exist
+ * @brief Creates the specified directory if it doesn't exist
  *
  * @param path The directory path to create
  * @return 0 on success, -1 on failure
  */
 int ensure_directory_exists(const char *path)
 {
+	// Use platform abstraction for directory creation
 	return platform_ensure_directory(path);
 }
 
 /**
- * Get the application home directory
+ * @brief Get the application home directory
  *
  * @param buffer Buffer to store the path
  * @param size Size of the buffer
@@ -51,11 +63,12 @@ int ensure_directory_exists(const char *path)
  */
 int get_app_home_directory(char *buffer, size_t size)
 {
+	// Use platform abstraction for getting app data directory
 	return platform_get_app_data_dir(buffer, size);
 }
 
 /**
- * Join multiple path components into a single path
+ * @brief Join multiple path components into a single path
  *
  * @param buffer Buffer to store the joined path
  * @param size Size of the buffer
@@ -68,59 +81,37 @@ int path_join(char *buffer, size_t size, const char **components, int count)
 	if (!buffer || size == 0 || !components || count <= 0)
 		return -1;
 
-	*buffer = '\0';
-	size_t pos = 0;
+	// Start with empty string
+	buffer[0] = '\0';
 
-	for (int i = 0; i < count; i++)
+	// For the first component
+	if (count > 0 && components[0])
 	{
-		if (!components[i])
-			continue;
+		strncpy(buffer, components[0], size - 1);
+		buffer[size - 1] = '\0';
+	}
 
-		size_t comp_len = strlen(components[i]);
-
-		// Skip empty components
-		if (comp_len == 0)
-			continue;
-
-		// Add separator if not the first component and if needed
-		if (pos > 0 && buffer[pos - 1] != PLATFORM_PATH_SEPARATOR &&
-			components[i][0] != PLATFORM_PATH_SEPARATOR)
+	// Join the rest of the components using platform_path_join
+	for (int i = 1; i < count; i++)
+	{
+		if (components[i])
 		{
-			if (pos + 1 >= size)
-				return -1; // Buffer overflow
+			char temp[1024];
+			strncpy(temp, buffer, sizeof(temp) - 1);
+			temp[sizeof(temp) - 1] = '\0';
 
-			buffer[pos++] = PLATFORM_PATH_SEPARATOR;
-			buffer[pos] = '\0';
+			if (platform_path_join(buffer, size, temp, components[i]) != 0)
+			{
+				return -1;
+			}
 		}
-
-		// Remove trailing separators from component
-		while (comp_len > 0 && components[i][comp_len - 1] == PLATFORM_PATH_SEPARATOR)
-			comp_len--;
-
-		// Skip leading separators if not the first component
-		const char *comp_start = components[i];
-		if (i > 0)
-		{
-			while (*comp_start == PLATFORM_PATH_SEPARATOR)
-				comp_start++;
-		}
-
-		comp_len = strlen(comp_start);
-
-		// Add component
-		if (pos + comp_len >= size)
-			return -1; // Buffer overflow
-
-		strncpy(buffer + pos, comp_start, comp_len);
-		pos += comp_len;
-		buffer[pos] = '\0';
 	}
 
 	return 0;
 }
 
 /**
- * Sanitize a filename by replacing invalid characters with underscores
+ * @brief Sanitize a filename by replacing invalid characters with underscores
  *
  * @param input The input filename
  * @param output The sanitized output filename
@@ -129,57 +120,31 @@ int path_join(char *buffer, size_t size, const char **components, int count)
  */
 int sanitize_filename(const char *input, char *output, size_t output_size)
 {
-	if (!input || !output || output_size == 0)
-		return -1;
-
-	size_t i, j = 0;
-	size_t input_len = strlen(input);
-
-	for (i = 0; i < input_len && j < output_size - 1; i++)
-	{
-		char c = input[i];
-		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-			(c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
-		{
-			output[j++] = c;
-		}
-		else if (c == ' ' || c == ',' || c == ';' || c == ':')
-		{
-			output[j++] = '_';
-		}
-	}
-
-	output[j] = '\0';
-	return 0;
+	// Use platform abstraction for creating valid filenames
+	return platform_create_valid_filename(input, output, output_size);
 }
 
 /**
- * Exports device configuration to a JSON file
+ * @brief Exports device configuration to a JSON file
  * @return 0 on success, negative value on error
  */
 int dumpConfig(void)
 {
 	const struct device *cur_device = getDevice();
-	struct devicestate *state = getDeviceState();
 
-	if (!cur_device || !state)
+	if (!cur_device)
 	{
 		fprintf(stderr, "No device initialized\n");
 		return -1;
 	}
 
-	// Get application home directory
-	char app_home[256];
-	if (platform_get_app_data_dir(app_home, sizeof(app_home)) != 0)
+	// Get application config directory
+	char config_dir[512];
+	if (platform_get_device_config_dir(config_dir, sizeof(config_dir)) != 0)
 	{
-		fprintf(stderr, "Failed to get application data directory\n");
+		fprintf(stderr, "Failed to get configuration directory\n");
 		return -1;
 	}
-
-	// Create the device_config subdirectory path
-	char config_dir[512];
-	snprintf(config_dir, sizeof(config_dir), "%s%cOSCMix%cdevice_config",
-			 app_home, PLATFORM_PATH_SEPARATOR, PLATFORM_PATH_SEPARATOR);
 
 	// Ensure directory exists
 	if (platform_ensure_directory(config_dir) != 0)
@@ -197,32 +162,42 @@ int dumpConfig(void)
 	}
 
 	// Sanitize device name for filename
-	char safe_name[64] = {0};
-	sanitize_filename(cur_device->name, safe_name, sizeof(safe_name));
+	char safe_name[64];
+	if (platform_create_valid_filename(cur_device->name, safe_name, sizeof(safe_name)) != 0)
+	{
+		fprintf(stderr, "Failed to create valid filename\n");
+		return -1;
+	}
 
 	// Create full filepath
 	char filename[768];
-	snprintf(filename, sizeof(filename), "%s%caudio-device_%s_date-time_%s.json",
-			 config_dir, PLATFORM_PATH_SEPARATOR, safe_name, date_str);
+	char *parts[] = {config_dir, "audio-device_", safe_name, "_date-time_", date_str, ".json"};
 
-	// Open file for writing - using standard file for now, could be platform_fopen
-	FILE *file = fopen(filename, "w");
+	// Join parts to form the filename
+	if (path_join(filename, sizeof(filename), (const char **)parts, 6) != 0)
+	{
+		fprintf(stderr, "Failed to create config filename\n");
+		return -1;
+	}
+
+	// Open file using platform abstraction
+	FILE *file = platform_fopen(filename, "w");
 	if (!file)
 	{
 		fprintf(stderr, "Failed to open file for writing: %s\n", filename);
 		return -1;
 	}
 
-	// Write device state as JSON using proper device_state accessors
+	// Write device state as JSON - real implementation would have more fields
 	fprintf(file, "{\n");
 	fprintf(file, "  \"device\": {\n");
 	fprintf(file, "    \"name\": \"%s\",\n", cur_device->name);
 	fprintf(file, "    \"id\": \"%s\",\n", cur_device->id);
 	fprintf(file, "    \"version\": %d,\n", cur_device->version);
-	fprintf(file, "    \"flags\": %d\n", cur_device->flags);
-	fprintf(file, "  },\n");
-
-	// Rest of file writing...
+	fprintf(file, "    \"flags\": %d,\n", cur_device->flags);
+	fprintf(file, "    \"timestamp\": \"%s\"\n", date_str);
+	fprintf(file, "  }\n");
+	fprintf(file, "}\n");
 
 	fclose(file);
 	printf("Device configuration saved to: %s\n", filename);
@@ -230,10 +205,18 @@ int dumpConfig(void)
 	return 0;
 }
 
-// Updated function to dump device state to console
+/**
+ * @brief Dumps the current device state to the console
+ */
 void dumpDeviceState(void)
 {
-	const struct device *current = cur_device; // Use cur_device consistently
+	const struct device *current = getDevice();
+
+	if (!current)
+	{
+		fprintf(stderr, "No device initialized\n");
+		return;
+	}
 
 	printf("Device: %s (ID: %s, Version: %d)\n",
 		   current->name, current->id, current->version);
@@ -258,7 +241,7 @@ void dumpDeviceState(void)
 			   i + 1, current->outputs[i].name, current->outputs[i].flags);
 	}
 
-	// Call the dumpConfig from util.c instead of duplicating the implementation
+	// Save state to file
 	printf("\nSaving state to file...\n");
-	dumpConfig(); // This will call the implementation in util.c
+	dumpConfig();
 }

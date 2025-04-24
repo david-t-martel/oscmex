@@ -52,7 +52,26 @@ int platform_get_device_config_dir(char *buffer, size_t size)
         return result;
     }
 
-    return platform_path_join(buffer, size, app_dir, "OSCMix" PLATFORM_PATH_SEPARATOR_STR "device_config");
+    // First join the paths
+    if (platform_path_join(buffer, size, app_dir, "OSCMix") != 0)
+    {
+        return -1;
+    }
+
+    // Now create the directory
+    if (platform_ensure_directory(buffer) != 0)
+    {
+        return -1;
+    }
+
+    // Add the device_config part
+    if (platform_path_join(buffer, size, buffer, "device_config") != 0)
+    {
+        return -1;
+    }
+
+    // And ensure this directory exists too
+    return platform_ensure_directory(buffer);
 }
 
 int platform_ensure_directory(const char *path)
@@ -202,8 +221,11 @@ int platform_path_join(char *buffer, size_t size, const char *part1, const char 
         snprintf(buffer, size, "%s%s", part1, part2);
     }
 
-    // Create the directory
-    return platform_ensure_directory(buffer);
+    // Ensure null-termination
+    buffer[size - 1] = '\0';
+
+    // Return success - don't automatically create the directory
+    return 0;
 }
 
 int platform_path_is_absolute(const char *path)
@@ -274,6 +296,15 @@ int platform_path_dirname(const char *path, char *buffer, size_t size)
     }
 
     return 0;
+}
+
+int platform_ensure_path(char *buffer, size_t size, const char *part1, const char *part2)
+{
+    int result = platform_path_join(buffer, size, part1, part2);
+    if (result != 0)
+        return result;
+
+    return platform_ensure_directory(buffer);
 }
 
 /* Socket functions */
@@ -458,14 +489,12 @@ static BOOL WINAPI win32_signal_handler(DWORD ctrlType)
     switch (ctrlType)
     {
     case CTRL_C_EVENT:
-        sig = SIGINT;
+        sig = SIGINT; // Now defined in platform.h
         break;
     case CTRL_BREAK_EVENT:
-        sig = SIGTERM;
-        break;
     case CTRL_CLOSE_EVENT:
     case CTRL_SHUTDOWN_EVENT:
-        sig = SIGTERM;
+        sig = SIGTERM; // Now defined in platform.h
         break;
     default:
         return FALSE;

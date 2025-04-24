@@ -74,14 +74,14 @@ socket_t sockopen(const char *addr, int recv)
 
 	for (ai = res; ai; ai = ai->ai_next)
 	{
-		platform_socket_t fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+		platform_socket_t fd = platform_socket_create(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
 		if (fd == PLATFORM_INVALID_SOCKET)
 			continue;
 
 		if (recv)
 		{
 			optval = 1;
-			if (platform_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
+			if (platform_socket_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
 			{
 				perror("setsockopt");
 				platform_socket_close(fd);
@@ -120,25 +120,17 @@ socket_t sockopen(const char *addr, int recv)
 				}
 			}
 
-			if (bind(fd, ai->ai_addr, ai->ai_addrlen) < 0)
+			if (platform_socket_bind(fd, host, atoi(port)) < 0)
 			{
-#ifdef _WIN32
-				closesocket(fd);
-#else
-				close(fd);
-#endif
+				platform_socket_close(fd);
 				continue;
 			}
 		}
 		else
 		{
-			if (connect(fd, ai->ai_addr, ai->ai_addrlen) < 0)
+			if (platform_socket_connect(fd, host, atoi(port)) < 0)
 			{
-#ifdef _WIN32
-				closesocket(fd);
-#else
-				close(fd);
-#endif
+				platform_socket_close(fd);
 				continue;
 			}
 		}

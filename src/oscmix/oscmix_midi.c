@@ -183,7 +183,7 @@ void oscsend(const char *addr, const char *type, ...)
         switch (*t)
         {
         case 'f':
-            oscputfloat(&oscmsg, va_arg(ap, double));
+            oscputfloat(&oscmsg, va_arg(ap, double)); // Note: float is promoted to double in var args
             break;
         case 'i':
             oscputint(&oscmsg, va_arg(ap, int));
@@ -196,8 +196,7 @@ void oscsend(const char *addr, const char *type, ...)
             // No argument for boolean tags
             break;
         default:
-            fprintf(stderr, "Unsupported OSC type tag: %c\n", *t);
-            assert(0);
+            fprintf(stderr, "unsupported osc type: %c\n", *t);
         }
     }
     va_end(ap);
@@ -252,11 +251,11 @@ long getsamplerate(int val)
 {
     static const long samplerates[] = {
         44100, 48000, 88200, 96000, 176400, 192000,
-        352800, 384000, 705600, 768000
-    };
+        352800, 384000, 705600, 768000};
 
     return (val >= 0 && val < sizeof(samplerates) / sizeof(samplerates[0]))
-           ? samplerates[val] : 0;
+               ? samplerates[val]
+               : 0;
 }
 
 /**
@@ -290,144 +289,161 @@ void handleregs(uint_least32_t *payload, size_t len)
         // In a real implementation, we'd have a reverse mapping from reg to path
         switch (reg)
         {
-            case 0x8000: // Sample rate
-                components[0] = "system";
-                components[1] = "samplerate";
-                comp_count = 2;
-                break;
+        case 0x8000: // Sample rate
+            components[0] = "system";
+            components[1] = "samplerate";
+            comp_count = 2;
+            break;
 
-            case 0x3e04: // DSP load
-                components[0] = "hardware";
-                components[1] = "dspload";
-                comp_count = 2;
-                break;
+        case 0x3e04: // DSP load
+            components[0] = "hardware";
+            components[1] = "dspload";
+            comp_count = 2;
+            break;
 
-            case 0x3e90: // DURec status
-                components[0] = "durec";
-                components[1] = "status";
-                comp_count = 2;
-                break;
+        case 0x3e90: // DURec status
+            components[0] = "durec";
+            components[1] = "status";
+            comp_count = 2;
+            break;
 
-            case 0x3e91: // DURec time
-                components[0] = "durec";
-                components[1] = "time";
-                comp_count = 2;
-                break;
+        case 0x3e91: // DURec time
+            components[0] = "durec";
+            components[1] = "time";
+            comp_count = 2;
+            break;
 
-            default:
-                // Try to find by other means
-                comp_count = 0;
+        default:
+            // Try to find by other means
+            comp_count = 0;
 
-                // Check for input register range
-                if (reg >= 0x0000 && reg < 0x0800) {
-                    int ch = reg >> 6;
-                    int subidx = reg & 0x3F;
+            // Check for input register range
+            if (reg >= 0x0000 && reg < 0x0800)
+            {
+                int ch = reg >> 6;
+                int subidx = reg & 0x3F;
 
-                    if (ch < 64) { // Input channel
-                        components[0] = "input";
-                        char chnum[8];
-                        sprintf(chnum, "%d", ch + 1);
-                        components[1] = strdup(chnum);
-
-                        switch (subidx) {
-                            case 0: // Volume
-                                components[2] = "volume";
-                                comp_count = 3;
-                                break;
-
-                            case 1: // Pan
-                                components[2] = "pan";
-                                comp_count = 3;
-                                break;
-
-                            case 2: // Stereo
-                                components[2] = "stereo";
-                                comp_count = 3;
-                                break;
-
-                            case 3: // Mute
-                                components[2] = "mute";
-                                comp_count = 3;
-                                break;
-
-                            case 4: // 48V/Hi-Z/Ref Level
-                                if (ch < 2) {
-                                    components[2] = "48v";
-                                    comp_count = 3;
-                                } else if (ch < 4) {
-                                    components[2] = "hiz";
-                                    comp_count = 3;
-                                } else {
-                                    components[2] = "reflevel";
-                                    comp_count = 3;
-                                }
-                                break;
-                        }
-                    }
-                }
-
-                // Check for output register range
-                else if (reg >= 0x1000 && reg < 0x1800) {
-                    int ch = (reg >> 6) & 0x3F;
-                    int subidx = reg & 0x3F;
-
-                    components[0] = "output";
+                if (ch < 64)
+                { // Input channel
+                    components[0] = "input";
                     char chnum[8];
                     sprintf(chnum, "%d", ch + 1);
                     components[1] = strdup(chnum);
 
-                    switch (subidx) {
-                        case 0: // Volume
-                            components[2] = "volume";
-                            comp_count = 3;
-                            break;
+                    switch (subidx)
+                    {
+                    case 0: // Volume
+                        components[2] = "volume";
+                        comp_count = 3;
+                        break;
 
-                        case 1: // Pan
-                            components[2] = "pan";
-                            comp_count = 3;
-                            break;
+                    case 1: // Pan
+                        components[2] = "pan";
+                        comp_count = 3;
+                        break;
 
-                        case 2: // Stereo
-                            components[2] = "stereo";
-                            comp_count = 3;
-                            break;
+                    case 2: // Stereo
+                        components[2] = "stereo";
+                        comp_count = 3;
+                        break;
 
-                        case 3: // Mute
-                            components[2] = "mute";
+                    case 3: // Mute
+                        components[2] = "mute";
+                        comp_count = 3;
+                        break;
+
+                    case 4: // 48V/Hi-Z/Ref Level
+                        if (ch < 2)
+                        {
+                            components[2] = "48v";
                             comp_count = 3;
-                            break;
+                        }
+                        else if (ch < 4)
+                        {
+                            components[2] = "hiz";
+                            comp_count = 3;
+                        }
+                        else
+                        {
+                            components[2] = "reflevel";
+                            comp_count = 3;
+                        }
+                        break;
                     }
                 }
+            }
 
-                // Check for mixer register range
-                else if (reg >= 0x2000 && reg < 0x3000) {
-                    int outch = (reg >> 6) & 0x3F;
-                    int inch = reg & 0x3F;
+            // Check for output register range
+            else if (reg >= 0x1000 && reg < 0x1800)
+            {
+                int ch = (reg >> 6) & 0x3F;
+                int subidx = reg & 0x3F;
 
-                    components[0] = "mixer";
-                    char outnum[8], innum[8];
-                    sprintf(outnum, "%d", outch + 1);
-                    sprintf(innum, "%d", inch + 1);
-                    components[1] = strdup(outnum);
-                    components[2] = strdup(innum);
+                components[0] = "output";
+                char chnum[8];
+                sprintf(chnum, "%d", ch + 1);
+                components[1] = strdup(chnum);
 
-                    // Check for volume or pan
-                    if (val & 0x8000) {
-                        components[3] = "pan";
-                    } else {
-                        components[3] = "volume";
-                    }
-                    comp_count = 4;
+                switch (subidx)
+                {
+                case 0: // Volume
+                    components[2] = "volume";
+                    comp_count = 3;
+                    break;
+
+                case 1: // Pan
+                    components[2] = "pan";
+                    comp_count = 3;
+                    break;
+
+                case 2: // Stereo
+                    components[2] = "stereo";
+                    comp_count = 3;
+                    break;
+
+                case 3: // Mute
+                    components[2] = "mute";
+                    comp_count = 3;
+                    break;
                 }
-                break;
+            }
+
+            // Check for mixer register range
+            else if (reg >= 0x2000 && reg < 0x3000)
+            {
+                int outch = (reg >> 6) & 0x3F;
+                int inch = reg & 0x3F;
+
+                components[0] = "mixer";
+                char outnum[8], innum[8];
+                sprintf(outnum, "%d", outch + 1);
+                sprintf(innum, "%d", inch + 1);
+                components[1] = strdup(outnum);
+                components[2] = strdup(innum);
+
+                // Check for volume or pan
+                if (val & 0x8000)
+                {
+                    components[3] = "pan";
+                }
+                else
+                {
+                    components[3] = "volume";
+                }
+                comp_count = 4;
+            }
+            break;
         }
 
-        if (comp_count > 0) {
+        if (comp_count > 0)
+        {
             int npath = oscnode_find(components, comp_count, path, 16);
-            if (npath > 0 && path[npath-1]->new) {
+            if (npath > 0 && path[npath - 1]->new)
+            {
                 // Format the full address
                 addr[0] = '\0';
-                for (int j = 0; j < comp_count; j++) {
+                for (int j = 0; j < comp_count; j++)
+                {
                     strcat(addr, "/");
                     strcat(addr, components[j]);
                 }
@@ -436,16 +452,19 @@ void handleregs(uint_least32_t *payload, size_t len)
                 int sval = ((int)val ^ 0x8000) - 0x8000;
 
                 // Call the node's update function
-                path[npath-1]->new(path, addr, reg, sval);
+                path[npath - 1]->new(path, addr, reg, sval);
             }
 
             // Free any dynamically allocated component strings
-            for (int j = 1; j < comp_count; j++) {
-                if (j == 1 || j == 2) {
+            for (int j = 1; j < comp_count; j++)
+            {
+                if (j == 1 || j == 2)
+                {
                     char test[8];
                     sprintf(test, "%d", j);
-                    if (components[j] && strncmp(components[j], test, strlen(test)) == 0) {
-                        free((void*)components[j]);
+                    if (components[j] && strncmp(components[j], test, strlen(test)) == 0)
+                    {
+                        free((void *)components[j]);
                     }
                 }
             }
@@ -453,13 +472,15 @@ void handleregs(uint_least32_t *payload, size_t len)
     }
 
     // If we're in a refresh cycle, check if it's complete
-    if (isRefreshing && reg == 0x2fc0) {
+    if (isRefreshing && reg == 0x2fc0)
+    {
         // Refresh is complete, notify the system
         const char *refreshComponents[] = {"refresh", "done"};
         int npath = oscnode_find(refreshComponents, 2, path, 16);
 
-        if (npath > 0 && path[npath-1]->new) {
-            path[npath-1]->new(path, "/refresh/done", 0, 1);
+        if (npath > 0 && path[npath - 1]->new)
+        {
+            path[npath - 1]->new(path, "/refresh/done", 0, 1);
         }
 
         // Reset refreshing state
@@ -504,13 +525,15 @@ void handlelevels(int subid, uint_least32_t *payload, size_t len)
         type = "input"; /* fallthrough */
     case 1:
         peakfx = inputpeakfx, rmsfx = inputrmsfx;
-        if (!type) type = "input";
+        if (!type)
+            type = "input";
         break;
     case 5:
         type = "output"; /* fallthrough */
     case 3:
         peakfx = outputpeakfx, rmsfx = outputrmsfx;
-        if (!type) type = "output";
+        if (!type)
+            type = "output";
         break;
     case 2:
         type = "playback";
@@ -651,12 +674,14 @@ int newinputstereo(const struct oscnode *path[], const char *addr, int reg, int 
 
     // Update both channels of the stereo pair
     input = get_input_state(idx);
-    if (input) {
+    if (input)
+    {
         input->stereo = val != 0;
     }
 
     input = get_input_state(idx + 1);
-    if (input) {
+    if (input)
+    {
         input->stereo = val != 0;
     }
 
@@ -679,12 +704,14 @@ int newoutputstereo(const struct oscnode *path[], const char *addr, int reg, int
 
     // Update both channels of the stereo pair
     output = get_output_state(idx);
-    if (output) {
+    if (output)
+    {
         output->stereo = val != 0;
     }
 
     output = get_output_state(idx + 1);
-    if (output) {
+    if (output)
+    {
         output->stereo = val != 0;
     }
 
@@ -895,7 +922,7 @@ int newdurecstatus(const struct oscnode *path[], const char *addr, int reg, int 
     set_durec_state(status, position, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
 
     // Send status as both string and integer
-    if (status >= 0 && status < sizeof(names)/sizeof(names[0]) && names[status])
+    if (status >= 0 && status < sizeof(names) / sizeof(names[0]) && names[status])
         oscsend(addr, ",s", names[status]);
     else
         oscsend(addr, ",s", "Unknown");

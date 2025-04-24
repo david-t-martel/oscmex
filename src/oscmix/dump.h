@@ -1,3 +1,8 @@
+/**
+ * @file dump.h
+ * @brief Functions for dumping OSCMix device state for debugging and configuration
+ */
+
 #ifndef DUMP_H
 #define DUMP_H
 
@@ -6,6 +11,9 @@
 
 /**
  * @brief Dumps the current device state to the console
+ *
+ * This function is called when an OSC message with address "/dump" is received.
+ * It prints a detailed report of the current device state to stdout.
  */
 void dump(void);
 
@@ -25,5 +33,10 @@ int dumpState(const struct device *dev, const struct devicestate *state);
  * @return 0 on success, non-zero on failure
  */
 int dumpConfig(void);
+
+/**
+ * @brief Outputs the detailed device state to console
+ */
+void dumpDeviceState(void);
 
 #endif /* DUMP_H */

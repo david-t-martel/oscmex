@@ -1,4 +1,12 @@
-/* SPDX-License-Identifier: Unlicense */
+/**
+ * @file intpack.h
+ * @brief Platform-independent functions for packing and unpacking integers
+ *
+ * This file provides functions for converting between host byte order and
+ * network byte order (big-endian) or little-endian formats. These functions
+ * are used for cross-platform binary data serialization.
+ */
+
 #ifndef INTPACK_H
 #define INTPACK_H
 
