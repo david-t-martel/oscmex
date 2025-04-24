@@ -7,6 +7,7 @@
 #include "oscmix_commands.h"
 #include "oscmix_midi.h"
 #include "device.h"
+#include "platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
