@@ -235,6 +235,24 @@ int main(int argc, char *argv[])
     const char *port;
     int result;
 
+    // Initialize logging early
+    char log_filename[512];
+    if (log_create_filename(log_filename, sizeof(log_filename), "oscmix") != 0)
+    {
+        fprintf(stderr, "Failed to create log filename\n");
+        return 1;
+    }
+
+    result = log_init(log_filename, argc > 1 && strcmp(argv[1], "--debug") == 0, NULL);
+    if (result != 0)
+    {
+        fprintf(stderr, "Failed to initialize logging system\n");
+        return 1;
+    }
+
+    log_info("OSCMix v%s starting up", VERSION);
+    log_info("Log file: %s", log_filename);
+
     // Initialize socket subsystem
     if (platform_socket_init() != 0)
     {
@@ -392,5 +410,7 @@ int main(int argc, char *argv[])
     platform_socket_close(wfd);
     platform_socket_cleanup();
 
+    // Before exiting:
+    log_cleanup();
     return 0;
 }

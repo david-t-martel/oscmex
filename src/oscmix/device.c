@@ -1,8 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include "device.h"
 #include "platform.h"
+#include "logging.h"
 
 /* Global variable to track the current device */
 const struct device *cur_device = NULL;
@@ -11,6 +13,9 @@ const struct device *cur_device = NULL;
 extern const struct device ffucxii;
 extern const struct device ff802;
 extern const struct device ufxii;
+
+/* Define sample rate count */
+#define SAMPLE_RATE_COUNT 10
 
 /* Enumeration names */
 const char *const CLOCK_SOURCE_NAMES[] = {
@@ -102,14 +107,17 @@ static const struct outputinfo ffucxii_outputs[] = {
 
 /* Device definitions */
 static const struct device ffucxii = {
-    .id = "FFUCXII",
     .name = "Fireface UCX II",
-    .version = 1,
+    .inputslen = sizeof(ffucxii_inputs) / sizeof(ffucxii_inputs[0]),
+    .outputslen = sizeof(ffucxii_outputs) / sizeof(ffucxii_outputs[0]),
+    .playbacklen = 18, /* 18 playback channels */
+    .mixerlen = 18,    /* 18 mixer channels */
     .flags = DEVICE_DUREC,
     .inputs = ffucxii_inputs,
-    .inputslen = sizeof(ffucxii_inputs) / sizeof(ffucxii_inputs[0]),
-    .outputs = ffucxii_outputs,
-    .outputslen = sizeof(ffucxii_outputs) / sizeof(ffucxii_outputs[0])};
+    .outputs = ffucxii_outputs};
+
+/* Forward declaration for device state cleanup function */
+void cleanupDeviceState(void);
 
 /* Known devices array */
 static const struct device *known_devices[] = {
@@ -129,6 +137,7 @@ int device_init(const char *name)
     {
         /* Default to first device if none specified */
         cur_device = &ffucxii;
+        log_info("Initialized default device: %s", ffucxii.name);
         return 0;
     }
 
@@ -137,6 +146,7 @@ int device_init(const char *name)
         strcmp(name, "ucxii") == 0)
     {
         cur_device = &ffucxii;
+        log_info("Initialized device: %s", ffucxii.name);
         return 0;
     }
 
@@ -155,6 +165,7 @@ int device_init(const char *name)
     }
 
     /* Unknown device */
+    log_error("Unknown device name: %s", name);
     return -1;
 }
 
@@ -163,6 +174,8 @@ int device_init(const char *name)
  */
 void device_cleanup(void)
 {
+    log_info("Cleaning up device resources");
+
     if (volumes)
     {
         for (int i = 0; cur_device && i < cur_device->inputslen; i++)
@@ -205,6 +218,7 @@ void device_cleanup(void)
     cleanupDeviceState();
 
     cur_device = NULL;
+    log_debug("Device cleanup complete");
 }
 
 /**
@@ -221,6 +235,18 @@ const struct device *get_current_device(void)
 const struct device *getDevice(void)
 {
     return cur_device;
+}
+
+/* Forward declaration for device state functions */
+int set_dsp_state(int version, int load);
+int set_durec_state(int status, int position, int time, int usb_errors, int usb_load,
+                    float total_space, float free_space, int file, int record_time,
+                    int prev, int next, int playmode);
+
+/* Placeholder for device state functions */
+void cleanupDeviceState(void)
+{
+    /* Implementation to be provided */
 }
 
 int load_device_config(const char *device_id, struct devicestate *state)
@@ -257,6 +283,15 @@ int update_dsp_status(uint16_t reg_value)
 }
 
 /**
+ * @brief Set DSP state
+ */
+int set_dsp_state(int version, int load)
+{
+    /* Implementation to be provided */
+    return 0;
+}
+
+/**
  * @brief Update DURec status from register value
  * @param reg_value The raw register value
  * @return 0 on success, non-zero on failure
@@ -269,6 +304,17 @@ int update_durec_status(uint16_t reg_value)
     // Update internal state
     set_durec_state(status, position, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
 
+    return 0;
+}
+
+/**
+ * @brief Set DURec state
+ */
+int set_durec_state(int status, int position, int time, int usb_errors, int usb_load,
+                    float total_space, float free_space, int file, int record_time,
+                    int prev, int next, int playmode)
+{
+    /* Implementation to be provided */
     return 0;
 }
 
@@ -378,4 +424,29 @@ int refreshing_state(int new_state)
     return is_refreshing;
 }
 
-// Additional parameter update functions...
+/**
+ * @brief Update sample rate
+ */
+int update_sample_rate(int val)
+{
+    /* Implementation to be provided */
+    return 0;
+}
+
+/**
+ * @brief Update input parameter
+ */
+int update_input_parameter(int channel, int param, int val)
+{
+    /* Implementation to be provided */
+    return 0;
+}
+
+/**
+ * @brief Set DURec files length
+ */
+int set_durec_files_length(int length)
+{
+    /* Implementation to be provided */
+    return 0;
+}

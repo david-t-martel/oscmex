@@ -246,6 +246,38 @@ int platform_thread_join(platform_thread_t thread);
  */
 void platform_sleep_ms(unsigned long ms);
 
+/**
+ * @brief Initialize a mutex
+ *
+ * @param mutex Pointer to the mutex to initialize
+ * @return 0 on success, non-zero on failure
+ */
+int platform_mutex_init(platform_mutex_t *mutex);
+
+/**
+ * @brief Destroy a mutex
+ *
+ * @param mutex Pointer to the mutex to destroy
+ * @return 0 on success, non-zero on failure
+ */
+int platform_mutex_destroy(platform_mutex_t *mutex);
+
+/**
+ * @brief Lock a mutex
+ *
+ * @param mutex Pointer to the mutex to lock
+ * @return 0 on success, non-zero on failure
+ */
+int platform_mutex_lock(platform_mutex_t *mutex);
+
+/**
+ * @brief Unlock a mutex
+ *
+ * @param mutex Pointer to the mutex to unlock
+ * @return 0 on success, non-zero on failure
+ */
+int platform_mutex_unlock(platform_mutex_t *mutex);
+
 /* Signal handling functions */
 
 /**

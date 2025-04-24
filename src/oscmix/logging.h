@@ -2,6 +2,7 @@
 #define LOGGING_H
 
 #include <stdarg.h>
+#include "platform.h" // Include platform.h for mutex type
 
 // Log levels
 typedef enum
@@ -28,6 +29,28 @@ int log_init(const char *filename, int debug_enabled, void (*gui_callback)(log_l
 void log_cleanup(void);
 
 /**
+ * @brief Set the log level
+ *
+ * @param level Maximum level to log
+ */
+void log_set_level(log_level_t level);
+
+/**
+ * @brief Get the current log level
+ *
+ * @return Current log level
+ */
+log_level_t log_get_level(void);
+
+/**
+ * @brief Enable or disable debug logging
+ *
+ * @param enabled 1 to enable, 0 to disable
+ * @return Previous state
+ */
+int log_set_debug(int enabled);
+
+/**
  * @brief Log a message
  *
  * @param level The log level
@@ -35,6 +58,15 @@ void log_cleanup(void);
  * @param ... Format arguments
  */
 void log_message(log_level_t level, const char *fmt, ...);
+
+/**
+ * @brief Log a message with a va_list
+ *
+ * @param level The log level
+ * @param fmt Printf-style format string
+ * @param args Variable argument list
+ */
+void log_message_v(log_level_t level, const char *fmt, va_list args);
 
 // Convenience macros
 #define log_error(fmt, ...) log_message(LOG_ERROR, fmt, ##__VA_ARGS__)
@@ -50,5 +82,30 @@ void log_message(log_level_t level, const char *fmt, ...);
  * @return Number of messages retrieved
  */
 int log_get_recent(const char **messages, int max_messages);
+
+/**
+ * @brief Clear the log history buffer
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int log_clear_history(void);
+
+/**
+ * @brief Set a custom log file
+ *
+ * @param filename Path to log file (NULL to close current file)
+ * @return 0 on success, non-zero on failure
+ */
+int log_set_file(const char *filename);
+
+/**
+ * @brief Create a valid log filename using platform functions
+ *
+ * @param buffer Buffer to store the filename
+ * @param size Size of the buffer
+ * @param prefix Optional prefix for the log filename
+ * @return 0 on success, non-zero on failure
+ */
+int log_create_filename(char *buffer, size_t size, const char *prefix);
 
 #endif /* LOGGING_H */

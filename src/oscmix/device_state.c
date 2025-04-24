@@ -17,6 +17,7 @@
 #include "oscmix.h"
 #include "dump.h"             // Include dump.h for dumping functions
 #include "device_observers.h" // Include the device observers header
+#include "logging.h"
 
 /* External variables from device.c */
 extern const struct device *cur_device;

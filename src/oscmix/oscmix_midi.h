@@ -147,46 +147,6 @@ int get_observer_status(bool *dsp_active, bool *durec_active, bool *samplerate_a
 void send_full_device_state(void);
 
 /**
- * @brief Add a log message to the log buffer
- *
- * @param format Format string followed by arguments (printf style)
- * @param ... Variable arguments
- */
-void log_add(const char *format, ...);
-
-/**
- * @brief Log error message
- *
- * @param format Format string followed by arguments (printf style)
- * @param ... Variable arguments
- */
-void log_error(const char *format, ...);
-
-/**
- * @brief Log warning message
- *
- * @param format Format string followed by arguments (printf style)
- * @param ... Variable arguments
- */
-void log_warning(const char *format, ...);
-
-/**
- * @brief Log info message
- *
- * @param format Format string followed by arguments (printf style)
- * @param ... Variable arguments
- */
-void log_info(const char *format, ...);
-
-/**
- * @brief Get recent log messages
- *
- * @param max_messages Maximum number of messages to retrieve
- * @return Array of strings containing log messages (NULL-terminated)
- */
-const char **log_get_recent(int max_messages);
-
-/**
  * @brief Set the last error information
  *
  * @param code Error code

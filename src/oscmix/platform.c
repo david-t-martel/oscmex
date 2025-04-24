@@ -897,3 +897,48 @@ int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_
     return -1;
 }
 #endif
+
+/* Mutex functions */
+
+int platform_mutex_init(platform_mutex_t *mutex)
+{
+#if defined(PLATFORM_WINDOWS)
+    *mutex = CreateMutex(NULL, FALSE, NULL);
+    return (*mutex == NULL) ? -1 : 0;
+#else
+    return pthread_mutex_init(mutex, NULL);
+#endif
+}
+
+int platform_mutex_destroy(platform_mutex_t *mutex)
+{
+#if defined(PLATFORM_WINDOWS)
+    if (*mutex != NULL)
+    {
+        CloseHandle(*mutex);
+        *mutex = NULL;
+    }
+    return 0;
+#else
+    return pthread_mutex_destroy(mutex);
+#endif
+}
+
+int platform_mutex_lock(platform_mutex_t *mutex)
+{
+#if defined(PLATFORM_WINDOWS)
+    DWORD result = WaitForSingleObject(*mutex, INFINITE);
+    return (result == WAIT_OBJECT_0 || result == WAIT_ABANDONED) ? 0 : -1;
+#else
+    return pthread_mutex_lock(mutex);
+#endif
+}
+
+int platform_mutex_unlock(platform_mutex_t *mutex)
+{
+#if defined(PLATFORM_WINDOWS)
+    return ReleaseMutex(*mutex) ? 0 : -1;
+#else
+    return pthread_mutex_unlock(mutex);
+#endif
+}

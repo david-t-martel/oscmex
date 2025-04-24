@@ -10,6 +10,7 @@
 #include "oscmix.h"
 #include "sysex.h"
 #include "osc.h"
+#include "logging.h" // Include the new logging header
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,12 +33,6 @@ int samplerate_observer_count = 0;
 int input_observer_count = 0;
 int output_observer_count = 0;
 int mixer_observer_count = 0;
-
-/* Log buffer */
-#define MAX_LOG_ENTRIES 100
-static char *log_entries[MAX_LOG_ENTRIES];
-static int log_entry_count = 0;
-static int log_entry_index = 0;
 
 /**
  * @brief Writes a SysEx message to the device
@@ -76,7 +71,7 @@ int setreg(unsigned reg, unsigned val)
     static unsigned char sysexbuf[16];
 
 #ifdef DEBUG
-    fprintf(stderr, "Setting register 0x%04x = 0x%04x\n", reg, val);
+    log_debug("Setting register 0x%04x = 0x%04x", reg, val);
 #endif
 
     // Handle special case commands (loopback, EQD, etc.)
@@ -1447,9 +1442,58 @@ void send_full_device_state(void)
         oscsend("/durec/position", ",i", position);
     }
 
-    // Continue with the rest of the implementation
-    // Note: Ensure any calls to get_input_state and get_output_state
-    // are updated to use the renamed functions
+    // Get the device information
+    const struct device *device = getDevice();
+    if (!device)
+    {
+        log_error("No device available to send state");
+        return; // Return a value here instead of void expression
+    }
+
+    // Send all input states
+    for (int i = 0; i < device->inputslen; i++)
+    {
+        float gain = 0.0f;
+        bool phantom = false, hiz = false, mute = false;
+
+        if (get_input_params(i, &gain, &phantom, &hiz, &mute) == 0)
+        {
+            char addr[256];
+
+            snprintf(addr, sizeof(addr), "/input/%d/gain", i);
+            oscsend(addr, ",f", gain);
+
+            snprintf(addr, sizeof(addr), "/input/%d/phantom", i);
+            oscsend(addr, ",i", phantom ? 1 : 0);
+
+            snprintf(addr, sizeof(addr), "/input/%d/hiz", i);
+            oscsend(addr, ",i", hiz ? 1 : 0);
+
+            snprintf(addr, sizeof(addr), "/input/%d/mute", i);
+            oscsend(addr, ",i", mute ? 1 : 0);
+        }
+    }
+
+    // Send all output states
+    for (int i = 0; i < device->outputslen; i++)
+    {
+        float volume = 0.0f;
+        bool mute = false;
+
+        if (get_output_params(i, &volume, &mute) == 0)
+        {
+            char addr[256];
+
+            snprintf(addr, sizeof(addr), "/output/%d/volume", i);
+            oscsend(addr, ",f", volume);
+
+            snprintf(addr, sizeof(addr), "/output/%d/mute", i);
+            oscsend(addr, ",i", mute ? 1 : 0);
+        }
+    }
+
+    // Flush the OSC message queue
+    oscflush();
 }
 
 /**
@@ -1521,70 +1565,6 @@ int get_observer_status(bool *dsp_active, bool *durec_active, bool *samplerate_a
     return count;
 }
 
-/**
- * @brief Add a log message to the log buffer
- */
-void log_add(const char *format, ...)
-{
-    va_list args;
-    char buffer[512];
-
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    // Free previous log entry if it exists
-    if (log_entries[log_entry_index])
-    {
-        free(log_entries[log_entry_index]);
-    }
-
-    // Store new log entry
-    log_entries[log_entry_index] = strdup(buffer);
-
-    // Update index and count
-    log_entry_index = (log_entry_index + 1) % MAX_LOG_ENTRIES;
-    if (log_entry_count < MAX_LOG_ENTRIES)
-    {
-        log_entry_count++;
-    }
-}
-
-/**
- * @brief Get recent log messages
- */
-const char **log_get_recent(int max_messages)
-{
-    static const char *recent_logs[MAX_LOG_ENTRIES + 1]; // +1 for NULL terminator
-    int i, count;
-
-    if (max_messages > log_entry_count)
-    {
-        max_messages = log_entry_count;
-    }
-
-    if (max_messages > MAX_LOG_ENTRIES)
-    {
-        max_messages = MAX_LOG_ENTRIES;
-    }
-
-    // Fill the recent logs array
-    count = 0;
-    for (i = 0; i < max_messages; i++)
-    {
-        int idx = (log_entry_index - 1 - i + MAX_LOG_ENTRIES) % MAX_LOG_ENTRIES;
-        if (log_entries[idx])
-        {
-            recent_logs[count++] = log_entries[idx];
-        }
-    }
-
-    // NULL terminate the array
-    recent_logs[count] = NULL;
-
-    return recent_logs;
-}
-
 /* Error handling */
 static int last_error_code = 0;
 static char last_error_context[128] = {0};
@@ -1612,8 +1592,12 @@ void set_last_error(int code, const char *context, const char *format, ...)
     vsnprintf(last_error_message, sizeof(last_error_message), format, args);
     va_end(args);
 
-    // Also add to log
-    log_add("ERROR: %s - %s", last_error_context, last_error_message);
+    // Use the platform logging system
+    char full_message[512];
+    snprintf(full_message, sizeof(full_message), "%s - %s",
+             last_error_context[0] ? last_error_context : "Unknown context",
+             last_error_message);
+    log_error("%s", full_message);
 }
 
 /**
@@ -1633,42 +1617,6 @@ const char *get_last_error(int *code, char *context, size_t context_size)
     }
 
     return last_error_message;
-}
-
-void log_error(const char *format, ...)
-{
-    va_list args;
-    char buffer[512];
-
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    log_add("ERROR: %s", buffer);
-}
-
-void log_warning(const char *format, ...)
-{
-    va_list args;
-    char buffer[512];
-
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    log_add("WARNING: %s", buffer);
-}
-
-void log_info(const char *format, ...)
-{
-    va_list args;
-    char buffer[512];
-
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    log_add("INFO: %s", buffer);
 }
 
 // Fix the refresh state function to return an int
