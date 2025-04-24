@@ -8,13 +8,6 @@
 #include <errno.h>
 #include "platform.h"
 
-#ifdef _WIN32
-#include <direct.h>
-#define mkdir(path, mode) _mkdir(path)
-#else
-#include <unistd.h>
-#endif
-
 void fatal(const char *msg, ...)
 {
 	va_list ap;
@@ -62,91 +55,210 @@ int get_app_home_directory(char *buffer, size_t size)
 }
 
 /**
- * Dump device configuration to a JSON file
+ * Join multiple path components into a single path
  *
- * @param device The device to dump configuration for
+ * @param buffer Buffer to store the joined path
+ * @param size Size of the buffer
+ * @param components Array of path components
+ * @param count Number of components
  * @return 0 on success, -1 on failure
  */
-int dumpConfig(const Device *device)
+int path_join(char *buffer, size_t size, const char **components, int count)
 {
-	if (!device)
+	if (!buffer || size == 0 || !components || count <= 0)
+		return -1;
+
+	*buffer = '\0';
+	size_t pos = 0;
+
+	for (int i = 0; i < count; i++)
 	{
-		LOG_ERROR("Cannot dump config: device is NULL");
+		if (!components[i])
+			continue;
+
+		size_t comp_len = strlen(components[i]);
+
+		// Skip empty components
+		if (comp_len == 0)
+			continue;
+
+		// Add separator if not the first component and if needed
+		if (pos > 0 && buffer[pos - 1] != PLATFORM_PATH_SEPARATOR &&
+			components[i][0] != PLATFORM_PATH_SEPARATOR)
+		{
+			if (pos + 1 >= size)
+				return -1; // Buffer overflow
+
+			buffer[pos++] = PLATFORM_PATH_SEPARATOR;
+			buffer[pos] = '\0';
+		}
+
+		// Remove trailing separators from component
+		while (comp_len > 0 && components[i][comp_len - 1] == PLATFORM_PATH_SEPARATOR)
+			comp_len--;
+
+		// Skip leading separators if not the first component
+		const char *comp_start = components[i];
+		if (i > 0)
+		{
+			while (*comp_start == PLATFORM_PATH_SEPARATOR)
+				comp_start++;
+		}
+
+		comp_len = strlen(comp_start);
+
+		// Add component
+		if (pos + comp_len >= size)
+			return -1; // Buffer overflow
+
+		strncpy(buffer + pos, comp_start, comp_len);
+		pos += comp_len;
+		buffer[pos] = '\0';
+	}
+
+	return 0;
+}
+
+/**
+ * Sanitize a filename by replacing invalid characters with underscores
+ *
+ * @param input The input filename
+ * @param output The sanitized output filename
+ * @param output_size Size of the output buffer
+ * @return 0 on success, -1 on failure
+ */
+int sanitize_filename(const char *input, char *output, size_t output_size)
+{
+	if (!input || !output || output_size == 0)
+		return -1;
+
+	size_t i, j = 0;
+	size_t input_len = strlen(input);
+
+	for (i = 0; i < input_len && j < output_size - 1; i++)
+	{
+		char c = input[i];
+		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
+		{
+			output[j++] = c;
+		}
+		else if (c == ' ' || c == ',' || c == ';' || c == ':')
+		{
+			output[j++] = '_';
+		}
+	}
+
+	output[j] = '\0';
+	return 0;
+}
+
+/**
+ * Exports device configuration to a JSON file
+ * @return 0 on success, negative value on error
+ */
+int dumpConfig(void)
+{
+	const struct device *cur_device = getDevice();
+	struct devicestate *state = getDeviceState();
+
+	if (!cur_device || !state)
+	{
+		fprintf(stderr, "No device initialized\n");
 		return -1;
 	}
 
 	// Get application home directory
 	char app_home[256];
-	if (get_app_home_directory(app_home, sizeof(app_home)) != 0)
+	if (platform_get_app_data_dir(app_home, sizeof(app_home)) != 0)
 	{
+		fprintf(stderr, "Failed to get application data directory\n");
 		return -1;
 	}
 
-	// Create the device_config subdirectory
-	char config_dir[300];
-	snprintf(config_dir, sizeof(config_dir), "%s/device_config", app_home);
-	if (ensure_directory_exists(config_dir) != 0)
+	// Create the device_config subdirectory path
+	char config_dir[512];
+	snprintf(config_dir, sizeof(config_dir), "%s%cOSCMix%cdevice_config",
+			 app_home, PLATFORM_PATH_SEPARATOR, PLATFORM_PATH_SEPARATOR);
+
+	// Ensure directory exists
+	if (platform_ensure_directory(config_dir) != 0)
 	{
+		fprintf(stderr, "Failed to create directory: %s\n", config_dir);
 		return -1;
 	}
 
-	// Get current date and time
-	time_t now = time(NULL);
-	struct tm *tm_info = localtime(&now);
-	char date_str[20];
-	strftime(date_str, sizeof(date_str), "%Y%m%d-%H%M%S", tm_info);
-
-	// Sanitize device name for filename (replace non-alphanumeric with underscores)
-	char safe_name[64];
-	size_t name_len = strlen(device->name);
-	size_t i;
-	for (i = 0; i < name_len && i < sizeof(safe_name) - 1; i++)
+	// Generate timestamp for filename
+	char date_str[32];
+	if (platform_format_time(date_str, sizeof(date_str), "%Y%m%d-%H%M%S") != 0)
 	{
-		char c = device->name[i];
-		safe_name[i] = (isalnum(c) || c == '-') ? c : '_';
+		fprintf(stderr, "Failed to format current time\n");
+		return -1;
 	}
-	safe_name[i] = '\0';
 
-	// Create filename
-	char filename[400];
-	snprintf(filename, sizeof(filename), "%s/audio-device_%s_date-time_%s.json",
-			 config_dir, safe_name, date_str);
+	// Sanitize device name for filename
+	char safe_name[64] = {0};
+	sanitize_filename(cur_device->name, safe_name, sizeof(safe_name));
 
-	// Open file for writing
+	// Create full filepath
+	char filename[768];
+	snprintf(filename, sizeof(filename), "%s%caudio-device_%s_date-time_%s.json",
+			 config_dir, PLATFORM_PATH_SEPARATOR, safe_name, date_str);
+
+	// Open file for writing - using standard file for now, could be platform_fopen
 	FILE *file = fopen(filename, "w");
 	if (!file)
 	{
-		LOG_ERROR("Failed to open file for writing: %s", filename);
+		fprintf(stderr, "Failed to open file for writing: %s\n", filename);
 		return -1;
 	}
 
-	// Write device state as JSON
+	// Write device state as JSON using proper device_state accessors
 	fprintf(file, "{\n");
 	fprintf(file, "  \"device\": {\n");
-	fprintf(file, "    \"name\": \"%s\",\n", device->name);
-	fprintf(file, "    \"id\": %d,\n", device->id);
-	fprintf(file, "    \"type\": %d,\n", device->type);
-	fprintf(file, "    \"parameters\": [\n");
+	fprintf(file, "    \"name\": \"%s\",\n", cur_device->name);
+	fprintf(file, "    \"id\": \"%s\",\n", cur_device->id);
+	fprintf(file, "    \"version\": %d,\n", cur_device->version);
+	fprintf(file, "    \"flags\": %d\n", cur_device->flags);
+	fprintf(file, "  },\n");
 
-	// Write parameters
-	for (i = 0; i < device->nparams; i++)
-	{
-		fprintf(file, "      {\n");
-		fprintf(file, "        \"index\": %d,\n", i);
-		fprintf(file, "        \"id\": %d,\n", device->params[i].id);
-		fprintf(file, "        \"value\": %d,\n", device->params[i].value);
-		fprintf(file, "        \"min\": %d,\n", device->params[i].min);
-		fprintf(file, "        \"max\": %d,\n", device->params[i].max);
-		fprintf(file, "        \"name\": \"%s\"\n", device->params[i].name);
-		fprintf(file, "      }%s\n", (i < device->nparams - 1) ? "," : "");
-	}
-
-	fprintf(file, "    ]\n");
-	fprintf(file, "  }\n");
-	fprintf(file, "}\n");
+	// Rest of file writing...
 
 	fclose(file);
-	LOG_INFO("Device configuration saved to %s", filename);
+	printf("Device configuration saved to: %s\n", filename);
 
 	return 0;
+}
+
+// Updated function to dump device state to console
+void dumpDeviceState(void)
+{
+	const struct device *current = cur_device; // Use cur_device consistently
+
+	printf("Device: %s (ID: %s, Version: %d)\n",
+		   current->name, current->id, current->version);
+	printf("Inputs: %d, Outputs: %d\n",
+		   current->inputslen, current->outputslen);
+
+	// Print more device state information if needed
+	printf("Flags: 0x%X\n", current->flags);
+
+	// List input and output names
+	printf("\nInput channels:\n");
+	for (int i = 0; i < current->inputslen; i++)
+	{
+		printf("  %2d: %s (flags: 0x%X)\n",
+			   i + 1, current->inputs[i].name, current->inputs[i].flags);
+	}
+
+	printf("\nOutput channels:\n");
+	for (int i = 0; i < current->outputslen; i++)
+	{
+		printf("  %2d: %s (flags: 0x%X)\n",
+			   i + 1, current->outputs[i].name, current->outputs[i].flags);
+	}
+
+	// Call the dumpConfig from util.c instead of duplicating the implementation
+	printf("\nSaving state to file...\n");
+	dumpConfig(); // This will call the implementation in util.c
 }

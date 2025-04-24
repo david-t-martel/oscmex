@@ -4,8 +4,10 @@ This document illustrates the core architecture and processing flow of OSCMix, w
 
 ```mermaid
 flowchart TD
-    A[Program Start] --> B[device_init(): Initialize device parameters]
-    B --> C[Initialize channel structures: inputs_init(), playbacks_init(), outputs_init()]
+    A[Program Start] --> A1[platform_init(): Initialize platform-specific services]
+    A1 --> B[device_init(): Initialize device parameters]
+    B --> B1[initDeviceState(): Initialize device state structure]
+    B1 --> C[Initialize channel structures: inputs_init(), playbacks_init(), outputs_init()]
     C --> D[osc_server_init(): Set up OSC message handling]
     D --> E[Main Loop: osc_server_poll() for incoming messages]
     E --> F{Incoming OSC Message?}
@@ -25,7 +27,8 @@ flowchart TD
     I3 --> J
     I4 --> J
     I5 --> J
-    J --> K[oscsend(): Send acknowledgment/notification back to client]
+    J --> J1[Update device_state with new values]
+    J1 --> K[oscsend(): Send acknowledgment/notification back to client]
     K --> E
 
     %% Parameter Query Flow
@@ -51,6 +54,15 @@ flowchart TD
     N -- "/dump" --> P[dump(): Debug function to display internal state]
     P --> E
 
+    N -- "/dump/save" --> P1[dumpConfig(): Save state to JSON file]
+    P1 --> P2[dumpState(): Format device state as JSON]
+    P2 --> P3[platform_get_app_data_dir(): Get platform-specific storage dir]
+    P3 --> P4[platform_ensure_directory(): Create directory if needed]
+    P4 --> P5[platform_format_time(): Create timestamp for filename]
+    P5 --> P6[Write JSON to file]
+    P6 --> P7[Send success/failure notification]
+    P7 --> E
+
     N -- "/sysex" --> Q[writesysex(): Send raw SysEx command to device]
     Q --> E
 
@@ -61,7 +73,8 @@ flowchart TD
     S[MIDI SysEx Response from Device] --> T[handlesysex(): Process device response]
     T --> U{SysEx Message Type}
     U -- Register Values --> V[handleregs(): Update internal state with register values]
-    V --> W[Send OSC notifications for changed parameters]
+    V --> V1[Update device_state with received values]
+    V1 --> W[Send OSC notifications for changed parameters]
     W --> E
 
     U -- Level Meters --> X[handlelevels(): Process level meter data]

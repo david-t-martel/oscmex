@@ -10,14 +10,9 @@
 #ifndef OSCMIX_H
 #define OSCMIX_H
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
-
-// Include our modular component headers
-#include "oscnode_tree.h"
-#include "oscmix_commands.h"
-#include "oscmix_midi.h"
+// Add missing includes
+#include "device_state.h"
+#include "platform.h"
 
 /**
  * @brief Initialize the OSCMix application
@@ -48,7 +43,7 @@ int init(const char *port);
  * @param len      Length of the SysEx message in bytes
  * @param payload  Buffer to store extracted parameter values (must be at least len/4 in size)
  */
-void handlesysex(const unsigned char *buf, size_t len, uint_least32_t *payload);
+void handlesysex(const unsigned char *buf, size_t len, uint32_t *payload);
 
 /**
  * @brief Process incoming OSC messages from the network
@@ -63,7 +58,7 @@ void handlesysex(const unsigned char *buf, size_t len, uint_least32_t *payload);
  *
  * @return 0 on success, non-zero on failure
  */
-int handleosc(const void *buf, size_t len);
+int handleosc(const unsigned char *buf, size_t len);
 
 /**
  * @brief Perform periodic processing like level meter updates
@@ -98,5 +93,22 @@ extern void writemidi(const void *buf, size_t len);
  * @param len  Length of the OSC data in bytes
  */
 extern void writeosc(const void *buf, size_t len);
+
+/**
+ * Dump device state to console
+ */
+void dump(void);
+
+/**
+ * Dump device state to a JSON file
+ * @return 0 on success, non-zero on failure
+ */
+int dumpState(void);
+
+/**
+ * Exports device configuration to a JSON file
+ * @return 0 on success, negative value on error
+ */
+int dumpConfig(void);
 
 #endif /* OSCMIX_H */
