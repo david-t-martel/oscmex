@@ -492,4 +492,173 @@ typedef void (*platform_midi_callback_t)(void *data, size_t len, void *user_data
  */
 int platform_midi_set_callback(platform_midiin_t handle, platform_midi_callback_t callback, void *user_data);
 
+/**
+ * @brief Platform-independent socket type
+ */
+#if defined(PLATFORM_WINDOWS)
+typedef SOCKET platform_socket_t;
+#define PLATFORM_INVALID_SOCKET INVALID_SOCKET
+#define PLATFORM_ECONNREFUSED WSAECONNREFUSED
+#else
+typedef int platform_socket_t;
+#define PLATFORM_INVALID_SOCKET (-1)
+#define PLATFORM_ECONNREFUSED ECONNREFUSED
+#endif
+
+/**
+ * @brief Platform-independent stream type
+ */
+typedef FILE platform_stream_t;
+
+/**
+ * @brief Platform-independent thread type
+ */
+#if defined(PLATFORM_WINDOWS)
+typedef HANDLE platform_thread_t;
+#else
+typedef pthread_t platform_thread_t;
+#endif
+
+/**
+ * @brief Get platform error code
+ *
+ * @return Error code
+ */
+int platform_errno(void);
+
+/**
+ * @brief Get error message string
+ *
+ * @param errnum Error code
+ * @return Error message string
+ */
+const char *platform_strerror(int errnum);
+
+/**
+ * @brief Open a socket
+ *
+ * @param address Address string in the format "udp!host!port"
+ * @param server 1 for server (bind), 0 for client (connect)
+ * @return Socket handle or PLATFORM_INVALID_SOCKET on error
+ */
+platform_socket_t platform_socket_open(const char *address, int server);
+
+/**
+ * @brief Close a socket
+ *
+ * @param sock Socket handle
+ */
+void platform_socket_close(platform_socket_t sock);
+
+/**
+ * @brief Send data on a socket
+ *
+ * @param sock Socket handle
+ * @param buf Data buffer
+ * @param len Data length
+ * @param flags Send flags
+ * @return Number of bytes sent or -1 on error
+ */
+ssize_t platform_socket_send(platform_socket_t sock, const void *buf, size_t len, int flags);
+
+/**
+ * @brief Receive data from a socket
+ *
+ * @param sock Socket handle
+ * @param buf Data buffer
+ * @param len Buffer size
+ * @param flags Receive flags
+ * @return Number of bytes received or -1 on error
+ */
+ssize_t platform_socket_recv(platform_socket_t sock, void *buf, size_t len, int flags);
+
+/**
+ * @brief Get standard input stream
+ *
+ * @return Standard input stream
+ */
+platform_stream_t *platform_get_stdin(void);
+
+/**
+ * @brief Get standard output stream
+ *
+ * @return Standard output stream
+ */
+platform_stream_t *platform_get_stdout(void);
+
+/**
+ * @brief Read line from stream
+ *
+ * @param buf Buffer to read into
+ * @param size Buffer size
+ * @param stream Input stream
+ * @return Buffer pointer or NULL on error or EOF
+ */
+char *platform_gets(char *buf, size_t size, platform_stream_t *stream);
+
+/**
+ * @brief Write formatted string to stream
+ *
+ * @param stream Output stream
+ * @param format Format string
+ * @param ... Format arguments
+ * @return Number of characters written or negative on error
+ */
+int platform_printf(platform_stream_t *stream, const char *format, ...);
+
+/**
+ * @brief Write data to stream
+ *
+ * @param buf Data buffer
+ * @param size Data size
+ * @param stream Output stream
+ * @return Number of items written
+ */
+size_t platform_write(const void *buf, size_t size, platform_stream_t *stream);
+
+/**
+ * @brief Read data from stream
+ *
+ * @param buf Buffer to read into
+ * @param size Item size
+ * @param stream Input stream
+ * @return Number of items read
+ */
+size_t platform_read(void *buf, size_t size, platform_stream_t *stream);
+
+/**
+ * @brief Flush stream output
+ *
+ * @param stream Output stream
+ * @return 0 on success, non-zero on failure
+ */
+int platform_flush(platform_stream_t *stream);
+
+/**
+ * @brief Check if stream has error
+ *
+ * @param stream Stream to check
+ * @return Non-zero if error, 0 otherwise
+ */
+int platform_error(platform_stream_t *stream);
+
+/**
+ * @brief Create a thread
+ *
+ * @param thread Pointer to thread handle
+ * @param start_routine Thread entry point
+ * @param arg Thread argument
+ * @return 0 on success, error code on failure
+ */
+int platform_thread_create(platform_thread_t *thread, void *(*start_routine)(void *), void *arg);
+
+/**
+ * @brief Join a thread
+ *
+ * @param thread Thread handle
+ * @param retval Pointer to store return value
+ * @return 0 on success, error code on failure
+ */
+int platform_thread_join(platform_thread_t thread, void **retval);
+
 #endif /* PLATFORM_H */

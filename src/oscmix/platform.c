@@ -942,3 +942,368 @@ int platform_mutex_unlock(platform_mutex_t *mutex)
     return pthread_mutex_unlock(mutex);
 #endif
 }
+
+/**
+ * @brief Get platform error code
+ *
+ * @return Error code
+ */
+int platform_errno(void)
+{
+#if defined(PLATFORM_WINDOWS)
+    return WSAGetLastError();
+#else
+    return errno;
+#endif
+}
+
+/**
+ * @brief Get error message string
+ *
+ * @param errnum Error code
+ * @return Error message string
+ */
+const char *platform_strerror(int errnum)
+{
+#if defined(PLATFORM_WINDOWS)
+    static char buf[256];
+
+    FormatMessageA(
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        errnum,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        buf,
+        sizeof(buf),
+        NULL);
+
+    // Remove trailing newlines/carriage returns
+    char *p = buf + strlen(buf) - 1;
+    while (p >= buf && (*p == '\r' || *p == '\n'))
+        *p-- = '\0';
+
+    return buf;
+#else
+    return strerror(errnum);
+#endif
+}
+
+/**
+ * @brief Open a socket
+ *
+ * @param address Address string in the format "udp!host!port"
+ * @param server 1 for server (bind), 0 for client (connect)
+ * @return Socket handle or PLATFORM_INVALID_SOCKET on error
+ */
+platform_socket_t platform_socket_open(const char *address, int server)
+{
+    char proto[16], host[256], *port_str;
+    int port, ret;
+    struct sockaddr_in addr;
+    platform_socket_t sock = PLATFORM_INVALID_SOCKET;
+
+    // Initialize socket system if needed
+    static int socket_initialized = 0;
+    if (!socket_initialized)
+    {
+        platform_socket_init();
+        socket_initialized = 1;
+    }
+
+    // Parse the address string (format: "udp!host!port")
+    if (sscanf(address, "%15[^!]!%255[^!]!%ms", proto, host, &port_str) != 3)
+    {
+        log_error("Invalid address format: %s (expected proto!host!port)", address);
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    port = atoi(port_str);
+    free(port_str);
+
+    // Only UDP is supported for now
+    if (strcmp(proto, "udp") != 0)
+    {
+        log_error("Unsupported protocol: %s (only udp is supported)", proto);
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    // Create socket
+    sock = platform_socket_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock == PLATFORM_INVALID_SOCKET)
+    {
+        log_error("Failed to create socket: %s", platform_strerror(platform_errno()));
+        return PLATFORM_INVALID_SOCKET;
+    }
+
+    // Set up address structure
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    if (server)
+    {
+        // For server (receiver), bind to the port
+        int optval = 1;
+
+        // Allow address reuse
+        if (platform_socket_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+                                       (const char *)&optval, sizeof(optval)) != 0)
+        {
+            log_warning("Failed to set SO_REUSEADDR: %s", platform_strerror(platform_errno()));
+        }
+
+        // Check if this is a multicast address
+        if (strncmp(host, "224.", 4) == 0 || strncmp(host, "239.", 4) == 0)
+        {
+            struct ip_mreq mreq;
+
+            // Set up the multicast group
+            mreq.imr_multiaddr.s_addr = inet_addr(host);
+            mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+            // Join the multicast group
+            if (platform_socket_setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+                                           (const char *)&mreq, sizeof(mreq)) != 0)
+            {
+                log_error("Failed to join multicast group: %s", platform_strerror(platform_errno()));
+                platform_socket_close(sock);
+                return PLATFORM_INVALID_SOCKET;
+            }
+
+            log_info("Joined multicast group: %s", host);
+            addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        }
+        else if (strcmp(host, "0.0.0.0") == 0 || strcmp(host, "*") == 0)
+        {
+            // Bind to all interfaces
+            addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        }
+        else
+        {
+            // Bind to specific interface
+            addr.sin_addr.s_addr = inet_addr(host);
+        }
+
+        // Bind to the address
+        if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+        {
+            log_error("Failed to bind socket: %s", platform_strerror(platform_errno()));
+            platform_socket_close(sock);
+            return PLATFORM_INVALID_SOCKET;
+        }
+
+        log_info("Socket bound to %s:%d", host, port);
+    }
+    else
+    {
+        // For client (sender), connect to the destination
+        addr.sin_addr.s_addr = inet_addr(host);
+
+        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+        {
+            log_error("Failed to connect socket: %s", platform_strerror(platform_errno()));
+            platform_socket_close(sock);
+            return PLATFORM_INVALID_SOCKET;
+        }
+
+        log_info("Socket connected to %s:%d", host, port);
+    }
+
+    return sock;
+}
+
+/**
+ * @brief Send data on a socket
+ *
+ * @param sock Socket handle
+ * @param buf Data buffer
+ * @param len Data length
+ * @param flags Send flags
+ * @return Number of bytes sent or -1 on error
+ */
+ssize_t platform_socket_send(platform_socket_t sock, const void *buf, size_t len, int flags)
+{
+#if defined(PLATFORM_WINDOWS)
+    return send(sock, (const char *)buf, (int)len, flags);
+#else
+    return send(sock, buf, len, flags);
+#endif
+}
+
+/**
+ * @brief Receive data from a socket
+ *
+ * @param sock Socket handle
+ * @param buf Data buffer
+ * @param len Buffer size
+ * @param flags Receive flags
+ * @return Number of bytes received or -1 on error
+ */
+ssize_t platform_socket_recv(platform_socket_t sock, void *buf, size_t len, int flags)
+{
+#if defined(PLATFORM_WINDOWS)
+    return recv(sock, (char *)buf, (int)len, flags);
+#else
+    return recv(sock, buf, len, flags);
+#endif
+}
+
+/**
+ * @brief Get standard input stream
+ *
+ * @return Standard input stream
+ */
+platform_stream_t *platform_get_stdin(void)
+{
+    return stdin;
+}
+
+/**
+ * @brief Get standard output stream
+ *
+ * @return Standard output stream
+ */
+platform_stream_t *platform_get_stdout(void)
+{
+    return stdout;
+}
+
+/**
+ * @brief Read line from stream
+ *
+ * @param buf Buffer to read into
+ * @param size Buffer size
+ * @param stream Input stream
+ * @return Buffer pointer or NULL on error or EOF
+ */
+char *platform_gets(char *buf, size_t size, platform_stream_t *stream)
+{
+    if (fgets(buf, (int)size, stream) == NULL)
+        return NULL;
+
+    // Remove trailing newline if present
+    size_t len = strlen(buf);
+    if (len > 0 && buf[len - 1] == '\n')
+        buf[len - 1] = '\0';
+
+    return buf;
+}
+
+/**
+ * @brief Write formatted string to stream
+ *
+ * @param stream Output stream
+ * @param format Format string
+ * @param ... Format arguments
+ * @return Number of characters written or negative on error
+ */
+int platform_printf(platform_stream_t *stream, const char *format, ...)
+{
+    va_list args;
+    int ret;
+
+    va_start(args, format);
+    ret = vfprintf(stream, format, args);
+    va_end(args);
+
+    return ret;
+}
+
+/**
+ * @brief Write data to stream
+ *
+ * @param buf Data buffer
+ * @param size Data size
+ * @param stream Output stream
+ * @return Number of items written
+ */
+size_t platform_write(const void *buf, size_t size, platform_stream_t *stream)
+{
+    return fwrite(buf, 1, size, stream);
+}
+
+/**
+ * @brief Read data from stream
+ *
+ * @param buf Buffer to read into
+ * @param size Item size
+ * @param stream Input stream
+ * @return Number of items read
+ */
+size_t platform_read(void *buf, size_t size, platform_stream_t *stream)
+{
+    return fread(buf, 1, size, stream);
+}
+
+/**
+ * @brief Flush stream output
+ *
+ * @param stream Output stream
+ * @return 0 on success, non-zero on failure
+ */
+int platform_flush(platform_stream_t *stream)
+{
+    return fflush(stream);
+}
+
+/**
+ * @brief Check if stream has error
+ *
+ * @param stream Stream to check
+ * @return Non-zero if error, 0 otherwise
+ */
+int platform_error(platform_stream_t *stream)
+{
+    return ferror(stream);
+}
+
+/**
+ * @brief Create a thread
+ *
+ * @param thread Pointer to thread handle
+ * @param start_routine Thread entry point
+ * @param arg Thread argument
+ * @return 0 on success, error code on failure
+ */
+int platform_thread_create(platform_thread_t *thread, void *(*start_routine)(void *), void *arg)
+{
+#if defined(PLATFORM_WINDOWS)
+    unsigned thread_id;
+    *thread = (HANDLE)_beginthreadex(NULL, 0,
+                                     (unsigned(__stdcall *)(void *))start_routine,
+                                     arg, 0, &thread_id);
+    return (*thread == NULL) ? GetLastError() : 0;
+#else
+    return pthread_create(thread, NULL, start_routine, arg);
+#endif
+}
+
+/**
+ * @brief Join a thread
+ *
+ * @param thread Thread handle
+ * @param retval Pointer to store return value
+ * @return 0 on success, error code on failure
+ */
+int platform_thread_join(platform_thread_t thread, void **retval)
+{
+#if defined(PLATFORM_WINDOWS)
+    DWORD result = WaitForSingleObject(thread, INFINITE);
+    if (result != WAIT_OBJECT_0)
+    {
+        return GetLastError();
+    }
+
+    if (retval)
+    {
+        DWORD exit_code;
+        GetExitCodeThread(thread, &exit_code);
+        *retval = (void *)(uintptr_t)exit_code;
+    }
+
+    CloseHandle(thread);
+    return 0;
+#else
+    return pthread_join(thread, retval);
+#endif
+}
