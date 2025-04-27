@@ -1,3 +1,4 @@
+// filepath: c:\codedev\auricleinc\oscmex\src\oscpp\include\osc\OSC.h
 /*
  *  OSCPP - Open Sound Control C++ (OSCPP) Library.
  *  TO DO: Add Exceptions implementation from REQUIREMENTS.md and from SPECIFICATION.md
@@ -18,7 +19,6 @@
 #include "Message.h"
 #include "Bundle.h"
 #include "Address.h"
-#include "AddressImpl.h"
 #include "Server.h"
 #include "ServerThread.h"
 

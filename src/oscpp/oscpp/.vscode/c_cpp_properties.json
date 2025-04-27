@@ -1,0 +1,45 @@
+{
+  "configurations": [
+    {
+      "name": "Win32",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/src/oscpp/oscpp/include",
+        "${workspaceFolder}/src/oscpp/include"
+      ],
+      "defines": ["_DEBUG", "UNICODE", "_UNICODE", "_WIN32"],
+      "windowsSdkVersion": "10.0.19041.0",
+      "compilerPath": "C:/Program Files/LLVM/bin/clang++.exe",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-clang-x64"
+    },
+    {
+      "name": "Linux",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/src/oscpp/oscpp/include",
+        "${workspaceFolder}/src/oscpp/include"
+      ],
+      "defines": ["_DEBUG"],
+      "compilerPath": "/usr/bin/g++",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64"
+    },
+    {
+      "name": "Mac",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/src/oscpp/oscpp/include",
+        "${workspaceFolder}/src/oscpp/include"
+      ],
+      "defines": ["_DEBUG"],
+      "compilerPath": "/usr/bin/clang++",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "macos-clang-x64"
+    }
+  ],
+  "version": 4
+}

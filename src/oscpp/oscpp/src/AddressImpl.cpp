@@ -1,7 +1,7 @@
 #include "AddressImpl.h"
 #include <cstring>
 #include <sstream>
-#include <algorithm>
+#include <regex>
 
 #ifdef _WIN32
 // Define ssize_t for Windows
@@ -22,12 +22,6 @@ namespace osc
     bool AddressImpl::initializeNetworking()
     {
 #ifdef _WIN32
-        // Initialize Winsock
-        WSADATA wsaData;
-        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-        {
-            return false;
-        }
 #endif
 
         networkingInitialized = true;
@@ -38,7 +32,6 @@ namespace osc
     void AddressImpl::cleanupNetworking()
     {
 #ifdef _WIN32
-        WSACleanup();
 #endif
 
         networkingInitialized = false;
@@ -52,16 +45,14 @@ namespace osc
         // Initialize networking subsystem if needed
         if (!networkingInitialized)
         {
-            networkingInitialized = initializeNetworking();
+            initializeNetworking();
         }
 
         // Initialize socket and resolve address
         if (networkingInitialized)
         {
-            if (resolveAddress())
-            {
-                initializeSocket();
-            }
+            resolveAddress();
+            initializeSocket();
         }
     }
 
@@ -77,13 +68,11 @@ namespace osc
         if (socket_ != INVALID_SOCKET_VALUE)
         {
             CLOSE_SOCKET(socket_);
-            socket_ = INVALID_SOCKET_VALUE;
         }
 
         if (addrInfo_)
         {
             freeaddrinfo(addrInfo_);
-            addrInfo_ = nullptr;
         }
     }
 
@@ -100,37 +89,18 @@ namespace osc
         for (addr = addrInfo_; addr != nullptr; addr = addr->ai_next)
         {
             socket_ = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-            if (socket_ == INVALID_SOCKET_VALUE)
+            if (socket_ != INVALID_SOCKET_VALUE)
             {
-                continue;
-            }
-
-            // For TCP, we need to establish a connection
-            if (protocol_ == Protocol::TCP)
-            {
-                if (connect(socket_, addr->ai_addr, addr->ai_addrlen) != SOCKET_ERROR_VALUE)
+                if (bind(socket_, addr->ai_addr, addr->ai_addrlen) == 0)
                 {
-                    connected_ = true;
-                    break;
+                    break; // Successfully bound
                 }
-
                 CLOSE_SOCKET(socket_);
-                socket_ = INVALID_SOCKET_VALUE;
-            }
-            else
-            {
-                // For UDP we're done
-                break;
             }
         }
 
         if (socket_ == INVALID_SOCKET_VALUE)
         {
-#ifdef _WIN32
-            errorCode_ = WSAGetLastError();
-#else
-            errorCode_ = errno;
-#endif
             return false;
         }
 
@@ -156,25 +126,15 @@ namespace osc
             break;
         case Protocol::UNIX:
 #ifdef _WIN32
-            // Windows doesn't support UNIX domain sockets in older versions
-            errorCode_ = WSAEOPNOTSUPP;
-            return false;
 #else
-            hints.ai_family = AF_UNIX;
-            hints.ai_socktype = SOCK_STREAM;
-#endif
             break;
+#endif
         }
 
         // Resolve the address
         int result = getaddrinfo(host_.c_str(), port_.c_str(), &hints, &addrInfo_);
         if (result != 0)
         {
-#ifdef _WIN32
-            errorCode_ = WSAGetLastError();
-#else
-            errorCode_ = result;
-#endif
             return false;
         }
 
@@ -206,18 +166,15 @@ namespace osc
         case Protocol::TCP:
             if (!connected_)
             {
-                return false;
+                // Connect to the server
+                connect(socket_, addrInfo_->ai_addr, addrInfo_->ai_addrlen);
+                connected_ = true;
             }
 
             // For TCP, first send the size
             uint32_t size = htonl(static_cast<uint32_t>(data.size()));
             if (::send(socket_, reinterpret_cast<const char *>(&size), sizeof(size), 0) != sizeof(size))
             {
-#ifdef _WIN32
-                errorCode_ = WSAGetLastError();
-#else
-                errorCode_ = errno;
-#endif
                 return false;
             }
 
@@ -230,37 +187,13 @@ namespace osc
 
         case Protocol::UNIX:
 #ifdef _WIN32
-            // Not supported on Windows
-            return false;
 #else
-            if (!connected_)
-            {
-                return false;
-            }
-
-            // UNIX domain sockets use stream semantics like TCP
-            uint32_t size = htonl(static_cast<uint32_t>(data.size()));
-            if (::send(socket_, reinterpret_cast<const char *>(&size), sizeof(size), 0) != sizeof(size))
-            {
-                errorCode_ = errno;
-                return false;
-            }
-
-            bytesSent = ::send(socket_,
-                               reinterpret_cast<const char *>(data.data()),
-                               data.size(),
-                               0);
-#endif
             break;
+#endif
         }
 
         if (bytesSent == SOCKET_ERROR_VALUE)
         {
-#ifdef _WIN32
-            errorCode_ = WSAGetLastError();
-#else
-            errorCode_ = errno;
-#endif
             return false;
         }
 
@@ -293,17 +226,7 @@ namespace osc
         }
         else
         {
-            // Check if IPv6 address (needs brackets)
-            if (host_.find(':') != std::string::npos)
-            {
-                url << "[" << host_ << "]";
-            }
-            else
-            {
-                url << host_;
-            }
-
-            url << ":" << port_;
+            url << host_ << ":" << port_;
         }
 
         url << "/";
@@ -331,15 +254,9 @@ namespace osc
 
         if (result != SOCKET_ERROR_VALUE)
         {
-            ttl_ = ttl;
             return true;
         }
 
-#ifdef _WIN32
-        errorCode_ = WSAGetLastError();
-#else
-        errorCode_ = errno;
-#endif
         return false;
     }
 
@@ -352,23 +269,7 @@ namespace osc
         }
 
         int flag = enable ? 1 : 0;
-        int result = setsockopt(socket_,
-                                IPPROTO_TCP,
-                                TCP_NODELAY,
-                                reinterpret_cast<const char *>(&flag),
-                                sizeof(flag));
-
-        if (result != SOCKET_ERROR_VALUE)
-        {
-            return true;
-        }
-
-#ifdef _WIN32
-        errorCode_ = WSAGetLastError();
-#else
-        errorCode_ = errno;
-#endif
-        return false;
+        return setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char *>(&flag), sizeof(flag)) != SOCKET_ERROR_VALUE;
     }
 
     // Set socket timeout
@@ -379,63 +280,16 @@ namespace osc
             return false;
         }
 
-#ifdef _WIN32
-        DWORD timeoutVal = static_cast<DWORD>(timeout.count());
-        int result = setsockopt(socket_,
-                                SOL_SOCKET,
-                                SO_SNDTIMEO,
-                                reinterpret_cast<const char *>(&timeoutVal),
-                                sizeof(timeoutVal));
-#else
         struct timeval tv;
-        tv.tv_sec = static_cast<time_t>(timeout.count() / 1000);
-        tv.tv_usec = static_cast<suseconds_t>((timeout.count() % 1000) * 1000);
-        int result = setsockopt(socket_,
-                                SOL_SOCKET,
-                                SO_SNDTIMEO,
-                                &tv,
-                                sizeof(tv));
-#endif
-
-        if (result != SOCKET_ERROR_VALUE)
-        {
-            return true;
-        }
-
-#ifdef _WIN32
-        errorCode_ = WSAGetLastError();
-#else
-        errorCode_ = errno;
-#endif
-        return false;
+        tv.tv_sec = static_cast<long>(timeout.count() / 1000);
+        tv.tv_usec = static_cast<long>((timeout.count() % 1000) * 1000);
+        return setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&tv), sizeof(tv)) != SOCKET_ERROR_VALUE;
     }
 
     // Get human-readable error message
     std::string AddressImpl::getErrorMessage() const
     {
-        if (errorCode_ == 0)
-        {
-            return "No error";
-        }
-
-#ifdef _WIN32
-        char *msgBuf = nullptr;
-        size_t size = FormatMessageA(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-            nullptr, errorCode_, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            reinterpret_cast<LPSTR>(&msgBuf), 0, nullptr);
-
-        std::string msg = "Unknown error";
-        if (msgBuf)
-        {
-            msg = std::string(msgBuf, size);
-            LocalFree(msgBuf);
-        }
-
-        return msg;
-#else
-        return std::string(strerror(errorCode_));
-#endif
+        return std::strerror(errorCode_);
     }
 
 } // namespace osc

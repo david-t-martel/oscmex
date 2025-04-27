@@ -1,3 +1,10 @@
+// filepath: c:\codedev\auricleinc\oscmex\src\oscpp\include\osc\Types.h
+/*
+ *  OSCPP - Open Sound Control C++ (OSCPP) Library.
+ *  This header file defines various types used in the OSC library,
+ *  including the TimeTag, Blob, and Value classes.
+ */
+
 #pragma once
 
 #include <cstdint>
@@ -122,29 +129,9 @@ namespace osc
          * @return std::chrono::system_clock::time_point
          */
         std::chrono::system_clock::time_point toTimePoint() const;
-
-        /**
-         * @brief Get seconds part of the time tag
-         *
-         * @return uint32_t Seconds since Jan 1, 1900
-         */
         uint32_t seconds() const;
-
-        /**
-         * @brief Get fraction part of the time tag
-         *
-         * @return uint32_t Fraction of a second
-         */
         uint32_t fraction() const;
-
-        /**
-         * @brief Check if this is an immediate time tag
-         *
-         * @return true if immediate (1)
-         */
         bool isImmediate() const;
-
-        // Comparison operators
         bool operator==(const TimeTag &other) const;
         bool operator!=(const TimeTag &other) const;
         bool operator<(const TimeTag &other) const;
@@ -163,45 +150,8 @@ namespace osc
     class Blob
     {
     public:
-        /**
-         * @brief Construct an empty Blob
-         */
-        Blob();
-
-        /**
-         * @brief Construct a Blob with data
-         *
-         * @param data Binary data
-         */
-        explicit Blob(const std::vector<std::byte> &data);
-
-        /**
-         * @brief Construct a Blob with data
-         *
-         * @param data Pointer to binary data
-         * @param size Size of data in bytes
-         */
-        Blob(const void *data, size_t size);
-
-        /**
-         * @brief Get the raw data
-         *
-         * @return const std::vector<std::byte>& Reference to data
-         */
         const std::vector<std::byte> &data() const;
-
-        /**
-         * @brief Get the size of the blob in bytes
-         *
-         * @return size_t Size in bytes
-         */
         size_t size() const;
-
-        /**
-         * @brief Get pointer to raw data
-         *
-         * @return const void* Pointer to data
-         */
         const void *ptr() const;
 
     private:
@@ -226,25 +176,6 @@ namespace osc
     class Value
     {
     public:
-        // Default constructor creates a nil value
-        Value();
-
-        // Construct from various types
-        Value(int32_t value);
-        Value(int64_t value);
-        Value(float value);
-        Value(double value);
-        Value(const std::string &value);
-        Value(const char *value);
-        Value(const Blob &value);
-        Value(const TimeTag &value);
-        Value(char value);
-        Value(uint32_t rgba);                      // RGBA color
-        Value(const std::array<uint8_t, 4> &midi); // MIDI message
-        Value(bool value);
-        Value(const Array &array);
-
-        // Type identification
         bool isInt32() const;
         bool isInt64() const;
         bool isFloat() const;
@@ -262,8 +193,6 @@ namespace osc
         bool isNil() const;
         bool isInfinitum() const;
         bool isArray() const;
-
-        // Value access (throws if wrong type)
         int32_t asInt32() const;
         int64_t asInt64() const;
         float asFloat() const;
@@ -277,32 +206,12 @@ namespace osc
         std::array<uint8_t, 4> asMidi() const;
         bool asBool() const;
         Array asArray() const;
-
-        // Type tag character for this value
         char typeTag() const;
-
-        // Serialize to bytes
         std::vector<std::byte> serialize() const;
 
     private:
-        // Variant to hold the actual value
         std::variant<
-            std::monostate,         // Nil
-            int32_t,                // i
-            int64_t,                // h
-            float,                  // f
-            double,                 // d
-            std::string,            // s
-            std::string,            // S (symbol)
-            Blob,                   // b
-            TimeTag,                // t
-            char,                   // c
-            uint32_t,               // r (RGBA color)
-            std::array<uint8_t, 4>, // m (MIDI)
-            bool,                   // T/F
-            bool,                   // I (Infinitum - stored as bool)
-            Array                   // Array
-            >
+            std::monostate,            int32_t,            int64_t,            float,            double,            std::string,            std::string,            Blob,            TimeTag,            char,            uint32_t,            std::array<uint8_t, 4>,            bool,            bool,            Array            >
             value_;
     };
 
@@ -313,5 +222,7 @@ namespace osc
     class Server;
     class ServerThread;
     class Method;
+
+    using MethodId = int;
 
 } // namespace osc
