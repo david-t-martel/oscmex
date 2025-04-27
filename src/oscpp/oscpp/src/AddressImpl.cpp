@@ -1,15 +1,26 @@
 #include "AddressImpl.h"
+#include "Address.h"
 #include <cstring>
 #include <sstream>
 #include <regex>
 
 #ifdef _WIN32
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
 // Define ssize_t for Windows
 #ifdef _WIN64
 typedef __int64 ssize_t;
 #else
 typedef int ssize_t;
 #endif
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
 #endif
 
 namespace osc
@@ -22,6 +33,12 @@ namespace osc
     bool AddressImpl::initializeNetworking()
     {
 #ifdef _WIN32
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+        {
+            errorCode_ = WSAGetLastError();
+            return false;
+        }
 #endif
 
         networkingInitialized = true;
@@ -32,6 +49,7 @@ namespace osc
     void AddressImpl::cleanupNetworking()
     {
 #ifdef _WIN32
+        WSACleanup();
 #endif
 
         networkingInitialized = false;

@@ -21,6 +21,7 @@
 #include "Address.h"
 #include "Server.h"
 #include "ServerThread.h"
+#include "Exception.h" // Added Exception header
 
 // Version information
 #define OSC_VERSION_MAJOR 1

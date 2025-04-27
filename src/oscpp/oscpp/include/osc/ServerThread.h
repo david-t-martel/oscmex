@@ -42,9 +42,9 @@ namespace osc
         bool isRunning() const;
 
     private:
-        std::shared_ptr<Server> server_;  ///< The OSC server instance.
-        std::thread thread_;               ///< The thread running the server.
-        std::atomic<bool> running_;        ///< Flag indicating if the thread is running.
+        std::shared_ptr<Server> server_; ///< The OSC server instance.
+        std::thread thread_;             ///< The thread running the server.
+        std::atomic<bool> running_;      ///< Flag indicating if the thread is running.
 
         /**
          * @brief The main loop for the server thread.
