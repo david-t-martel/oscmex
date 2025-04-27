@@ -1,15 +1,6 @@
 /*
- *  Copyright (C) 2014 Steve Harris et al. (see AUTHORS)
- *
- *  This program is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public License
- *  as published by the Free Software Foundation; either version 2.1
- *  of the License, or (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU Lesser General Public License for more details.
+ *  OSCPP - Open Sound Control C++ (OSCPP) Library.
+ *  TO DO: Add Exceptions implementation from REQUIREMENTS.md and from SPECIFICATION.md
  */
 
 #ifndef OSC_EXCEPTIONS_H

@@ -6,6 +6,11 @@
 #include <memory>
 #include <chrono>
 
+/*
+ *  OSCPP - Open Sound Control C++ (OSCPP) Library.
+ *  TO DO: Add Exceptions implementation from REQUIREMENTS.md and from SPECIFICATION.md
+ */
+
 namespace osc
 {
 
