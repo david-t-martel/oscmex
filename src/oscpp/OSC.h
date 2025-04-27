@@ -13,6 +13,7 @@
 #include "Message.h"
 #include "Bundle.h"
 #include "Address.h"
+#include "AddressImpl.h"
 #include "Server.h"
 #include "ServerThread.h"
 
