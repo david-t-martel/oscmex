@@ -1,0 +1,131 @@
+\chapter{Open Sound Control (OSC) Protocol Summary}
+\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n}{}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n}\index{Open Sound Control (OSC) Protocol Summary@{Open Sound Control (OSC) Protocol Summary}}
+\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md46}%
+\Hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md46}%
+\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md47}{}\doxysection{\texorpdfstring{Introduction}{Introduction}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md47}
+Open Sound Control (OSC) is a content format and protocol designed for communication among computers, sound synthesizers, and other multimedia devices. It is optimized for modern networking technology and provides high-\/resolution, flexible, and time-\/sensitive control. Originally developed at CNMAT (Center for New Music and Audio Technologies, UC Berkeley), it offers advantages over MIDI in terms of networkability, data types, and namespace flexibility.\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md48}{}\doxysection{\texorpdfstring{OSCPP Library Conformance Note}{OSCPP Library Conformance Note}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md48}
+This document summarizes the OSC 1.\+0 and 1.\+1 specifications. The {\ttfamily oscpp} library aims to implement these specifications fully.
+
+
+\begin{DoxyItemize}
+\item {\bfseries{Current Status\+:}} Please refer to the project\textquotesingle{}s \doxysectlink{md__r_e_a_d_m_e}{{\ttfamily README.md}}{0} and \doxysectlink{md__t_o_d_o}{{\ttfamily TODO.md}}{0} for the specific features and data types currently implemented and those that are pending (e.\+g., full pattern matching, TCP framing, array support).
+\end{DoxyItemize}\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md49}{}\doxysection{\texorpdfstring{Core Concepts (OSC 1.\+0 \& 1.\+1)}{Core Concepts (OSC 1.\+0 \& 1.\+1)}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md49}
+OSC communication is based on sending {\bfseries{OSC Packets}} over a network (or other transport layers).\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md50}{}\doxysubsection{\texorpdfstring{1. OSC Packets}{1. OSC Packets}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md50}
+There are two fundamental types of OSC Packets\+:
+
+
+\begin{DoxyItemize}
+\item {\bfseries{OSC Message\+:}} An atomic unit of data transfer. It consists of\+:
+\begin{DoxyItemize}
+\item An {\bfseries{OSC Address Pattern}}\+: A null-\/terminated, OSC-\/\+String starting with {\ttfamily /}, indicating the target parameter(s) (e.\+g., {\ttfamily /mixer/channel/1/fader}).
+\item An {\bfseries{OSC Type Tag String}}\+: An OSC-\/\+String starting with a comma {\ttfamily ,}, followed by characters representing the data types of the arguments (e.\+g., {\ttfamily ,ifs} for int32, float32, string). If no arguments are present, a string containing only the comma {\ttfamily ,} should be sent.
+\item {\bfseries{OSC Arguments}}\+: A sequence of binary data representing the values, corresponding to the type tags. Data must be 4-\/byte aligned (padded with null bytes if necessary).
+\end{DoxyItemize}
+\item {\bfseries{OSC Bundle\+:}} A collection of OSC Messages and/or other OSC Bundles, intended to be processed atomically based on a timestamp. It consists of\+:
+\begin{DoxyItemize}
+\item The OSC-\/\+String {\ttfamily "{}\#bundle"{}}.
+\item An {\bfseries{OSC Time Tag}}\+: A 64-\/bit fixed-\/point timestamp indicating when the bundle\textquotesingle{}s contents should ideally take effect. It uses the NTP format (Network Time Protocol)\+: the first 32 bits represent seconds since midnight Jan 1, 1900, and the last 32 bits represent fractional parts of a second. A value of {\ttfamily 0x00000000 00000001} (1) represents immediate execution.
+\item A sequence of {\bfseries{OSC Packet Elements}}\+: Each element is preceded by its size (int32, indicating the number of bytes in the element) and contains either a complete OSC Message or another complete OSC Bundle.
+\end{DoxyItemize}
+\end{DoxyItemize}\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md51}{}\doxysubsection{\texorpdfstring{2. OSC Address Space \& Pattern Matching}{2. OSC Address Space \& Pattern Matching}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md51}
+
+\begin{DoxyItemize}
+\item {\bfseries{Address Space\+:}} OSC uses a hierarchical, symbolic naming scheme similar to URLs or file paths (e.\+g., {\ttfamily /synthesizers/granular/grain\+\_\+rate}). Parts are separated by {\ttfamily /}. The receiving entity maintains a set of OSC Addresses corresponding to its controllable methods or parameters.
+\item {\bfseries{Pattern Matching\+:}} Receiving applications match incoming OSC Address Patterns against the OSC Addresses of their controllable elements. OSC defines a powerful pattern matching syntax\+:
+\begin{DoxyItemize}
+\item {\ttfamily ?}\+: Matches any single character except {\ttfamily /}.
+\item {\ttfamily \texorpdfstring{$\ast$}{*}}\+: Matches any sequence of zero or more characters except {\ttfamily /}.
+\item {\ttfamily \mbox{[}\mbox{]}}\+: Matches any single character listed within the brackets (e.\+g., {\ttfamily \mbox{[}abc\mbox{]}}). Ranges are allowed (e.\+g., {\ttfamily \mbox{[}0-\/9\mbox{]}}). {\ttfamily !} or {\ttfamily \texorpdfstring{$^\wedge$}{\string^}} as the first character negates the set (e.\+g., {\ttfamily \mbox{[}!abc\mbox{]}}).
+\item {\ttfamily \{\}}\+: Matches any string from a comma-\/separated list within the braces (e.\+g., {\ttfamily \{foo,bar\}}).
+\end{DoxyItemize}
+\item {\bfseries{Dispatching\+:}} When an OSC Message arrives, the receiving server attempts to match the Address Pattern against all known OSC Addresses in its address space. For every matching address, the corresponding OSC Method (function/procedure) is invoked with the arguments from the OSC Message. If multiple addresses match, the corresponding methods should ideally be invoked concurrently or in an undefined order.
+\end{DoxyItemize}\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md52}{}\doxysubsection{\texorpdfstring{3. OSC Data Types (OSC 1.\+0 Core)}{3. OSC Data Types (OSC 1.\+0 Core)}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md52}
+OSC 1.\+0 defined a basic set of argument types, each identified by a character in the Type Tag String\+:
+
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{4}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ Tag   }&\cellcolor{\tableheadbgcolor}\textbf{ Type   }&\cellcolor{\tableheadbgcolor}\textbf{ Description   }&\cellcolor{\tableheadbgcolor}\textbf{ Alignment    }\\\cline{1-4}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ Tag   }&\cellcolor{\tableheadbgcolor}\textbf{ Type   }&\cellcolor{\tableheadbgcolor}\textbf{ Description   }&\cellcolor{\tableheadbgcolor}\textbf{ Alignment    }\\\cline{1-4}
+\endhead
+{\ttfamily i}   &int32   &32-\/bit big-\/endian two\textquotesingle{}s complement integer   &4 bytes    \\\cline{1-4}
+{\ttfamily f}   &float32   &32-\/bit big-\/endian IEEE 754 floating point number   &4 bytes    \\\cline{1-4}
+{\ttfamily s}   &OSC-\/\+String   &Sequence of non-\/null ASCII chars, followed by a null, followed by 0-\/3 null padding bytes   &4 bytes    \\\cline{1-4}
+{\ttfamily b}   &OSC-\/\+Blob   &Binary Large Object\+: int32 size count, followed by that many bytes, followed by 0-\/3 null padding bytes   &4 bytes    \\\cline{1-4}
+{\ttfamily t}   &OSC-\/\+Time\+Tag   &64-\/bit NTP format timestamp (used in bundles, can technically be an argument)   &8 bytes   \\\cline{1-4}
+\end{longtabu}
+
+
+{\itshape Note\+: All argument data must be padded with null bytes to ensure the total size of the argument data is a multiple of 4 bytes.}\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md53}{}\doxysection{\texorpdfstring{Updates and Additions (OSC 1.\+1)}{Updates and Additions (OSC 1.\+1)}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md53}
+OSC 1.\+1 builds upon OSC 1.\+0, adding new data types and clarifications without breaking backward compatibility for the core types.\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md54}{}\doxysubsection{\texorpdfstring{New Data Types in OSC 1.\+1}{New Data Types in OSC 1.\+1}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md54}
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{5}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ Tag   }&\cellcolor{\tableheadbgcolor}\textbf{ Type   }&\cellcolor{\tableheadbgcolor}\textbf{ Description   }&\cellcolor{\tableheadbgcolor}\textbf{ Argument Data   }&\cellcolor{\tableheadbgcolor}\textbf{ Alignment    }\\\cline{1-5}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ Tag   }&\cellcolor{\tableheadbgcolor}\textbf{ Type   }&\cellcolor{\tableheadbgcolor}\textbf{ Description   }&\cellcolor{\tableheadbgcolor}\textbf{ Argument Data   }&\cellcolor{\tableheadbgcolor}\textbf{ Alignment    }\\\cline{1-5}
+\endhead
+{\ttfamily h}   &int64   &64-\/bit big-\/endian two\textquotesingle{}s complement integer   &Yes   &8 bytes    \\\cline{1-5}
+{\ttfamily d}   &float64   &64-\/bit big-\/endian IEEE 754 double-\/precision float   &Yes   &8 bytes    \\\cline{1-5}
+{\ttfamily S}   &Symbol   &Alternate representation for OSC-\/string (semantics may differ by implementation)   &Yes   &4 bytes    \\\cline{1-5}
+{\ttfamily c}   &char   &32-\/bit ASCII character (represented as an int32)   &Yes   &4 bytes    \\\cline{1-5}
+{\ttfamily r}   &RGBA color   &32-\/bit RGBA color (8 bits per component\+: red, green, blue, alpha)   &Yes   &4 bytes    \\\cline{1-5}
+{\ttfamily m}   &MIDI message   &4 bytes\+: Port ID (byte 0), Status byte (byte 1), Data1 (byte 2), Data2 (byte 3)   &Yes   &4 bytes    \\\cline{1-5}
+{\ttfamily T}   &True   &Represents the value True   &No   &0 bytes    \\\cline{1-5}
+{\ttfamily F}   &False   &Represents the value False   &No   &0 bytes    \\\cline{1-5}
+{\ttfamily N}   &Nil / Null   &Represents Null   &No   &0 bytes    \\\cline{1-5}
+{\ttfamily I}   &Infinitum   &Represents Infinity   &No   &0 bytes    \\\cline{1-5}
+{\ttfamily \mbox{[}}   &Array Begin   &Indicates the beginning of an array; type tags between {\ttfamily \mbox{[}} and {\ttfamily \mbox{]}} belong to the array   &No   &0 bytes    \\\cline{1-5}
+{\ttfamily \mbox{]}}   &Array End   &Indicates the end of an array   &No   &0 bytes   \\\cline{1-5}
+\end{longtabu}
+
+
+{\itshape Note\+: Argument data alignment applies relative to the start of the argument data section.}\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md55}{}\doxysubsection{\texorpdfstring{Clarifications in OSC 1.\+1}{Clarifications in OSC 1.\+1}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md55}
+OSC 1.\+1 also provides clearer definitions for certain aspects, improves error condition descriptions, and refines pattern matching details. Implementers should consult the OSC 1.\+1 specification for these nuances. Key clarifications include\+:
+
+
+\begin{DoxyItemize}
+\item More precise definition of OSC-\/\+String padding.
+\item Handling of malformed messages and bundles.
+\item Time tag semantics, especially regarding bundle processing order.
+\end{DoxyItemize}\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md56}{}\doxysection{\texorpdfstring{Transport Layer}{Transport Layer}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md56}
+OSC itself only defines the {\itshape content format}. It is transport-\/independent. Common transport methods include\+:
+
+
+\begin{DoxyItemize}
+\item {\bfseries{UDP\+:}} Most common due to low overhead and speed, suitable for real-\/time control. Packet loss and ordering are potential issues. Maximum packet size is limited by the underlying network MTU (Maximum Transmission Unit).
+\item {\bfseries{TCP\+:}} Provides reliable, ordered transmission, useful when data integrity is paramount, but introduces latency and overhead. Requires a streaming format (e.\+g., SLIP encoding or length-\/prefixing) to delineate packet boundaries. {\itshape (Note\+: Framing required for oscpp)}
+\item {\bfseries{SLIP (Serial Line IP)\+:}} A simple protocol (RFC 1055) for sending IP datagrams over serial lines. OSC packets can be framed using SLIP\textquotesingle{}s END (0x\+C0) and ESC (0x\+DB) characters.
+\item Other transports (like Files, Pipes, USB, Shared Memory) are also possible.
+\end{DoxyItemize}\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md57}{}\doxysection{\texorpdfstring{Error Handling}{Error Handling}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md57}
+The OSC specification does not mandate a specific error reporting mechanism back to the sender (especially difficult over UDP). Receiving applications should handle errors gracefully, such as\+:
+
+
+\begin{DoxyItemize}
+\item Ignoring malformed packets.
+\item Logging errors locally.
+\item Ignoring messages with address patterns that don\textquotesingle{}t match any known address.
+\item Handling type mismatches (e.\+g., receiving an int where a float was expected) according to application logic (e.\+g., type coercion, ignoring the message, logging an error).
+\end{DoxyItemize}\hypertarget{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md58}{}\doxysection{\texorpdfstring{Official Specification Documents}{Official Specification Documents}}\label{md__s_p_e_c_i_f_i_c_a_t_i_o_n_autotoc_md58}
+The authoritative sources for the OSC protocol are\+:
+
+
+\begin{DoxyEnumerate}
+\item {\bfseries{OSC 1.\+0 Specification\+:}}
+\begin{DoxyItemize}
+\item URL\+: \href{http://opensoundcontrol.org/spec-1_0}{\texttt{ http\+://opensoundcontrol.\+org/spec-\/1\+\_\+0}}
+\item Defines the foundational structure, core data types, address patterns, and bundle format.
+\end{DoxyItemize}
+\item {\bfseries{OSC 1.\+1 Specification\+:}}
+\begin{DoxyItemize}
+\item URL\+: \href{http://opensoundcontrol.org/spec-1_1}{\texttt{ http\+://opensoundcontrol.\+org/spec-\/1\+\_\+1}}
+\item Extends OSC 1.\+0 with additional data types and provides clarifications. It is recommended to consult this for modern implementations. 
+\end{DoxyItemize}
+\end{DoxyEnumerate}

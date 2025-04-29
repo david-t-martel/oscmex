@@ -1,5 +1,6 @@
-#include <iostream>
 #include <cassert>
+#include <iostream>
+
 #include "osc/Address.h"
 
 void test_address_creation() {

@@ -4,41 +4,76 @@
       "name": "Win32",
       "includePath": [
         "${workspaceFolder}/include",
-        "${workspaceFolder}/src/oscpp/oscpp/include",
-        "${workspaceFolder}/src/oscpp/include"
+        "${workspaceFolder}/include/osc"
       ],
       "defines": ["_DEBUG", "UNICODE", "_UNICODE", "_WIN32"],
       "windowsSdkVersion": "10.0.19041.0",
-      "compilerPath": "C:/Program Files/LLVM/bin/clang++.exe",
+      "compilerPath": "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\bin\\icx.exe",
       "cStandard": "c11",
       "cppStandard": "c++17",
-      "intelliSenseMode": "windows-clang-x64"
+      "intelliSenseMode": "windows-clang-x64",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "browse": {
+        "path": ["${workspaceFolder}/include", "${workspaceFolder}/src"],
+        "limitSymbolsToIncludedHeaders": true
+      }
     },
     {
       "name": "Linux",
       "includePath": [
         "${workspaceFolder}/include",
-        "${workspaceFolder}/src/oscpp/oscpp/include",
-        "${workspaceFolder}/src/oscpp/include"
+        "${workspaceFolder}/include/osc"
       ],
       "defines": ["_DEBUG"],
       "compilerPath": "/usr/bin/g++",
       "cStandard": "c11",
       "cppStandard": "c++17",
-      "intelliSenseMode": "linux-gcc-x64"
+      "intelliSenseMode": "linux-gcc-x64",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "browse": {
+        "path": ["${workspaceFolder}/include", "${workspaceFolder}/src"],
+        "limitSymbolsToIncludedHeaders": true
+      }
     },
     {
       "name": "Mac",
       "includePath": [
         "${workspaceFolder}/include",
-        "${workspaceFolder}/src/oscpp/oscpp/include",
-        "${workspaceFolder}/src/oscpp/include"
+        "${workspaceFolder}/include/osc"
       ],
       "defines": ["_DEBUG"],
       "compilerPath": "/usr/bin/clang++",
       "cStandard": "c11",
       "cppStandard": "c++17",
-      "intelliSenseMode": "macos-clang-x64"
+      "intelliSenseMode": "macos-clang-x64",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "browse": {
+        "path": ["${workspaceFolder}/include", "${workspaceFolder}/src"],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    },
+    {
+      "name": "Intel oneAPI",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/include/osc",
+        "C:/Program Files (x86)/Intel/oneAPI/compiler/latest/windows/include",
+        "C:/Program Files (x86)/Intel/oneAPI/compiler/latest/windows/compiler/include"
+      ],
+      "defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE",
+        "USE_INTEL_COMPILER",
+        "INTEL_ONEAPI_WINDOWS"
+      ],
+      "windowsSdkVersion": "10.0.19041.0",
+      "compilerPath": "C:/Program Files (x86)/Intel/oneAPI/compiler/latest/windows/bin/icx.exe",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-clang-x64",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "compileCommands": "${workspaceFolder}/build_intel/compile_commands.json"
     }
   ],
   "version": 4

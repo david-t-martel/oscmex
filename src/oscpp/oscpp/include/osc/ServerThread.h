@@ -1,23 +1,23 @@
 // filepath: c:\codedev\auricleinc\oscmex\include\osc\ServerThread.h
 #pragma once
 
-#include "Types.h"
-#include <thread>
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <thread>
 
-namespace osc
-{
+#include "osc/Types.h"
+
+namespace osc {
 
     class Server;
 
     /**
      * @brief Class for running an OSC server in a separate thread.
      */
-    class ServerThread
-    {
-    public:
+    class ServerThread {
+       public:
         /**
          * @brief Construct a new ServerThread object.
          * @param server The OSC server to run in the thread.
@@ -41,10 +41,11 @@ namespace osc
          */
         bool isRunning() const;
 
-    private:
-        std::shared_ptr<Server> server_; ///< The OSC server instance.
-        std::thread thread_;             ///< The thread running the server.
-        std::atomic<bool> running_;      ///< Flag indicating if the thread is running.
+       private:
+        std::shared_ptr<Server> server_;  ///< The OSC server instance.
+        std::thread thread_;              ///< The thread running the server.
+        std::atomic<bool> running_;       ///< Flag indicating if the thread is running.
+        mutable std::mutex mutex_;        ///< Mutex for thread safety
 
         /**
          * @brief The main loop for the server thread.
@@ -52,4 +53,4 @@ namespace osc
         void run();
     };
 
-} // namespace osc
+}  // namespace osc

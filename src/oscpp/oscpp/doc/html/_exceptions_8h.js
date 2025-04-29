@@ -1,0 +1,25 @@
+var _exceptions_8h =
+[
+    [ "osc::OSCException", "classosc_1_1_o_s_c_exception.html", "classosc_1_1_o_s_c_exception" ],
+    [ "osc::NetworkException", "classosc_1_1_network_exception.html", "classosc_1_1_network_exception" ],
+    [ "osc::MalformedPacketException", "classosc_1_1_malformed_packet_exception.html", "classosc_1_1_malformed_packet_exception" ],
+    [ "osc::TypeMismatchException", "classosc_1_1_type_mismatch_exception.html", "classosc_1_1_type_mismatch_exception" ],
+    [ "osc::BufferOverflowException", "classosc_1_1_buffer_overflow_exception.html", "classosc_1_1_buffer_overflow_exception" ],
+    [ "osc::UnknownTypeException", "classosc_1_1_unknown_type_exception.html", "classosc_1_1_unknown_type_exception" ],
+    [ "osc::AddressException", "classosc_1_1_address_exception.html", "classosc_1_1_address_exception" ],
+    [ "osc::InvalidArgumentException", "classosc_1_1_invalid_argument_exception.html", "classosc_1_1_invalid_argument_exception" ],
+    [ "osc::InvalidMessageException", "classosc_1_1_invalid_message_exception.html", "classosc_1_1_invalid_message_exception" ],
+    [ "osc::InvalidBundleException", "classosc_1_1_invalid_bundle_exception.html", "classosc_1_1_invalid_bundle_exception" ],
+    [ "osc::PatternException", "classosc_1_1_pattern_exception.html", "classosc_1_1_pattern_exception" ],
+    [ "osc::ServerException", "classosc_1_1_server_exception.html", "classosc_1_1_server_exception" ],
+    [ "osc::ClientException", "classosc_1_1_client_exception.html", "classosc_1_1_client_exception" ],
+    [ "osc::OutOfMemoryException", "classosc_1_1_out_of_memory_exception.html", "classosc_1_1_out_of_memory_exception" ],
+    [ "osc::NotImplementedException", "classosc_1_1_not_implemented_exception.html", "classosc_1_1_not_implemented_exception" ],
+    [ "osc::SocketException", "classosc_1_1_socket_exception.html", "classosc_1_1_socket_exception" ],
+    [ "osc::NetworkingException", "classosc_1_1_networking_exception.html", "classosc_1_1_networking_exception" ],
+    [ "osc::MessageSizeException", "classosc_1_1_message_size_exception.html", "classosc_1_1_message_size_exception" ],
+    [ "osc::DeserializationException", "classosc_1_1_deserialization_exception.html", "classosc_1_1_deserialization_exception" ],
+    [ "osc::SerializationException", "classosc_1_1_serialization_exception.html", "classosc_1_1_serialization_exception" ],
+    [ "osc::MatchException", "classosc_1_1_match_exception.html", "classosc_1_1_match_exception" ],
+    [ "osc::PlatformException", "classosc_1_1_platform_exception.html", "classosc_1_1_platform_exception" ]
+];

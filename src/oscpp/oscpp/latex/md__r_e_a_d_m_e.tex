@@ -1,0 +1,369 @@
+\chapter{OSC++ Library}
+\hypertarget{md__r_e_a_d_m_e}{}\label{md__r_e_a_d_m_e}\index{OSC++ Library@{OSC++ Library}}
+\label{md__r_e_a_d_m_e_autotoc_md12}%
+\Hypertarget{md__r_e_a_d_m_e_autotoc_md12}%
+
+
+A modern C++ implementation of the Open Sound Control (OSC) protocol based on the OSC 1.\+0 and 1.\+1 specifications. This library provides a robust, type-\/safe, and cross-\/platform interface for OSC communication.\hypertarget{md__r_e_a_d_m_e_autotoc_md13}{}\doxysection{\texorpdfstring{Features}{Features}}\label{md__r_e_a_d_m_e_autotoc_md13}
+
+\begin{DoxyItemize}
+\item Support for all OSC data types including int32, int64, float, double, string, blob, and more {\itshape (Implemented)}
+\item Bundle support with immediate or timestamped message delivery {\itshape (Implemented)}
+\item Multiple transport protocols (UDP, TCP, Unix sockets) {\itshape (Foundation Laid, TCP Framing Missing)}
+\item Cross-\/platform compatibility (Windows, mac\+OS, Linux) {\itshape (Foundation Laid)}
+\item Modern C++ design with RAII, strong typing, and exception safety {\itshape (Implemented)}
+\item Thread-\/safe server implementation ({\ttfamily Server\+Thread})
+\end{DoxyItemize}\hypertarget{md__r_e_a_d_m_e_autotoc_md14}{}\doxysection{\texorpdfstring{Requirements}{Requirements}}\label{md__r_e_a_d_m_e_autotoc_md14}
+
+\begin{DoxyItemize}
+\item C++17 compatible compiler
+\item CMake 3.\+14 or higher for building
+\item Platform-\/specific requirements\+:
+\begin{DoxyItemize}
+\item {\bfseries{Windows}}\+:
+\begin{DoxyItemize}
+\item Visual Studio 2017 or newer
+\item Windows SDK 10.\+0 or newer
+\item Win\+Sock2 libraries (automatically included)
+\end{DoxyItemize}
+\item {\bfseries{mac\+OS}}\+:
+\begin{DoxyItemize}
+\item Xcode command-\/line tools
+\item mac\+OS 10.\+13 or newer
+\end{DoxyItemize}
+\item {\bfseries{Linux/\+Unix}}\+:
+\begin{DoxyItemize}
+\item GCC 7+ or Clang 6+
+\item POSIX socket API
+\item pthread library
+\end{DoxyItemize}
+\end{DoxyItemize}
+\end{DoxyItemize}
+
+For detailed requirements, please refer to \doxysectlink{md__r_e_q_u_i_r_e_m_e_n_t_s}{REQUIREMENTS.md}{0}.\hypertarget{md__r_e_a_d_m_e_autotoc_md15}{}\doxysection{\texorpdfstring{Building the Library}{Building the Library}}\label{md__r_e_a_d_m_e_autotoc_md15}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md16}{}\doxysubsection{\texorpdfstring{Using CMake (Recommended)}{Using CMake (Recommended)}}\label{md__r_e_a_d_m_e_autotoc_md16}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md17}{}\doxysubsubsection{\texorpdfstring{Windows}{Windows}}\label{md__r_e_a_d_m_e_autotoc_md17}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{\#\ Navigate\ to\ the\ library\ directory}
+\DoxyCodeLine{cd\ oscpp}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Generate\ build\ files}
+\DoxyCodeLine{build.bat}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ For\ Debug\ build}
+\DoxyCodeLine{build.bat\ debug}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ For\ standalone\ test}
+\DoxyCodeLine{build.bat\ standalone-\/test}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ To\ clean\ previous\ builds}
+\DoxyCodeLine{build.bat\ clean}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ To\ build\ with\ examples}
+\DoxyCodeLine{build.bat\ examples}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ To\ create\ an\ installation\ package}
+\DoxyCodeLine{build.bat\ install}
+
+\end{DoxyCode}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md18}{}\doxysubsubsection{\texorpdfstring{Linux/mac\+OS}{Linux/mac\+OS}}\label{md__r_e_a_d_m_e_autotoc_md18}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{\#\ Navigate\ to\ the\ library\ directory}
+\DoxyCodeLine{cd\ oscpp}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Make\ the\ build\ script\ executable\ if\ needed}
+\DoxyCodeLine{chmod\ +x\ build.sh}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Generate\ build\ files\ and\ build}
+\DoxyCodeLine{./build.sh}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ For\ Debug\ build}
+\DoxyCodeLine{./build.sh\ debug}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ For\ standalone\ test}
+\DoxyCodeLine{./build.sh\ standalone-\/test}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ To\ clean\ previous\ builds}
+\DoxyCodeLine{./build.sh\ clean}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ To\ build\ with\ examples}
+\DoxyCodeLine{./build.sh\ examples}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ To\ create\ an\ installation\ package}
+\DoxyCodeLine{./build.sh\ install}
+
+\end{DoxyCode}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md19}{}\doxysubsection{\texorpdfstring{Manual CMake Build}{Manual CMake Build}}\label{md__r_e_a_d_m_e_autotoc_md19}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{\#\ Create\ and\ navigate\ to\ a\ build\ directory}
+\DoxyCodeLine{mkdir\ build\ \&\&\ cd\ build}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Configure\ the\ project}
+\DoxyCodeLine{cmake\ ..}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Build\ the\ library}
+\DoxyCodeLine{cmake\ -\/-\/build\ .\ -\/-\/config\ Release}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Run\ tests}
+\DoxyCodeLine{ctest\ -\/C\ Release}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Install\ (optional)}
+\DoxyCodeLine{cmake\ -\/-\/install\ .\ -\/-\/config\ Release}
+
+\end{DoxyCode}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md20}{}\doxysubsection{\texorpdfstring{CMake Options}{CMake Options}}\label{md__r_e_a_d_m_e_autotoc_md20}
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{3}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Option   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Default    }\\\cline{1-3}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Option   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Default    }\\\cline{1-3}
+\endhead
+{\ttfamily OSCPP\+\_\+\+BUILD\+\_\+\+EXAMPLES}   &Build example applications   &ON    \\\cline{1-3}
+{\ttfamily OSCPP\+\_\+\+BUILD\+\_\+\+TESTS}   &Build test applications   &ON    \\\cline{1-3}
+{\ttfamily OSCPP\+\_\+\+INSTALL}   &Generate installation target   &ON    \\\cline{1-3}
+{\ttfamily OSC\+\_\+\+STANDALONE\+\_\+\+TEST}   &Build a standalone test application   &OFF    \\\cline{1-3}
+{\ttfamily OSCPP\+\_\+\+EXTRA\+\_\+\+C\+\_\+\+FLAGS}   &Additional C compiler flags   &"{}"{}    \\\cline{1-3}
+{\ttfamily OSCPP\+\_\+\+EXTRA\+\_\+\+CXX\+\_\+\+FLAGS}   &Additional C++ compiler flags   &"{}"{}   \\\cline{1-3}
+\end{longtabu}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md21}{}\doxysubsection{\texorpdfstring{Using CMake Presets}{Using CMake Presets}}\label{md__r_e_a_d_m_e_autotoc_md21}
+If you have CMake 3.\+20 or newer, you can use presets\+:
+
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{\#\ Configure\ using\ a\ preset}
+\DoxyCodeLine{cmake\ -\/-\/preset\ windows-\/msvc-\/release}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Build\ using\ the\ preset}
+\DoxyCodeLine{cmake\ -\/-\/build\ -\/-\/preset\ windows-\/msvc-\/release}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Test\ using\ the\ preset}
+\DoxyCodeLine{ctest\ -\/-\/preset\ windows-\/msvc-\/release}
+
+\end{DoxyCode}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md22}{}\doxysection{\texorpdfstring{Current Status \& Roadmap}{Current Status \& Roadmap}}\label{md__r_e_a_d_m_e_autotoc_md22}
+The library provides a comprehensive implementation of the OSC protocol with complete Bundle and Message handling, type system, and server architecture. We\textquotesingle{}re now focusing on optimizing the pattern matching and completing TCP transport handling.
+
+{\bfseries{Work Remaining\+:}}
+
+
+\begin{DoxyEnumerate}
+\item {\bfseries{Consolidate Error Handling\+:}} Standardize exception handling throughout the codebase to improve error reporting.
+\item {\bfseries{Implement OSC Pattern Matching\+:}} Implement the core logic for matching incoming message address patterns against registered server methods (supporting {\ttfamily ?}, {\ttfamily \texorpdfstring{$\ast$}{*}}, {\ttfamily \mbox{[}\mbox{]}}, {\ttfamily \{\}}).
+\item {\bfseries{Implement TCP Message Framing\+:}} Add SLIP encoding or length-\/prefixing to ensure reliable message boundaries over TCP connections.
+\item {\bfseries{Expand Test Coverage\+:}} Create more comprehensive tests for nested bundle structures, pattern matching, and network operations.
+\item {\bfseries{Expand Examples \& Documentation\+:}} Provide more detailed usage examples and ensure API documentation is complete.
+\end{DoxyEnumerate}\hypertarget{md__r_e_a_d_m_e_autotoc_md23}{}\doxysection{\texorpdfstring{Usage Examples}{Usage Examples}}\label{md__r_e_a_d_m_e_autotoc_md23}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md24}{}\doxysubsection{\texorpdfstring{Basic Usage (Server)}{Basic Usage (Server)}}\label{md__r_e_a_d_m_e_autotoc_md24}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ "{}osc/ServerThread.h"{}}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ "{}osc/Message.h"{}}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ "{}osc/Value.h"{}}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ <iostream>}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ <chrono>}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ <thread>}}
+\DoxyCodeLine{}
+\DoxyCodeLine{\textcolor{keywordtype}{int}\ main()\ \{}
+\DoxyCodeLine{\ \ \ \ \textcolor{keywordflow}{try}\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Create\ a\ server\ thread\ listening\ on\ UDP\ port\ 8000}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ osc::ServerThread\ server(\textcolor{stringliteral}{"{}8000"{}},\ osc::Protocol::UDP);}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Add\ a\ message\ handler\ for\ "{}/test/path"{}\ expecting\ int,\ float,\ string}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ server.addMethod(\textcolor{stringliteral}{"{}/test/path"{}},\ \textcolor{stringliteral}{"{}ifs"{}},\ [](\textcolor{keyword}{const}\ osc::Message\&\ message)\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordflow}{try}\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{comment}{//\ Access\ arguments\ (assuming\ Value\ accessors\ are\ implemented)}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ int32\_t\ intVal\ =\ message.getArguments()[0].asInt32();}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\ floatVal\ =\ message.getArguments()[1].asFloat();}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ std::string\ strVal\ =\ message.getArguments()[2].asString();}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ std::cout\ <<\ \textcolor{stringliteral}{"{}Received\ /test/path:\ "{}}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ <<\ intVal\ <<\ \textcolor{stringliteral}{"{},\ "{}}\ <<\ floatVal\ <<\ \textcolor{stringliteral}{"{},\ \(\backslash\)"{}"{}}\ <<\ strVal\ <<\ \textcolor{stringliteral}{"{}\(\backslash\)"{}"{}}\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \}\ \textcolor{keywordflow}{catch}\ (\textcolor{keyword}{const}\ osc::OSCException\&\ e)\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Error\ processing\ message\ args:\ "{}}\ <<\ e.what()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \}\ \textcolor{keywordflow}{catch}\ (\textcolor{keyword}{const}\ std::exception\&\ e)\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Standard\ exception\ in\ handler:\ "{}}\ <<\ e.what()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \});}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Add\ a\ default\ handler\ for\ other\ messages}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ server.addDefaultMethod([](\textcolor{keyword}{const}\ osc::Message\&\ message)\{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cout\ <<\ \textcolor{stringliteral}{"{}Received\ unhandled\ message:\ "{}}\ <<\ message.getPath()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \});}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Set\ an\ error\ handler}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ server.setErrorHandler([](\textcolor{keywordtype}{int}\ code,\ \textcolor{keyword}{const}\ std::string\&\ msg,\ \textcolor{keyword}{const}\ std::string\&\ where)\{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Server\ Error\ "{}}\ <<\ code\ <<\ \textcolor{stringliteral}{"{}\ in\ "{}}\ <<\ where\ <<\ \textcolor{stringliteral}{"{}:\ "{}}\ <<\ msg\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \});}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Start\ the\ server\ thread}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{keywordflow}{if}\ (server.start())\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cout\ <<\ \textcolor{stringliteral}{"{}Server\ started\ on\ UDP\ port\ "{}}\ <<\ server.port()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \textcolor{comment}{//\ Keep\ the\ main\ thread\ alive\ (e.g.,\ wait\ for\ user\ input)}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cout\ <<\ \textcolor{stringliteral}{"{}Press\ Enter\ to\ exit."{}}\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cin.get();}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ server.stop();}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cout\ <<\ \textcolor{stringliteral}{"{}Server\ stopped."{}}\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \}\ \textcolor{keywordflow}{else}\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Failed\ to\ start\ server."{}}\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordflow}{return}\ 1;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \}}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \}\ \textcolor{keywordflow}{catch}\ (\textcolor{keyword}{const}\ osc::OSCException\&\ e)\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}OSC\ Initialization\ Error:\ "{}}\ <<\ e.what()\ <<\ \textcolor{stringliteral}{"{}\ (Code:\ "{}}\ <<\ \textcolor{keyword}{static\_cast<}\textcolor{keywordtype}{int}\textcolor{keyword}{>}(e.code())\ <<\ \textcolor{stringliteral}{"{})"{}}\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{keywordflow}{return}\ 1;}
+\DoxyCodeLine{\ \ \ \ \}\ \textcolor{keywordflow}{catch}\ (\textcolor{keyword}{const}\ std::exception\&\ e)\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Error:\ "{}}\ <<\ e.what()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{keywordflow}{return}\ 1;}
+\DoxyCodeLine{\ \ \ \ \}}
+\DoxyCodeLine{\ \ \ \ \textcolor{keywordflow}{return}\ 0;}
+\DoxyCodeLine{\}}
+
+\end{DoxyCode}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md25}{}\doxysubsection{\texorpdfstring{Basic Usage (Client)}{Basic Usage (Client)}}\label{md__r_e_a_d_m_e_autotoc_md25}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ "{}osc/Address.h"{}}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ "{}osc/Message.h"{}}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ "{}osc/Bundle.h"{}}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ "{}osc/TimeTag.h"{}}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ <iostream>}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ <vector>}}
+\DoxyCodeLine{\textcolor{preprocessor}{\#include\ <cstddef>}\ \textcolor{comment}{//\ For\ std::byte}}
+\DoxyCodeLine{}
+\DoxyCodeLine{\textcolor{keywordtype}{int}\ main()\ \{}
+\DoxyCodeLine{\ \ \ \ \textcolor{keywordflow}{try}\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Target\ address:\ UDP\ to\ localhost\ port\ 8000}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ osc::Address\ address(\textcolor{stringliteral}{"{}127.0.0.1"{}},\ \textcolor{stringliteral}{"{}8000"{}},\ osc::Protocol::UDP);}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{keywordflow}{if}\ (!address.isValid())\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Failed\ to\ initialize\ address:\ "{}}\ <<\ address.getErrorMessage()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordflow}{return}\ 1;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \}}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Create\ an\ OSC\ message\ (assuming\ Message\ methods\ are\ implemented)}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ osc::Message\ msg(\textcolor{stringliteral}{"{}/test/path"{}});}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ msg.addInt32(42);}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ msg.addFloat(3.14159f);}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ msg.addString(\textcolor{stringliteral}{"{}Hello,\ OSC!"{}});}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Send\ the\ message}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{keywordflow}{if}\ (!address.send(msg))\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Failed\ to\ send\ message:\ "{}}\ <<\ address.getErrorMessage()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \}\ \textcolor{keywordflow}{else}\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cout\ <<\ \textcolor{stringliteral}{"{}Message\ sent."{}}\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \}}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Create\ a\ bundle\ with\ multiple\ messages}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ osc::Bundle\ bundle(osc::TimeTag::immediate());\ \textcolor{comment}{//\ Immediate\ execution}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ bundle.addMessage(msg);}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ osc::Message\ msg2(\textcolor{stringliteral}{"{}/test/another"{}});}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ msg2.addInt64(100LL);}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ bundle.addMessage(msg2);}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{comment}{//\ Send\ the\ bundle}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{keywordflow}{if}\ (!address.send(bundle))\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Failed\ to\ send\ bundle:\ "{}}\ <<\ address.getErrorMessage()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \}\ \textcolor{keywordflow}{else}\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \ \ \ \ std::cout\ <<\ \textcolor{stringliteral}{"{}Bundle\ sent."{}}\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \}}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ \}\ \textcolor{keywordflow}{catch}\ (\textcolor{keyword}{const}\ osc::OSCException\&\ e)\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}OSC\ Error:\ "{}}\ <<\ e.what()\ <<\ \textcolor{stringliteral}{"{}\ (Code:\ "{}}\ <<\ \textcolor{keyword}{static\_cast<}\textcolor{keywordtype}{int}\textcolor{keyword}{>}(e.code())\ <<\ \textcolor{stringliteral}{"{})"{}}\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{keywordflow}{return}\ 1;}
+\DoxyCodeLine{\ \ \ \ \}\ \textcolor{keywordflow}{catch}\ (\textcolor{keyword}{const}\ std::exception\&\ e)\ \{}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ std::cerr\ <<\ \textcolor{stringliteral}{"{}Error:\ "{}}\ <<\ e.what()\ <<\ std::endl;}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ \textcolor{keywordflow}{return}\ 1;}
+\DoxyCodeLine{\ \ \ \ \}}
+\DoxyCodeLine{\ \ \ \ \textcolor{keywordflow}{return}\ 0;}
+\DoxyCodeLine{\}}
+
+\end{DoxyCode}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md26}{}\doxysection{\texorpdfstring{Architecture}{Architecture}}\label{md__r_e_a_d_m_e_autotoc_md26}
+The library is designed with a layered architecture\+:\hypertarget{md__r_e_a_d_m_e_autotoc_md27}{}\doxysubsection{\texorpdfstring{Core Layer\+: Basic data types and serialization}{Core Layer\+: Basic data types and serialization}}\label{md__r_e_a_d_m_e_autotoc_md27}
+
+\begin{DoxyItemize}
+\item {\bfseries{Types.\+h}}\+: Fundamental OSC data types ({\ttfamily Time\+Tag}, {\ttfamily Blob}, {\ttfamily Value}, {\ttfamily Protocol}, {\ttfamily OSCException})
+\item {\bfseries{Value}}\+: Type-\/safe container for OSC values using {\ttfamily std\+::variant}
+\item {\bfseries{Time\+Tag}}\+: OSC time tag representation
+\end{DoxyItemize}\hypertarget{md__r_e_a_d_m_e_autotoc_md28}{}\doxysubsection{\texorpdfstring{Message Layer\+: OSC message and bundle handling}{Message Layer\+: OSC message and bundle handling}}\label{md__r_e_a_d_m_e_autotoc_md28}
+
+\begin{DoxyItemize}
+\item {\bfseries{Message}}\+: OSC message construction and parsing
+\item {\bfseries{Bundle}}\+: Container for messages with common time tag
+\end{DoxyItemize}\hypertarget{md__r_e_a_d_m_e_autotoc_md29}{}\doxysubsection{\texorpdfstring{Transport Layer\+: Network communication}{Transport Layer\+: Network communication}}\label{md__r_e_a_d_m_e_autotoc_md29}
+
+\begin{DoxyItemize}
+\item {\bfseries{Address}}\+: Network address and send operations
+\item {\bfseries{Server}}\+: Listening for and dispatching OSC messages
+\end{DoxyItemize}\hypertarget{md__r_e_a_d_m_e_autotoc_md30}{}\doxysubsection{\texorpdfstring{High-\/\+Level API}{High-\/\+Level API}}\label{md__r_e_a_d_m_e_autotoc_md30}
+
+\begin{DoxyItemize}
+\item {\bfseries{Server\+Thread}}\+: Convenience class for running a server in a background thread.
+\end{DoxyItemize}\hypertarget{md__r_e_a_d_m_e_autotoc_md31}{}\doxysubsection{\texorpdfstring{Utility Layer\+: Helper functions and exception handling}{Utility Layer\+: Helper functions and exception handling}}\label{md__r_e_a_d_m_e_autotoc_md31}
+
+\begin{DoxyItemize}
+\item {\bfseries{OSCException}}\+: Error handling hierarchy
+\end{DoxyItemize}
+
+For more detailed architectural information, see \doxysectlink{md__a_r_c_h_i_t_e_c_t_u_r_e}{ARCHITECTURE.md}{0}.\hypertarget{md__r_e_a_d_m_e_autotoc_md32}{}\doxysection{\texorpdfstring{Documentation}{Documentation}}\label{md__r_e_a_d_m_e_autotoc_md32}
+
+\begin{DoxyItemize}
+\item \doxysectlink{md__a_r_c_h_i_t_e_c_t_u_r_e}{Architecture Documentation}{0} -\/ Detailed design of the library components
+\item \doxysectlink{md__r_e_q_u_i_r_e_m_e_n_t_s}{Requirements}{0} -\/ System and compilation requirements
+\item \doxysectlink{md__s_p_e_c_i_f_i_c_a_t_i_o_n}{OSC Specification}{0} -\/ Details about the OSC protocol implementation
+\item \doxysectlink{md__t_o_d_o}{TODO List}{0} -\/ Upcoming features and known issues
+\end{DoxyItemize}\hypertarget{md__r_e_a_d_m_e_autotoc_md33}{}\doxysection{\texorpdfstring{Testing}{Testing}}\label{md__r_e_a_d_m_e_autotoc_md33}
+Unit tests are provided in the {\ttfamily tests} directory. To run the tests, use the following command after building the library\+:
+
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{\#\ From\ build\ directory}
+\DoxyCodeLine{ctest\ -\/-\/output-\/on-\/failure}
+\DoxyCodeLine{}
+\DoxyCodeLine{\#\ Or\ using\ build\ script}
+\DoxyCodeLine{build.bat\ test\ \ \ \ \#\ Windows}
+\DoxyCodeLine{./build.sh\ test\ \ \ \#\ Linux/macOS}
+
+\end{DoxyCode}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md34}{}\doxysection{\texorpdfstring{OSC Protocol Compliance}{OSC Protocol Compliance}}\label{md__r_e_a_d_m_e_autotoc_md34}
+This implementation aims to adhere to both OSC 1.\+0 and 1.\+1 specifications, supporting\+:
+
+
+\begin{DoxyItemize}
+\item Standard OSC address pattern syntax and matching
+\item All core OSC data types
+\item OSC bundles with time tags
+\item OSC 1.\+1 extensions (arrays, etc.)
+\end{DoxyItemize}
+
+For detailed information about the OSC protocol specifications, see \doxysectlink{md__s_p_e_c_i_f_i_c_a_t_i_o_n}{SPECIFICATION.md}{0}.\hypertarget{md__r_e_a_d_m_e_autotoc_md35}{}\doxysection{\texorpdfstring{Troubleshooting}{Troubleshooting}}\label{md__r_e_a_d_m_e_autotoc_md35}
+\hypertarget{md__r_e_a_d_m_e_autotoc_md36}{}\doxysubsection{\texorpdfstring{Common Build Issues}{Common Build Issues}}\label{md__r_e_a_d_m_e_autotoc_md36}
+
+\begin{DoxyEnumerate}
+\item {\bfseries{CMake Not Found}}\+: Ensure CMake is installed and in your PATH
+\item {\bfseries{Compilation Errors}}\+:
+\begin{DoxyItemize}
+\item Check your compiler supports C++17
+\item On Windows, ensure Visual Studio and Windows SDK are properly installed
+\item On Linux, make sure you have the pthread development libraries installed
+\end{DoxyItemize}
+\item {\bfseries{Socket Initialization Failures}}\+:
+\begin{DoxyItemize}
+\item On Windows, check that Win\+Sock libraries are available
+\item On Linux/mac\+OS, check your firewall settings if socket binding fails
+\end{DoxyItemize}
+\end{DoxyEnumerate}\hypertarget{md__r_e_a_d_m_e_autotoc_md37}{}\doxysubsection{\texorpdfstring{Runtime Issues}{Runtime Issues}}\label{md__r_e_a_d_m_e_autotoc_md37}
+
+\begin{DoxyEnumerate}
+\item {\bfseries{Network Permission Errors}}\+: Some platforms require elevated permissions to bind to ports below 1024
+\item {\bfseries{Firewall Blocking}}\+: Ensure your firewall allows the application to send/receive UDP or TCP traffic
+\end{DoxyEnumerate}\hypertarget{md__r_e_a_d_m_e_autotoc_md38}{}\doxysection{\texorpdfstring{License}{License}}\label{md__r_e_a_d_m_e_autotoc_md38}
+\mbox{[}Your License Here\mbox{]}\hypertarget{md__r_e_a_d_m_e_autotoc_md39}{}\doxysection{\texorpdfstring{Contributing}{Contributing}}\label{md__r_e_a_d_m_e_autotoc_md39}
+Contributions are welcome! Please feel free to submit a Pull Request, focusing on the items listed in the Roadmap. 

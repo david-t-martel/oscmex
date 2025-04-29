@@ -1,0 +1,26 @@
+var searchData=
+[
+  ['b_0',['b',['../structosc_1_1_r_g_b_a_color.html#a7ed9e9f729621a9887dd39c006dc9a15',1,'osc::RGBAColor']]],
+  ['basic_20data_20types_20and_20serialization_1',['Core Layer: Basic data types and serialization',['../index.html#autotoc_md15',1,'']]],
+  ['basic_20usage_20client_2',['Basic Usage (Client)',['../index.html#autotoc_md13',1,'']]],
+  ['basic_20usage_20server_3',['Basic Usage (Server)',['../index.html#autotoc_md12',1,'']]],
+  ['bigendian_4',['bigEndian',['../namespaceosc.html#ae0736e89703d071525110eb7a08f91dc',1,'osc::bigEndian(uint32_t x)'],['../namespaceosc.html#a87d310760b5f6d26b276771baab8a588',1,'osc::bigEndian(int32_t x)'],['../namespaceosc.html#ae1d3592e94fb147c92afd71d44e4b407',1,'osc::bigEndian(uint64_t x)'],['../namespaceosc.html#a3167af3912729c67f94d479122ccb0e4',1,'osc::bigEndian(int64_t x)'],['../namespaceosc.html#a473e87ba7c25e4c156ccc2be85b9050b',1,'osc::bigEndian(float x)'],['../namespaceosc.html#a19d59435d6f2fc00e016485375d307b9',1,'osc::bigEndian(double x)']]],
+  ['blob_5',['Blob',['../classosc_1_1_blob.html',1,'osc::Blob'],['../classosc_1_1_blob.html#a0e940e241687b43b314fad77bab77f62',1,'osc::Blob::Blob()=default'],['../classosc_1_1_blob.html#a7e19a1ac3417119096db6497e719bf70',1,'osc::Blob::Blob(std::vector&lt; std::byte &gt; data)'],['../classosc_1_1_blob.html#a6cd398a95d91bf2ac4664406ebb083b6',1,'osc::Blob::Blob(const void *data, size_t size)']]],
+  ['blob_5ftag_6',['BLOB_TAG',['../classosc_1_1_value.html#aa09379521652269b1bea0d40ab26c9c6',1,'osc::Value']]],
+  ['bool_7',['Bool',['../classosc_1_1_value.html#adb48460a3ceba4492cafe0b6737f88f9',1,'osc::Value']]],
+  ['bufferoverflow_8',['BufferOverflow',['../classosc_1_1_o_s_c_exception.html#a3deb6b4f86b11fe9f6953bb1082cc854a68ec6e62c5fcbbb68b5ce093bdd60717',1,'osc::OSCException']]],
+  ['bufferoverflowexception_9',['BufferOverflowException',['../classosc_1_1_buffer_overflow_exception.html',1,'osc::BufferOverflowException'],['../classosc_1_1_buffer_overflow_exception.html#aefc64abf3d7bb64c17fba4efbf9e2943',1,'osc::BufferOverflowException::BufferOverflowException()']]],
+  ['build_10',['Manual CMake Build',['../index.html#autotoc_md7',1,'']]],
+  ['build_20issues_11',['Common Build Issues',['../index.html#autotoc_md24',1,'']]],
+  ['building_20the_20library_12',['Building the Library',['../index.html#autotoc_md3',1,'']]],
+  ['bundle_13',['Bundle',['../classosc_1_1_bundle.html',1,'osc::Bundle'],['../classosc_1_1_bundle.html#a232c6cacc402fa88f6fb49e5dc0cdb99',1,'osc::Bundle::Bundle()']]],
+  ['bundle_20handling_14',['Message Layer: OSC message and bundle handling',['../index.html#autotoc_md16',1,'']]],
+  ['bundle_2ecpp_15',['Bundle.cpp',['../_bundle_8cpp.html',1,'']]],
+  ['bundle_2eh_16',['Bundle.h',['../_bundle_8h.html',1,'']]],
+  ['bundleendhandler_17',['BundleEndHandler',['../namespaceosc.html#a911e74825f870631f802eb0b757d7c49',1,'osc']]],
+  ['bundleendhandler_5f_18',['bundleEndHandler_',['../classosc_1_1_server_impl.html#a368e48f375f757f97eceddb93f80cbe4',1,'osc::ServerImpl']]],
+  ['bundles_19',['bundles',['../classosc_1_1_bundle.html#ad0f9b6fa56bb740b9be83ae9ed391da7',1,'osc::Bundle']]],
+  ['bundlestarthandler_20',['BundleStartHandler',['../namespaceosc.html#a6451d0a82e31ed976dcecef23edcd8b3',1,'osc']]],
+  ['bundlestarthandler_5f_21',['bundleStartHandler_',['../classosc_1_1_server_impl.html#a303ecf9eaa80b8a8f054e59c06aac76b',1,'osc::ServerImpl']]],
+  ['bytes_22',['bytes',['../structosc_1_1_m_i_d_i_message.html#a8beef18d2b414a4719ebd1cca67e64cb',1,'osc::MIDIMessage::bytes'],['../classosc_1_1_blob.html#a013195f34d7f6fea9c488b010be2d362',1,'osc::Blob::bytes()']]]
+];

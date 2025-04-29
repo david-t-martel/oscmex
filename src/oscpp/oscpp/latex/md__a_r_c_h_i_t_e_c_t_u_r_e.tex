@@ -1,0 +1,156 @@
+\chapter{Modern C++ OSC Library Architecture}
+\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e}{}\label{md__a_r_c_h_i_t_e_c_t_u_r_e}\index{Modern C++ OSC Library Architecture@{Modern C++ OSC Library Architecture}}
+\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md0}%
+\Hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md0}%
+
+
+This document outlines the architecture of our modern C++ implementation of the Open Sound Control (OSC) protocol. The library is designed with SOLID principles, modern C++ features, and cross-\/platform compatibility in mind.\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md1}{}\doxysection{\texorpdfstring{Core Architecture}{Core Architecture}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md1}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{graph\ TD}
+\DoxyCodeLine{\ \ \ \ subgraph\ "{}OSC\ Core\ Modules"{}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ Types[Types]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ TimeTag[TimeTag]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ Message[Message]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ Bundle[Bundle]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ Address[Address]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ Server[Server]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ ServerThread[ServerThread]}
+\DoxyCodeLine{\ \ \ \ end}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ subgraph\ "{}Transport\ Layer\ (Abstracted\ by\ Address/Server)"{}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ AddressImpl[AddressImpl]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ ServerImpl[ServerImpl]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ UDP[UDP\ Support]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ TCP[TCP\ Support]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ UNIX[UNIX\ Socket\ Support]}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ Address\ -\/-\/>\ AddressImpl}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ Server\ -\/-\/>\ ServerImpl}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ AddressImpl\ -\/-\/>\ UDP}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ AddressImpl\ -\/-\/>\ TCP}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ AddressImpl\ -\/-\/>\ UNIX}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ ServerImpl\ -\/-\/>\ UDP}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ ServerImpl\ -\/-\/>\ TCP}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ ServerImpl\ -\/-\/>\ UNIX}
+\DoxyCodeLine{\ \ \ \ end}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ subgraph\ "{}Error\ Handling"{}}
+\DoxyCodeLine{\ \ \ \ \ \ \ \ Exceptions[OSCExceptions]}
+\DoxyCodeLine{\ \ \ \ end}
+\DoxyCodeLine{}
+\DoxyCodeLine{\ \ \ \ Message\ -\/-\/>\ Types}
+\DoxyCodeLine{\ \ \ \ Bundle\ -\/-\/>\ Message}
+\DoxyCodeLine{\ \ \ \ Bundle\ -\/-\/>\ TimeTag}
+\DoxyCodeLine{\ \ \ \ ServerThread\ -\/-\/>\ Server}
+\DoxyCodeLine{\ \ \ \ AddressImpl\ -\/-\/>\ Exceptions}
+\DoxyCodeLine{\ \ \ \ ServerImpl\ -\/-\/>\ Exceptions}
+\DoxyCodeLine{\ \ \ \ Message\ -\/-\/>\ Exceptions}
+\DoxyCodeLine{\ \ \ \ Bundle\ -\/-\/>\ Exceptions}
+
+\end{DoxyCode}
+\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md2}{}\doxysection{\texorpdfstring{Component Overview}{Component Overview}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md2}
+\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md3}{}\doxysubsection{\texorpdfstring{Core Components}{Core Components}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md3}
+
+\begin{DoxyItemize}
+\item {\bfseries{\href{include/osc/OSC.h}{\texttt{ OSC.\+h}}}}\+: Main include file for the library, providing a convenient single header to include all components.
+\item {\bfseries{\href{include/osc/Types.h}{\texttt{ Types.\+h}}}}\+: Defines fundamental types and enumerations used throughout the library.
+\item {\bfseries{\href{include/osc/TimeTag.h}{\texttt{ Time\+Tag.\+h}}}} / {\bfseries{\href{src/TimeTag.cpp}{\texttt{ Time\+Tag.\+cpp}}}}\+: Implements OSC time tags for message scheduling.
+\item {\bfseries{\href{include/osc/Message.h}{\texttt{ Message.\+h}}}} / {\bfseries{\href{src/Message.cpp}{\texttt{ Message.\+cpp}}}}\+: Core class for creating, manipulating, and serializing OSC messages.
+\item {\bfseries{\href{include/osc/Bundle.h}{\texttt{ Bundle.\+h}}}} / {\bfseries{\href{src/Bundle.cpp}{\texttt{ Bundle.\+cpp}}}}\+: Implements OSC bundles for grouping messages with a common time tag.
+\item {\bfseries{\href{include/osc/Address.h}{\texttt{ Address.\+h}}}} / {\bfseries{\href{src/Address.cpp}{\texttt{ Address.\+cpp}}}}\+: Client-\/side class for sending OSC messages to a specific destination.
+\item {\bfseries{\href{include/osc/Server.h}{\texttt{ Server.\+h}}}} / {\bfseries{\href{src/Server.cpp}{\texttt{ Server.\+cpp}}}}\+: Server-\/side class for receiving and dispatching OSC messages.
+\item {\bfseries{\href{include/osc/ServerThread.h}{\texttt{ Server\+Thread.\+h}}}} / {\bfseries{\href{src/ServerThread.cpp}{\texttt{ Server\+Thread.\+cpp}}}}\+: Threaded wrapper for the Server class.
+\end{DoxyItemize}\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md4}{}\doxysubsection{\texorpdfstring{Implementation Details}{Implementation Details}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md4}
+
+\begin{DoxyItemize}
+\item {\bfseries{\href{include/osc/AddressImpl.h}{\texttt{ Address\+Impl.\+h}}}} / {\bfseries{\href{src/AddressImpl.cpp}{\texttt{ Address\+Impl.\+cpp}}}}\+: Implementation details for the Address class (PIMPL pattern).
+\item {\bfseries{\href{include/osc/ServerImpl.h}{\texttt{ Server\+Impl.\+h}}}} / {\bfseries{\href{src/ServerImpl.cpp}{\texttt{ Server\+Impl.\+cpp}}}}\+: Implementation details for the Server class (PIMPL pattern).
+\item {\bfseries{\href{include/osc/Exceptions.h}{\texttt{ Exceptions.\+h}}}} / {\bfseries{\href{src/OSCException.cpp}{\texttt{ OSCException.\+cpp}}}}\+: Exception handling for the library.
+\item {\bfseries{\href{src/Value.cpp}{\texttt{ Value.\+cpp}}}}\+: Implementation of the OSC value system, supporting type conversions and serialization.
+\item {\bfseries{\href{src/main.cpp}{\texttt{ main.\+cpp}}}}\+: Core library entry points including initialization, cleanup, and utility functions.
+\end{DoxyItemize}\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md5}{}\doxysubsection{\texorpdfstring{Core Entry Points}{Core Entry Points}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md5}
+The library is designed with an easy-\/to-\/use API\+:
+
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{\textcolor{comment}{//\ Initialize\ the\ library}}
+\DoxyCodeLine{osc::initialize();}
+\DoxyCodeLine{}
+\DoxyCodeLine{\textcolor{comment}{//\ Create\ and\ send\ a\ message}}
+\DoxyCodeLine{osc::Message\ message(\textcolor{stringliteral}{"{}/address/pattern"{}});}
+\DoxyCodeLine{message.addInt32(42).addFloat(3.14f).addString(\textcolor{stringliteral}{"{}hello"{}});}
+\DoxyCodeLine{}
+\DoxyCodeLine{osc::Address\ destination(\textcolor{stringliteral}{"{}localhost"{}},\ \textcolor{stringliteral}{"{}8000"{}},\ osc::Protocol::UDP);}
+\DoxyCodeLine{destination.send(message);}
+\DoxyCodeLine{}
+\DoxyCodeLine{\textcolor{comment}{//\ Create\ a\ server\ to\ receive\ messages}}
+\DoxyCodeLine{osc::Server\ server(\textcolor{stringliteral}{"{}8000"{}},\ osc::Protocol::UDP);}
+\DoxyCodeLine{server.addMethod(\textcolor{stringliteral}{"{}/address/pattern"{}},\ \textcolor{stringliteral}{"{}"{}},\ [](\textcolor{keyword}{const}\ osc::Message\&\ msg)\ \{}
+\DoxyCodeLine{\ \ \ \ \textcolor{comment}{//\ Handle\ incoming\ message}}
+\DoxyCodeLine{\});}
+\DoxyCodeLine{}
+\DoxyCodeLine{\textcolor{comment}{//\ Use\ ServerThread\ for\ background\ processing}}
+\DoxyCodeLine{osc::ServerThread\ thread(server);}
+\DoxyCodeLine{thread.start();}
+\DoxyCodeLine{}
+\DoxyCodeLine{\textcolor{comment}{//\ ...later...}}
+\DoxyCodeLine{thread.stop();}
+\DoxyCodeLine{}
+\DoxyCodeLine{\textcolor{comment}{//\ Clean\ up\ when\ done}}
+\DoxyCodeLine{osc::cleanup();}
+
+\end{DoxyCode}
+\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md6}{}\doxysection{\texorpdfstring{Design Patterns}{Design Patterns}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md6}
+The library employs several design patterns to promote maintainability and flexibility\+:
+
+
+\begin{DoxyEnumerate}
+\item {\bfseries{PIMPL (Pointer to Implementation)}}\+: Used in Address and Server classes to hide platform-\/specific details and maintain ABI compatibility.
+\item {\bfseries{Factory Methods}}\+: Static creation methods like {\ttfamily Time\+Tag\+::now()}, {\ttfamily Time\+Tag\+::immediate()}, and {\ttfamily Address\+::from\+Url()}.
+\item {\bfseries{Builder Pattern}}\+: Method chaining in Message and Bundle for fluent construction.
+\item {\bfseries{Observer Pattern}}\+: Callback-\/based message dispatching in Server.
+\item {\bfseries{Façade Pattern}}\+: OSC.\+h provides a simple interface to the entire library.
+\end{DoxyEnumerate}\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md7}{}\doxysection{\texorpdfstring{Cross-\/\+Platform Support}{Cross-\/\+Platform Support}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md7}
+Platform-\/specific code is isolated in the implementation files\+:
+
+
+\begin{DoxyItemize}
+\item Windows\+: Using Winsock2 for networking
+\item Unix/\+Linux\+: Using POSIX sockets
+\item mac\+OS\+: Using BSD sockets with platform-\/specific extensions
+\end{DoxyItemize}
+
+The CMake build system (\href{CMakeLists.txt}{\texttt{ CMake\+Lists.\+txt}}) handles platform detection and configuration with platform-\/specific options in the \mbox{[}cmake\mbox{]}(cmake) directory.\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md8}{}\doxysection{\texorpdfstring{Error Handling}{Error Handling}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md8}
+The library employs a consistent error handling approach using custom exceptions\+:
+
+
+\begin{DoxyItemize}
+\item {\bfseries{OSCException}}\+: Base exception class with error codes for different failure categories
+\item All public methods document their exception behavior
+\item Functions that may fail without being exceptional return boolean success indicators
+\end{DoxyItemize}\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md9}{}\doxysection{\texorpdfstring{Memory Management}{Memory Management}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md9}
+
+\begin{DoxyItemize}
+\item Modern C++ smart pointers and RAII principles are used throughout
+\item Custom allocators are avoided in favor of standard containers
+\item Serialization functions avoid unnecessary copies with std\+::byte vectors
+\end{DoxyItemize}\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md10}{}\doxysection{\texorpdfstring{Protocol Support}{Protocol Support}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md10}
+The library implements\+:
+
+
+\begin{DoxyItemize}
+\item OSC 1.\+0 and 1.\+1 specifications
+\item UDP transport (primary)
+\item TCP transport with packet framing
+\item UNIX domain sockets (where available)
+\item Full OSC type system including standard, extended, and array types
+\end{DoxyItemize}\hypertarget{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md11}{}\doxysection{\texorpdfstring{Future Enhancements}{Future Enhancements}}\label{md__a_r_c_h_i_t_e_c_t_u_r_e_autotoc_md11}
+See \doxysectlink{md__t_o_d_o}{TODO.md}{0} for planned enhancements, including\+:
+
+
+\begin{DoxyItemize}
+\item Web\+Socket transport support
+\item OSC query support (zeroconf/discovery)
+\item Additional pattern matching algorithms
+\item Performance optimizations 
+\end{DoxyItemize}

@@ -1,0 +1,27 @@
+var classosc_1_1_message =
+[
+    [ "Message", "classosc_1_1_message.html#a94508ef1839fbd1caed13462a5815714", null ],
+    [ "addArray", "classosc_1_1_message.html#a69ce136d93b085dd71d6b179539b549d", null ],
+    [ "addBlob", "classosc_1_1_message.html#a2a7a511458aca9c8384a80cd93a3dd12", null ],
+    [ "addBool", "classosc_1_1_message.html#a94ec5eb6e8a58350aba90ce9499991e6", null ],
+    [ "addChar", "classosc_1_1_message.html#a9173c6f758eaf0c272b221a2cc60bc44", null ],
+    [ "addColor", "classosc_1_1_message.html#aff6b90a4555eeb51bd30e00e47cecb2d", null ],
+    [ "addDouble", "classosc_1_1_message.html#afdca9b06f77876cce40d7101999a7158", null ],
+    [ "addFalse", "classosc_1_1_message.html#a0aa9605700b7d110fae47a0fe80fb65c", null ],
+    [ "addFloat", "classosc_1_1_message.html#a537cb65a6d5e450b54f8bdc62aae8d4e", null ],
+    [ "addInfinitum", "classosc_1_1_message.html#af5c1a26f8406541d6a5d134c3ef0cbfd", null ],
+    [ "addInt32", "classosc_1_1_message.html#a870bd17eb36284184362704320a0506d", null ],
+    [ "addInt64", "classosc_1_1_message.html#aa26e1b2208bc199e680add8a802c0737", null ],
+    [ "addMidi", "classosc_1_1_message.html#aa3ed20eb1b490ef06bf2667cefe9ed58", null ],
+    [ "addNil", "classosc_1_1_message.html#a0959a3a22c56a0b02eb1a37a90bc3ecb", null ],
+    [ "addString", "classosc_1_1_message.html#a95fd40fc2fb13d23e331a29ad0ed9e0d", null ],
+    [ "addSymbol", "classosc_1_1_message.html#a253934cad99767f4568351b61c890647", null ],
+    [ "addTimeTag", "classosc_1_1_message.html#a49722edb1a4315c9637fc1c58814d2ac", null ],
+    [ "addTrue", "classosc_1_1_message.html#ac5e2a3b933b120390b3c86ee5bef0053", null ],
+    [ "addValue", "classosc_1_1_message.html#a035db59f1c9c20f7f858668ed4706ca0", null ],
+    [ "getArguments", "classosc_1_1_message.html#a0d13ee891fef2681af34b54448df5822", null ],
+    [ "getPath", "classosc_1_1_message.html#a1b204e9283fe813e3232d9c640fb815b", null ],
+    [ "serialize", "classosc_1_1_message.html#aff73a4da750ffd201112b561d45b8093", null ],
+    [ "arguments_", "classosc_1_1_message.html#aad885c7e79f72a58ac92e1cc54d8a233", null ],
+    [ "path_", "classosc_1_1_message.html#a21c00589a881f7b08b2b70a72efc0ffe", null ]
+];

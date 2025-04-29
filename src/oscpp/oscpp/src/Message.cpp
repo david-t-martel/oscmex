@@ -1,378 +1,376 @@
-// filepath: c:\codedev\auricleinc\oscmex\src\Message.cpp
-#include "Message.h"
-#include "Types.h"
+#include "osc/Message.h"
+
 #include <cstring>
 #include <sstream>
 
-namespace osc
-{
+#include "osc/Types.h"
 
-    // Constructor for Message class
-    Message::Message(const std::string &path) : path_(path) {}
-
-    // Copy constructor
-    Message::Message(const Message &other) : path_(other.path_), arguments_(other.arguments_) {}
-
-    // Move constructor
-    Message::Message(Message &&other) noexcept
-        : path_(std::move(other.path_)), arguments_(std::move(other.arguments_)) {}
-
-    // Add an argument directly
-    void Message::addValue(const Value &value)
-    {
-        arguments_.push_back(value);
-    }
-
-    // Add an int32 argument
-    void Message::addInt32(int32_t value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add an int64 argument
-    void Message::addInt64(int64_t value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add a float argument
-    void Message::addFloat(float value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add a double argument
-    void Message::addDouble(double value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add a string argument
-    void Message::addString(const std::string &value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add a symbol argument
-    void Message::addSymbol(const std::string &value)
-    {
-        // Note: In the current implementation, symbols are stored as strings
-        // We'd need a proper way to distinguish them when querying type
-        arguments_.emplace_back(value);
-    }
-
-    // Add a blob argument
-    void Message::addBlob(const Blob &value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add blob from raw data
-    void Message::addBlob(const void *data, size_t size)
-    {
-        arguments_.emplace_back(Blob(data, size));
-    }
-
-    // Add a time tag argument
-    void Message::addTimeTag(const TimeTag &value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add a char argument
-    void Message::addChar(char value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add a color argument
-    void Message::addColor(uint32_t rgba)
-    {
-        arguments_.emplace_back(rgba);
-    }
-
-    // Add a MIDI message
-    void Message::addMidi(const std::array<uint8_t, 4> &midi)
-    {
-        arguments_.emplace_back(midi);
-    }
-
-    // Add a boolean argument
-    void Message::addBool(bool value)
-    {
-        arguments_.emplace_back(value);
-    }
-
-    // Add a nil argument
-    void Message::addNil()
-    {
-        arguments_.emplace_back();
-    }
-
-    // Add an infinitum argument
-    void Message::addInfinitum()
-    {
-        // TODO: Implement proper infinitum type
-        arguments_.emplace_back(true);
-    }
-
-    // Add an array argument
-    void Message::addArray(const std::vector<Value> &array)
-    {
-        arguments_.emplace_back(array);
+namespace osc {
+    // Constructor for Message class with address path validation
+    Message::Message(const std::string &path) : path_(path) {
+        // Validate OSC path (must start with '/')
+        if (path.empty() || path[0] != '/') {
+            throw OSCException("Invalid OSC address pattern (must start with '/')",
+                               OSCException::ErrorCode::AddressError);
+        }
     }
 
     // Get the message path
-    const std::string &Message::getPath() const
-    {
-        return path_;
-    }
-
-    // Get the number of arguments
-    size_t Message::getArgumentCount() const
-    {
-        return arguments_.size();
-    }
+    std::string Message::getPath() const { return path_; }
 
     // Get all arguments
-    const std::vector<Value> &Message::getArguments() const
-    {
-        return arguments_;
+    const std::vector<Value> &Message::getArguments() const { return arguments_; }
+
+    // Add an Int32 argument (type tag 'i')
+    Message &Message::addInt32(int32_t value) {
+        arguments_.emplace_back(Value(value));
+        return *this;
     }
 
-    // Get an argument by index
-    const Value &Message::getArgument(size_t index) const
-    {
-        if (index < arguments_.size())
-        {
-            return arguments_[index];
+    // Add an Int64 argument (type tag 'h')
+    Message &Message::addInt64(int64_t value) {
+        arguments_.emplace_back(Value(value));
+        return *this;
+    }
+
+    // Add a Float argument (type tag 'f')
+    Message &Message::addFloat(float value) {
+        arguments_.emplace_back(Value(value));
+        return *this;
+    }
+
+    // Add a Double argument (type tag 'd')
+    Message &Message::addDouble(double value) {
+        arguments_.emplace_back(Value(value));
+        return *this;
+    }
+
+    // Add a String argument (type tag 's')
+    Message &Message::addString(const std::string &value) {
+        arguments_.emplace_back(Value(value));
+        return *this;
+    }
+
+    // Add a Symbol argument (type tag 'S')
+    Message &Message::addSymbol(const std::string &value) {
+        // Symbols are stored as strings but will have different type tag
+        arguments_.emplace_back(Value(std::string(value)));
+        return *this;
+    }
+
+    // Add a Blob argument from raw data (type tag 'b')
+    Message &Message::addBlob(const void *data, size_t size) {
+        arguments_.emplace_back(Value(Blob(data, size)));
+        return *this;
+    }
+
+    // Add a TimeTag argument (type tag 't')
+    Message &Message::addTimeTag(const TimeTag &timeTag) {
+        arguments_.emplace_back(Value(timeTag));
+        return *this;
+    }
+
+    // Add a Character argument (type tag 'c')
+    Message &Message::addChar(char value) {
+        arguments_.emplace_back(Value(value));
+        return *this;
+    }
+
+    // Add a RGBA Color argument (type tag 'r')
+    Message &Message::addColor(uint32_t value) {
+        RGBAColor color;
+        color.r = (value >> 24) & 0xFF;
+        color.g = (value >> 16) & 0xFF;
+        color.b = (value >> 8) & 0xFF;
+        color.a = value & 0xFF;
+        arguments_.emplace_back(Value(color));
+        return *this;
+    }
+
+    // Add a MIDI message argument (type tag 'm')
+    Message &Message::addMidi(uint8_t port, uint8_t status, uint8_t data1, uint8_t data2) {
+        MIDIMessage midi;
+        midi.bytes = {port, status, data1, data2};
+        arguments_.emplace_back(Value(midi));
+        return *this;
+    }
+
+    // Add a True argument (type tag 'T')
+    Message &Message::addTrue() {
+        arguments_.emplace_back(Value::trueBool());
+        return *this;
+    }
+
+    // Add a False argument (type tag 'F')
+    Message &Message::addFalse() {
+        arguments_.emplace_back(Value::falseBool());
+        return *this;
+    }
+
+    // Add a boolean argument (type tag 'T' or 'F')
+    Message &Message::addBool(bool value) {
+        if (value)
+            return addTrue();
+        else
+            return addFalse();
+    }
+
+    // Add a Nil argument (type tag 'N')
+    Message &Message::addNil() {
+        arguments_.emplace_back(Value::nil());
+        return *this;
+    }
+
+    // Add an Infinitum argument (type tag 'I')
+    Message &Message::addInfinitum() {
+        arguments_.emplace_back(Value::infinitum());
+        return *this;
+    }
+
+    // Add an Array of arguments (type tags '[ ... ]')
+    Message &Message::addArray(const std::vector<Value> &array) {
+        // Mark all values in the array as array elements
+        std::vector<Value> markedArray;
+        markedArray.reserve(array.size());
+
+        for (const auto &val : array) {
+            // Create a copy of the value and mark it as an array element
+            Value arrVal(val.variant(), true);
+            markedArray.push_back(arrVal);
         }
-        throw OSCException(OSCException::ErrorCode::InvalidArgument, "Argument index out of range");
-    }
 
-    // Helper function to append string with OSC padding
-    void Message::appendString(std::vector<std::byte> &buffer, const std::string &str)
-    {
-        // Add the string characters including null terminator
-        buffer.insert(buffer.end(),
-                      reinterpret_cast<const std::byte *>(str.c_str()),
-                      reinterpret_cast<const std::byte *>(str.c_str() + str.size() + 1));
+        // Add opening array bracket
+        arguments_.push_back(Value::arrayBegin());
 
-        // Add padding to align to 4-byte boundary
-        size_t padding = (4 - ((str.size() + 1) % 4)) % 4;
-        for (size_t i = 0; i < padding; ++i)
-        {
-            buffer.push_back(std::byte(0));
+        // Add array elements
+        for (const auto &val : markedArray) {
+            arguments_.push_back(val);
         }
+
+        // Add closing array bracket
+        arguments_.push_back(Value::arrayEnd());
+
+        return *this;
     }
+
+    // Add a generic Value argument
+    Message &Message::addValue(const Value &value) {
+        arguments_.push_back(value);
+        return *this;
+    }
+
+    // Helper function to pad to 4-byte boundary
+    inline size_t padSize(size_t size) { return (size + 3) & ~3; }
 
     // Serialize the message to OSC format
-    std::vector<std::byte> Message::serialize() const
-    {
-        std::vector<std::byte> buffer;
+    std::vector<std::byte> Message::serialize() const {
+        // Pre-calculate buffer size to avoid reallocations
+        size_t totalSize = 0;
 
-        // First add the OSC address pattern (with padding)
-        appendString(buffer, path_);
+        // Calculate address size with padding
+        size_t pathLen = path_.length() + 1;  // Include null terminator
+        size_t paddedPathSize = padSize(pathLen);
+        totalSize += paddedPathSize;
 
-        // Build the type tag string
-        std::string typeTagString = ","; // Always starts with comma
-        for (const auto &arg : arguments_)
-        {
-            typeTagString += arg.typeTag();
+        // Calculate type tag size with padding
+        std::string typeTag = ",";
+        for (const auto &arg : arguments_) {
+            typeTag += arg.typeTag();
+        }
+        size_t typeTagLen = typeTag.length() + 1;
+        size_t paddedTypeTagSize = padSize(typeTagLen);
+        totalSize += paddedTypeTagSize;
+
+        // Estimate argument sizes (conservatively)
+        for (const auto &arg : arguments_) {
+            char tag = arg.typeTag();
+
+            // Skip array markers as they don't have binary representation
+            if (tag == ARRAY_BEGIN_TAG || tag == ARRAY_END_TAG) {
+                continue;
+            }
+
+            // T, F, N, I types have no binary data
+            if (tag == TRUE_TAG || tag == FALSE_TAG || tag == NIL_TAG || tag == INFINITUM_TAG) {
+                continue;
+            }
+
+            // Add estimated size based on type
+            switch (tag) {
+                case INT32_TAG:
+                case FLOAT_TAG:
+                case CHAR_TAG:
+                case RGBA_TAG:
+                case MIDI_TAG:
+                    totalSize += 4;
+                    break;
+                case INT64_TAG:
+                case DOUBLE_TAG:
+                case TIMETAG_TAG:
+                    totalSize += 8;
+                    break;
+                case STRING_TAG:
+                case SYMBOL_TAG:
+                    // String length + null terminator + padding
+                    if (tag == STRING_TAG) {
+                        const auto &str = arg.asString();
+                        totalSize += padSize(str.length() + 1);
+                    } else {
+                        const auto &sym = arg.asSymbol();
+                        totalSize += padSize(sym.length() + 1);
+                    }
+                    break;
+                case BLOB_TAG:
+                    // Size field + blob data + padding
+                    const auto &blob = arg.asBlob();
+                    totalSize += 4 + padSize(blob.size());
+                    break;
+            }
         }
 
-        // Add the type tag string (with padding)
-        appendString(buffer, typeTagString);
+        // Create result vector with pre-allocated size
+        std::vector<std::byte> result;
+        result.reserve(totalSize);
 
-        // Add the argument data
-        for (const auto &arg : arguments_)
-        {
-            auto argData = arg.serialize();
-            buffer.insert(buffer.end(), argData.begin(), argData.end());
+        // 1. Add Address Pattern (null-terminated, padded to 4-byte boundary)
+        const char *pathStr = path_.c_str();
+
+        // Add path string with null terminator
+        const std::byte *pathBytes = reinterpret_cast<const std::byte *>(pathStr);
+        result.insert(result.end(), pathBytes, pathBytes + pathLen);
+
+        // Add padding to align to 4-byte boundary
+        result.resize(paddedPathSize, std::byte{0});
+
+        // 2. Add Type Tag String (starts with ',', null-terminated, padded)
+        // Add type tag string with null terminator
+        const char *typeTagStr = typeTag.c_str();
+        const std::byte *typeTagBytes = reinterpret_cast<const std::byte *>(typeTagStr);
+        result.insert(result.end(), typeTagBytes, typeTagBytes + typeTagLen);
+
+        // Add padding to align to 4-byte boundary
+        result.resize(paddedPathSize + paddedTypeTagSize, std::byte{0});
+
+        // 3. Add Argument Data
+        for (const auto &arg : arguments_) {
+            // Skip array markers as they don't have a binary representation
+            if (arg.typeTag() == ARRAY_BEGIN_TAG || arg.typeTag() == ARRAY_END_TAG) {
+                continue;
+            }
+
+            // T, F, N, I types have no binary data
+            if (arg.typeTag() == TRUE_TAG || arg.typeTag() == FALSE_TAG ||
+                arg.typeTag() == NIL_TAG || arg.typeTag() == INFINITUM_TAG) {
+                continue;
+            }
+
+            // Serialize the argument value
+            std::vector<std::byte> argData;
+            argData.reserve(16);  // Small initial reservation for most argument types
+            arg.serialize(argData);
+            result.insert(result.end(), argData.begin(), argData.end());
         }
 
-        return buffer;
+        return result;
     }
 
     // Deserialize a message from binary data
-    Message Message::deserialize(const std::byte *data, size_t size)
-    {
-        if (size < 4)
-        {
-            throw OSCException(OSCException::ErrorCode::InvalidMessage, "Message data too small");
+    Message Message::deserialize(const std::byte *data, size_t size) {
+        if (size < 4) {
+            throw OSCException("Message data too small", OSCException::ErrorCode::MalformedPacket);
         }
 
-        // Extract path (which should be the first part of the message)
+        // 1. Extract OSC Address Pattern
         const char *cdata = reinterpret_cast<const char *>(data);
-        if (cdata[0] != '/')
-        {
-            throw OSCException(OSCException::ErrorCode::InvalidMessage, "Invalid OSC address pattern");
+        if (cdata[0] != '/') {
+            throw OSCException("Invalid OSC address pattern (must start with '/')",
+                               OSCException::ErrorCode::AddressError);
         }
 
-        // Find the null terminator for the path
-        size_t pathLen = 0;
-        while (pathLen < size && cdata[pathLen] != '\0')
-        {
-            pathLen++;
+        // Find the null terminator for the address pattern
+        size_t pathEnd = 0;
+        while (pathEnd < size && cdata[pathEnd] != '\0') {
+            pathEnd++;
         }
 
-        if (pathLen >= size)
-        {
-            throw OSCException(OSCException::ErrorCode::InvalidMessage, "Missing null terminator in OSC address pattern");
+        if (pathEnd >= size) {
+            throw OSCException("Missing null terminator in OSC address pattern",
+                               OSCException::ErrorCode::MalformedPacket);
         }
 
-        // Extract the path string
-        std::string path(cdata, pathLen);
+        // Extract the address pattern string
+        std::string path(cdata, pathEnd);
 
-        // Create message with the path
+        // Create message object with validated path
         Message message(path);
 
-        // Skip past the path and its padding
-        size_t pos = pathLen + 1; // +1 for null terminator
-        pos = (pos + 3) & ~3;     // Round up to next multiple of 4
+        // Move position past the address pattern including padding
+        size_t pos = padSize(pathEnd + 1);  // +1 for null terminator
 
-        if (pos >= size)
-        {
-            // No type tag or arguments, return message with just the path
+        if (pos >= size) {
+            // No type tag string or arguments
             return message;
         }
 
-        // Check if we have a type tag (should start with ',')
-        if (cdata[pos] != ',')
-        {
-            throw OSCException(OSCException::ErrorCode::InvalidMessage, "Missing type tag string");
+        // 2. Extract Type Tag String
+        if (cdata[pos] != ',') {
+            throw OSCException("Type tag string must start with ','",
+                               OSCException::ErrorCode::MalformedPacket);
         }
 
-        // Extract type tag string
-        size_t typeTagPos = pos;
-        size_t typeTagLen = 0;
-        while (pos + typeTagLen < size && cdata[pos + typeTagLen] != '\0')
-        {
-            typeTagLen++;
+        // Find the null terminator for the type tag string
+        size_t typeTagStart = pos;
+        size_t typeTagEnd = pos;
+
+        while (typeTagEnd < size && cdata[typeTagEnd] != '\0') {
+            typeTagEnd++;
         }
 
-        if (pos + typeTagLen >= size)
-        {
-            throw OSCException(OSCException::ErrorCode::InvalidMessage, "Missing null terminator in type tag string");
+        if (typeTagEnd >= size) {
+            throw OSCException("Missing null terminator in type tag string",
+                               OSCException::ErrorCode::MalformedPacket);
         }
 
-        std::string typeTagString(cdata + pos, typeTagLen);
+        // Extract the type tag string
+        std::string typeTag(cdata + typeTagStart, typeTagEnd - typeTagStart);
 
-        // Skip past the type tag string and its padding
-        pos += typeTagLen + 1; // +1 for null terminator
-        pos = (pos + 3) & ~3;  // Round up to next multiple of 4
+        // Move position past the type tag string including padding
+        pos = padSize(typeTagEnd + 1);  // +1 for null terminator
 
-        // Parse arguments based on the type tag characters (skipping the initial ',')
-        for (size_t i = 1; i < typeTagString.size(); ++i)
-        {
-            char tag = typeTagString[i];
+        // 3. Extract Arguments based on Type Tags
+        bool inArray = false;
 
-            // Process based on type tag
-            switch (tag)
-            {
-            case 'i':
-            { // int32
-                if (pos + 4 > size)
-                {
-                    throw OSCException(OSCException::ErrorCode::InvalidMessage, "Message too short for int32 argument");
-                }
-                int32_t value = (static_cast<int32_t>(data[pos]) << 24) |
-                                (static_cast<int32_t>(data[pos + 1]) << 16) |
-                                (static_cast<int32_t>(data[pos + 2]) << 8) |
-                                static_cast<int32_t>(data[pos + 3]);
-                message.addInt32(value);
-                pos += 4;
-                break;
+        // Start from index 1 to skip the initial ',' character
+        for (size_t i = 1; i < typeTag.length(); i++) {
+            char tag = typeTag[i];
+
+            // Handle array markers
+            if (tag == Value::ARRAY_BEGIN_TAG) {
+                inArray = true;
+                message.arguments_.push_back(Value::arrayBegin());
+                continue;
             }
-            case 'f':
-            { // float
-                if (pos + 4 > size)
-                {
-                    throw OSCException(OSCException::ErrorCode::InvalidMessage, "Message too short for float argument");
-                }
-                union
-                {
-                    int32_t i;
-                    float f;
-                } value;
-                value.i = (static_cast<int32_t>(data[pos]) << 24) |
-                          (static_cast<int32_t>(data[pos + 1]) << 16) |
-                          (static_cast<int32_t>(data[pos + 2]) << 8) |
-                          static_cast<int32_t>(data[pos + 3]);
-                message.addFloat(value.f);
-                pos += 4;
-                break;
+
+            if (tag == Value::ARRAY_END_TAG) {
+                inArray = false;
+                message.arguments_.push_back(Value::arrayEnd());
+                continue;
             }
-            case 's':
-            { // string
-                const char *str = cdata + pos;
-                size_t strLen = 0;
-                while (pos + strLen < size && str[strLen] != '\0')
-                {
-                    strLen++;
-                }
 
-                if (pos + strLen >= size)
-                {
-                    throw OSCException(OSCException::ErrorCode::InvalidMessage, "Missing null terminator in string argument");
-                }
-
-                message.addString(std::string(str, strLen));
-
-                // Skip past the string and its padding
-                pos += strLen + 1;    // +1 for null terminator
-                pos = (pos + 3) & ~3; // Round up to next multiple of 4
-                break;
-            }
-            case 'b':
-            { // blob
-                if (pos + 4 > size)
-                {
-                    throw OSCException(OSCException::ErrorCode::InvalidMessage, "Message too short for blob size");
-                }
-
-                // Get blob size
-                int32_t blobSize = (static_cast<int32_t>(data[pos]) << 24) |
-                                   (static_cast<int32_t>(data[pos + 1]) << 16) |
-                                   (static_cast<int32_t>(data[pos + 2]) << 8) |
-                                   static_cast<int32_t>(data[pos + 3]);
-                pos += 4;
-
-                if (blobSize < 0 || pos + blobSize > size)
-                {
-                    throw OSCException(OSCException::ErrorCode::InvalidMessage, "Invalid blob size or message too short");
-                }
-
-                // Create and add blob
-                Blob blob(data + pos, blobSize);
-                message.addBlob(blob);
-
-                // Skip past the blob data and its padding
-                pos += blobSize;
-                pos = (pos + 3) & ~3; // Round up to next multiple of 4
-                break;
-            }
-            // Additional types would be handled here
-            case 'T': // True
-                message.addBool(true);
-                break;
-            case 'F': // False
-                message.addBool(false);
-                break;
-            case 'N': // Nil
-                message.addNil();
-                break;
-            case 'I': // Infinitum
-                message.addInfinitum();
-                break;
-            // Placeholders for other types
-            default:
-                throw OSCException(OSCException::ErrorCode::InvalidMessage,
-                                   "Unsupported type tag: " + std::string(1, tag));
+            // Handle other value types using Value::deserialize
+            if (pos <= size) {
+                size_t remainingSize = size - pos;
+                const std::byte *dataPtr = data + pos;
+                // Create the Value directly in the vector to avoid copy construction
+                message.arguments_.push_back(Value::deserialize(dataPtr, remainingSize, tag));
+                pos = size - remainingSize;  // Update position based on bytes consumed
+            } else {
+                throw OSCException("Message data truncated while parsing arguments",
+                                   OSCException::ErrorCode::MalformedPacket);
             }
         }
 
         return message;
     }
 
-} // namespace osc
+}  // namespace osc

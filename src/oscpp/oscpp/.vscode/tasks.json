@@ -1,0 +1,507 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Intel oneAPI Environment Setup",
+            "type": "shell",
+            "command": "\"C:\\Program Files (x86)\\Intel\\oneAPI\\setvars.bat\" && echo Intel oneAPI environment initialized.",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Configure (Intel oneAPI)",
+            "type": "shell",
+            "command": "cmake -G \"Ninja\" -DCMAKE_TOOLCHAIN_FILE=cmake/intel_oneapi.cmake -DCMAKE_BUILD_TYPE=Debug -B build_intel .",
+            "dependsOn": [
+                "Intel oneAPI Environment Setup"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "CMake Build (Intel oneAPI)",
+            "type": "shell",
+            "command": "cmake --build build_intel --config Debug",
+            "dependsOn": [
+                "CMake Configure (Intel oneAPI)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "CMake Build Release (Intel oneAPI)",
+            "type": "shell",
+            "command": "cmake -G \"Ninja\" -DCMAKE_TOOLCHAIN_FILE=cmake/intel_oneapi.cmake -DCMAKE_BUILD_TYPE=Release -B build_intel . && cmake --build build_intel --config Release",
+            "dependsOn": [
+                "Intel oneAPI Environment Setup"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Run Tests (Intel oneAPI)",
+            "type": "shell",
+            "command": "cd build_intel && ctest -C Debug --output-on-failure",
+            "dependsOn": [
+                "CMake Build (Intel oneAPI)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Clean Build (Intel oneAPI)",
+            "type": "shell",
+            "command": "if exist build_intel rmdir /s /q build_intel",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Examples (Intel oneAPI)",
+            "type": "shell",
+            "command": "cmake --build build_intel --config Debug --target examples",
+            "dependsOn": [
+                "CMake Configure (Intel oneAPI)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Generate Documentation",
+            "type": "shell",
+            "command": "doxygen Doxyfile",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+
+        // Cross-compilation tasks for Linux x86_64
+        {
+            "label": "Cross-Compile Configure (Linux x86_64)",
+            "type": "shell",
+            "command": "cmake -G \"Ninja\" -DCMAKE_TOOLCHAIN_FILE=cmake/intel_oneapi_cross_linux.cmake -DCMAKE_BUILD_TYPE=Release -B build_linux_x64 .",
+            "dependsOn": [
+                "Intel oneAPI Environment Setup"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Cross-Compile Build (Linux x86_64)",
+            "type": "shell",
+            "command": "cmake --build build_linux_x64 --config Release",
+            "dependsOn": [
+                "Cross-Compile Configure (Linux x86_64)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Cross-Compile Examples (Linux x86_64)",
+            "type": "shell",
+            "command": "cmake --build build_linux_x64 --config Release --target examples",
+            "dependsOn": [
+                "Cross-Compile Configure (Linux x86_64)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+
+        // Cross-compilation tasks for ARM64
+        {
+            "label": "Cross-Compile Configure (ARM64)",
+            "type": "shell",
+            "command": "cmake -G \"Ninja\" -DCMAKE_TOOLCHAIN_FILE=cmake/intel_oneapi_cross_arm64.cmake -DCMAKE_BUILD_TYPE=Release -B build_arm64 .",
+            "dependsOn": [
+                "Intel oneAPI Environment Setup"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Cross-Compile Build (ARM64)",
+            "type": "shell",
+            "command": "cmake --build build_arm64 --config Release",
+            "dependsOn": [
+                "Cross-Compile Configure (ARM64)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Cross-Compile Examples (ARM64)",
+            "type": "shell",
+            "command": "cmake --build build_arm64 --config Release --target examples",
+            "dependsOn": [
+                "Cross-Compile Configure (ARM64)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+
+        // Cross-compilation tasks for macOS
+        {
+            "label": "Cross-Compile Configure (macOS)",
+            "type": "shell",
+            "command": "cmake -G \"Ninja\" -DCMAKE_TOOLCHAIN_FILE=cmake/intel_oneapi_cross_macos.cmake -DCMAKE_BUILD_TYPE=Release -B build_macos .",
+            "dependsOn": [
+                "Intel oneAPI Environment Setup"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Cross-Compile Build (macOS)",
+            "type": "shell",
+            "command": "cmake --build build_macos --config Release",
+            "dependsOn": [
+                "Cross-Compile Configure (macOS)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Cross-Compile Examples (macOS)",
+            "type": "shell",
+            "command": "cmake --build build_macos --config Release --target examples",
+            "dependsOn": [
+                "Cross-Compile Configure (macOS)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+
+        // Build All Platforms task
+        {
+            "label": "Build All Platforms",
+            "dependsOn": [
+                "CMake Build Release (Intel oneAPI)",
+                "Cross-Compile Build (Linux x86_64)",
+                "Cross-Compile Build (ARM64)",
+                "Cross-Compile Build (macOS)"
+            ],
+            "dependsOrder": "sequence",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "none",
+                "isDefault": false
+            }
+        },
+
+        // Package creation tasks
+        {
+            "label": "Package Windows (Intel oneAPI)",
+            "type": "shell",
+            "command": "cmake --build build_intel --target package",
+            "dependsOn": [
+                "CMake Build Release (Intel oneAPI)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Package Linux (Cross-Compile)",
+            "type": "shell",
+            "command": "cmake -DOSCPP_CREATE_PACKAGE=ON --build build_linux_x64 --target package",
+            "dependsOn": [
+                "Cross-Compile Build (Linux x86_64)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Package ARM64 (Cross-Compile)",
+            "type": "shell",
+            "command": "cmake -DOSCPP_CREATE_PACKAGE=ON --build build_arm64 --target package",
+            "dependsOn": [
+                "Cross-Compile Build (ARM64)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Package macOS (Cross-Compile)",
+            "type": "shell",
+            "command": "cmake -DOSCPP_CREATE_PACKAGE=ON --build build_macos --target package",
+            "dependsOn": [
+                "Cross-Compile Build (macOS)"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Package All Platforms",
+            "dependsOn": [
+                "Package Windows (Intel oneAPI)",
+                "Package Linux (Cross-Compile)",
+                "Package ARM64 (Cross-Compile)",
+                "Package macOS (Cross-Compile)"
+            ],
+            "dependsOrder": "sequence",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "none",
+                "isDefault": false
+            }
+        }
+    ]
+}

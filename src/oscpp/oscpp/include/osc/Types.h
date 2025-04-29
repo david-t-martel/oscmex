@@ -5,17 +5,19 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstddef>
-#include <string>
-#include <vector>
-#include <chrono>
-#include <variant>
-#include <stdexcept>
 #include <array>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <stdexcept>
+#include <string>
+#include <variant>
+#include <vector>
 
-namespace osc
-{
+#include "osc/Exceptions.h"
+
+namespace osc {
 
 // Socket type definitions for cross-platform compatibility
 #ifdef _WIN32
@@ -23,21 +25,21 @@ namespace osc
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <WinSock2.h>
 #include <WS2tcpip.h>
+#include <WinSock2.h>
     using SOCKET_TYPE = SOCKET;
 #define INVALID_SOCKET_VALUE INVALID_SOCKET
 #define SOCKET_ERROR_VALUE SOCKET_ERROR
 #define CLOSE_SOCKET closesocket
 #else
 // POSIX socket definitions
-#include <sys/types.h>
-#include <sys/socket.h>
+#include <fcntl.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <fcntl.h>
     using SOCKET_TYPE = int;
 #define INVALID_SOCKET_VALUE -1
 #define SOCKET_ERROR_VALUE -1
@@ -51,49 +53,10 @@ namespace osc
     /**
      * @brief Enumeration of supported transport protocols
      */
-    enum class Protocol
-    {
-        UDP, ///< User Datagram Protocol
-        TCP, ///< Transmission Control Protocol
-        UNIX ///< Unix Domain Socket
-    };
-
-    /**
-     * @brief OSC error codes
-     */
-    enum class ErrorCode
-    {
-        None = 0,
-        NetworkError,    ///< Network-related error
-        MalformedPacket, ///< Packet does not conform to OSC spec
-        TypeMismatch,    ///< Type tag doesn't match expected types
-        BufferOverflow,  ///< Buffer size exceeded
-        UnknownType,     ///< Unknown OSC type tag
-        AddressError     ///< Error with OSC address pattern
-    };
-
-    /**
-     * @brief Exception class for OSC errors
-     */
-    class OSCException : public std::runtime_error
-    {
-    public:
-        /**
-         * @brief Construct a new OSC Exception
-         * @param msg Error message
-         * @param code Error code
-         */
-        OSCException(const std::string &msg, ErrorCode code = ErrorCode::None)
-            : std::runtime_error(msg), code_(code) {}
-
-        /**
-         * @brief Get the error code
-         * @return ErrorCode
-         */
-        ErrorCode code() const { return code_; }
-
-    private:
-        ErrorCode code_;
+    enum class Protocol {
+        UDP,  ///< User Datagram Protocol
+        TCP,  ///< Transmission Control Protocol
+        UNIX  ///< Unix Domain Socket
     };
 
     /**
@@ -102,9 +65,8 @@ namespace osc
      * OSC Time Tags are 64-bit fixed-point numbers representing
      * time in NTP format (seconds since Jan 1, 1900).
      */
-    class TimeTag
-    {
-    public:
+    class TimeTag {
+       public:
         /**
          * @brief Default constructor (creates an immediate time tag)
          */
@@ -179,9 +141,9 @@ namespace osc
         bool operator<=(const TimeTag &other) const;
         bool operator>=(const TimeTag &other) const;
 
-    private:
-        uint32_t seconds_;  ///< Seconds since Jan 1, 1900
-        uint32_t fraction_; ///< Fractional seconds (0-0xFFFFFFFF)
+       private:
+        uint32_t seconds_;   ///< Seconds since Jan 1, 1900
+        uint32_t fraction_;  ///< Fractional seconds (0-0xFFFFFFFF)
     };
 
     /**
@@ -189,9 +151,8 @@ namespace osc
      *
      * OSC Blobs are binary data with a specified size.
      */
-    class Blob
-    {
-    public:
+    class Blob {
+       public:
         /**
          * @brief Default constructor (empty blob)
          */
@@ -228,15 +189,14 @@ namespace osc
          */
         const std::byte *bytes() const;
 
-    private:
+       private:
         std::vector<std::byte> data_;
     };
 
     /**
      * @brief Structure for MIDI message (OSC type 'm')
      */
-    struct MIDIMessage
-    {
+    struct MIDIMessage {
         std::array<uint8_t, 4> bytes;
 
         MIDIMessage() : bytes{0, 0, 0, 0} {}
@@ -247,8 +207,7 @@ namespace osc
     /**
      * @brief Structure for RGBA color (OSC type 'r')
      */
-    struct RGBAColor
-    {
+    struct RGBAColor {
         uint8_t r, g, b, a;
 
         RGBAColor() : r(0), g(0), b(0), a(0) {}
@@ -261,9 +220,8 @@ namespace osc
      *
      * OSC values can be of various types, represented here as a variant.
      */
-    class Value
-    {
-    public:
+    class Value {
+       public:
         // Type tag constants
         static constexpr char INT32_TAG = 'i';
         static constexpr char INT64_TAG = 'h';
@@ -296,22 +254,21 @@ namespace osc
         using Infinitum = std::monostate;
 
         // Variant definition for all possible OSC types
-        using Variant = std::variant<
-            Nil,         // N
-            Bool,        // T, F
-            Int32,       // i
-            Int64,       // h
-            Float,       // f
-            Double,      // d
-            String,      // s
-            Symbol,      // S
-            Blob,        // b
-            TimeTag,     // t
-            Char,        // c
-            RGBAColor,   // r
-            MIDIMessage, // m
-            Infinitum    // I
-            >;
+        using Variant = std::variant<Nil,          // N
+                                     Bool,         // T, F
+                                     Int32,        // i
+                                     Int64,        // h
+                                     Float,        // f
+                                     Double,       // d
+                                     String,       // s
+                                     Symbol,       // S
+                                     Blob,         // b
+                                     TimeTag,      // t
+                                     Char,         // c
+                                     RGBAColor,    // r
+                                     MIDIMessage,  // m
+                                     Infinitum     // I
+                                     >;
 
         // Default constructor (creates Nil value)
         Value() : value_(Nil{}), isArrayElement_(false) {}
@@ -382,7 +339,11 @@ namespace osc
         // Get the raw variant
         const Variant &variant() const;
 
-    private:
+        // Serialization methods
+        void serialize(std::vector<std::byte> &buffer) const;
+        static Value deserialize(const std::byte *&data, size_t &remainingSize, char typeTag);
+
+       private:
         Variant value_;
         bool isArrayElement_;
     };
@@ -391,12 +352,11 @@ namespace osc
     using MethodId = int;
 
     // Method structure
-    struct Method
-    {
+    struct Method {
         std::string pathPattern;
         std::string typeSpec;
         std::function<void(const Message &)> handler;
         MethodId id;
     };
 
-} // namespace osc
+}  // namespace osc

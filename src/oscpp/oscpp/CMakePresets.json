@@ -1,0 +1,438 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 14,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "Default Config (Intel oneAPI)",
+            "description": "Default development configuration using Intel oneAPI compiler",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_intel",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/intel_oneapi.cmake",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "generator": "Visual Studio 17 2022",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/windows.cmake"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "macos-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/macos.cmake"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "linux-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/linux.cmake"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
+            "name": "intel-oneapi-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_intel",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/intel_oneapi.cmake"
+            }
+        },
+        {
+            "name": "intel-cross-linux-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_linux_x64",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/intel_oneapi_cross_linux.cmake"
+            }
+        },
+        {
+            "name": "intel-cross-arm64-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_arm64",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/intel_oneapi_cross_arm64.cmake"
+            }
+        },
+        {
+            "name": "intel-cross-macos-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_macos",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/intel_oneapi_cross_macos.cmake"
+            }
+        },
+        {
+            "name": "windows-debug",
+            "displayName": "Windows Debug",
+            "description": "Target Windows with Debug configuration",
+            "inherits": "windows-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "windows-release",
+            "displayName": "Windows Release",
+            "description": "Target Windows with Release configuration",
+            "inherits": "windows-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "windows-minimal",
+            "displayName": "Windows Minimal",
+            "description": "Target Windows with minimal build (no examples or tests)",
+            "inherits": "windows-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "OFF",
+                "OSCPP_BUILD_TESTS": "OFF"
+            }
+        },
+        {
+            "name": "macos-debug",
+            "displayName": "macOS Debug",
+            "description": "Target macOS with Debug configuration",
+            "inherits": "macos-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "macos-release",
+            "displayName": "macOS Release",
+            "description": "Target macOS with Release configuration",
+            "inherits": "macos-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "macos-universal",
+            "displayName": "macOS Universal",
+            "description": "Target macOS with universal binary (Intel+ARM)",
+            "inherits": "macos-release",
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "x86_64;arm64"
+            }
+        },
+        {
+            "name": "linux-debug",
+            "displayName": "Linux Debug",
+            "description": "Target Linux with Debug configuration",
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "linux-release",
+            "displayName": "Linux Release",
+            "description": "Target Linux with Release configuration",
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "intel-oneapi-debug",
+            "displayName": "Intel oneAPI Debug",
+            "description": "Target Windows with Intel oneAPI compiler in Debug mode",
+            "inherits": "intel-oneapi-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "intel-oneapi-release",
+            "displayName": "Intel oneAPI Release",
+            "description": "Target Windows with Intel oneAPI compiler in Release mode",
+            "inherits": "intel-oneapi-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "intel-cross-linux-debug",
+            "displayName": "Intel Cross-Compile Linux Debug",
+            "description": "Cross-compile for Linux using Intel oneAPI compiler in Debug mode",
+            "inherits": "intel-cross-linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "intel-cross-linux-release",
+            "displayName": "Intel Cross-Compile Linux Release",
+            "description": "Cross-compile for Linux using Intel oneAPI compiler in Release mode",
+            "inherits": "intel-cross-linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "intel-cross-arm64-release",
+            "displayName": "Intel Cross-Compile ARM64 Release",
+            "description": "Cross-compile for ARM64 using Intel oneAPI compiler in Release mode",
+            "inherits": "intel-cross-arm64-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "intel-cross-macos-release",
+            "displayName": "Intel Cross-Compile macOS Release",
+            "description": "Cross-compile for macOS using Intel oneAPI compiler in Release mode",
+            "inherits": "intel-cross-macos-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "dev",
+            "displayName": "Development",
+            "description": "Target the host platform with development settings",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "package",
+            "displayName": "Package",
+            "description": "Build release version with install target enabled",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "OSCPP_BUILD_EXAMPLES": "ON",
+                "OSCPP_BUILD_TESTS": "ON",
+                "OSCPP_INSTALL": "ON",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "configurePreset": "default"
+        },
+        {
+            "name": "windows-debug",
+            "configurePreset": "windows-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-release",
+            "configurePreset": "windows-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "windows-minimal",
+            "configurePreset": "windows-minimal",
+            "configuration": "Release"
+        },
+        {
+            "name": "macos-debug",
+            "configurePreset": "macos-debug"
+        },
+        {
+            "name": "macos-release",
+            "configurePreset": "macos-release"
+        },
+        {
+            "name": "macos-universal",
+            "configurePreset": "macos-universal"
+        },
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug"
+        },
+        {
+            "name": "linux-release",
+            "configurePreset": "linux-release"
+        },
+        {
+            "name": "intel-oneapi-debug",
+            "configurePreset": "intel-oneapi-debug"
+        },
+        {
+            "name": "intel-oneapi-release",
+            "configurePreset": "intel-oneapi-release"
+        },
+        {
+            "name": "intel-cross-linux-debug",
+            "configurePreset": "intel-cross-linux-debug"
+        },
+        {
+            "name": "intel-cross-linux-release",
+            "configurePreset": "intel-cross-linux-release"
+        },
+        {
+            "name": "intel-cross-arm64-release",
+            "configurePreset": "intel-cross-arm64-release"
+        },
+        {
+            "name": "intel-cross-macos-release",
+            "configurePreset": "intel-cross-macos-release"
+        },
+        {
+            "name": "intel-all-platforms",
+            "configurePreset": "intel-oneapi-release",
+            "targets": ["all"],
+            "jobs": 4
+        },
+        {
+            "name": "dev",
+            "configurePreset": "dev"
+        },
+        {
+            "name": "package",
+            "configurePreset": "package"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "default",
+            "configurePreset": "default",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "windows-debug",
+            "configurePreset": "windows-debug",
+            "configuration": "Debug",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "windows-release",
+            "configurePreset": "windows-release",
+            "configuration": "Release",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "macos-debug",
+            "configurePreset": "macos-debug",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "macos-release",
+            "configurePreset": "macos-release",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "linux-release",
+            "configurePreset": "linux-release",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "intel-oneapi-debug",
+            "configurePreset": "intel-oneapi-debug",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "intel-oneapi-release",
+            "configurePreset": "intel-oneapi-release",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "dev",
+            "configurePreset": "dev",
+            "output": {
+                "verbosity": "verbose"
+            }
+        }
+    ]
+}

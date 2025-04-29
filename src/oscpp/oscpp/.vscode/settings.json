@@ -1,7 +1,12 @@
 {
     "files.associations": {
+        ".fantomasignore": "ignore",
+        "*.rmd": "markdown",
         "*.h": "cpp",
-        "*.cpp": "cpp"
+        "*.cpp": "cpp",
+        "cstring": "cpp",
+        "vector": "cpp",
+        "*.md": "markdown"
     },
     "editor.formatOnSave": true,
     "editor.formatOnType": true,
@@ -11,7 +16,7 @@
     "C_Cpp.clang_format_style": "{ BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 100, NamespaceIndentation: All }",
     "C_Cpp.default.includePath": [
         "${workspaceFolder}/include",
-        "${workspaceFolder}/src/oscpp/oscpp/include"
+        "${workspaceFolder}/include/osc"
     ],
     "C_Cpp.default.defines": [
         "_DEBUG",
@@ -20,23 +25,82 @@
     ],
     "C_Cpp.default.cppStandard": "c++17",
     "C_Cpp.default.cStandard": "c11",
-    "C_Cpp.default.intelliSenseMode": "${default}",
-    "C_Cpp.default.compilerPath": "C:/Program Files/LLVM/bin/clang++.exe",
-    "C_Cpp.intelliSenseEngineFallback": "Disabled",
-    "C_Cpp.autocomplete": "Default",
-    "C_Cpp.errorSquiggles": "Enabled",
+    "C_Cpp.default.intelliSenseMode": "windows-msvc-x64",
+    "C_Cpp.default.compilerPath": "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\bin\\icx.exe",
+    "C_Cpp.intelliSenseEngineFallback": "disabled",
+    "C_Cpp.autocomplete": "default",
+    "C_Cpp.errorSquiggles": "enabled",
     "files.exclude": {
         "**/.git": true,
         "**/.svn": true,
         "**/.hg": true,
         "**/CVS": true,
         "**/.DS_Store": true,
-        "**/build": true,
-        "**/bin": true
+        "**/build": false,
+        "**/bin": false,
+        "**/CMakeFiles": true,
+        "**/*.o": true,
+        "**/*.obj": true,
+        "**/*.tmp": true
     },
     "files.trimTrailingWhitespace": true,
     "search.exclude": {
         "**/build": true,
-        "**/bin": true
-    }
+        "**/bin": true,
+        "**/CMakeFiles": true,
+        "**/html": true,
+        "**/latex": true
+    },
+
+    // Intel oneAPI terminal configuration
+    "terminal.integrated.defaultProfile.windows": "Intel oneAPI",
+    "terminal.integrated.profiles.windows": {
+        "Intel oneAPI": {
+            "path": "cmd.exe",
+            "args": ["/k", "C:\\Program Files (x86)\\Intel\\oneAPI\\setvars.bat"],
+            "icon": "terminal-cmd"
+        },
+        "Command Prompt": {
+            "path": ["${env:windir}\\Sysnative\\cmd.exe", "${env:windir}\\System32\\cmd.exe"],
+            "args": [],
+            "icon": "terminal-cmd"
+        },
+        "PowerShell": {
+            "source": "PowerShell",
+            "icon": "terminal-powershell"
+        }
+    },
+
+    // Auto run Intel oneAPI setup task on workspace startup
+    "workspace.autoStart": [
+        {
+            "type": "task",
+            "taskName": "Intel oneAPI Environment Setup",
+            "autoEnd": true
+        }
+    ],
+
+    // CMake integration settings
+    "cmake.configureOnOpen": true,
+    "cmake.useCMakePresets": "always",
+    "cmake.configurePreset": "intel-windows-debug",
+    "cmake.buildPreset": "intel-windows-debug",
+    "cmake.testPreset": "intel-windows-debug",
+    "cmake.environment": {
+        "ONEAPI_ROOT": "C:\\Program Files (x86)\\Intel\\oneAPI"
+    },
+    "cmake.buildBeforeRun": true,
+
+    // Tasks integration
+    "task.autoDetect": "on",
+    "task.quickOpen.showAll": true,
+    "task.problemMatchers.neverPrompt": false,
+
+    // Documentation settings
+    "doxdocgen.generic.authorName": "David T. Martel, PhD",
+    "doxdocgen.generic.authorEmail": "david.martel@auricleinc.com",
+    "doxdocgen.file.copyrightTag": [
+        "@copyright Copyright (c) 2022-2025 Auricle Inc."
+    ],
+    "C_Cpp.doxygen.generateOnType": true
 }

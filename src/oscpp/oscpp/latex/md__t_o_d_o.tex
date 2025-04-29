@@ -1,0 +1,97 @@
+\chapter{OSC Implementation TODO List}
+\hypertarget{md__t_o_d_o}{}\label{md__t_o_d_o}\index{OSC Implementation TODO List@{OSC Implementation TODO List}}
+\label{md__t_o_d_o_autotoc_md59}%
+\Hypertarget{md__t_o_d_o_autotoc_md59}%
+
+
+This list tracks the remaining work, prioritizing the core features needed for a functional OSC library based on the current status as of April 27, 2025.\hypertarget{md__t_o_d_o_autotoc_md60}{}\doxysection{\texorpdfstring{Current Status \& Progress}{Current Status \& Progress}}\label{md__t_o_d_o_autotoc_md60}
+
+\begin{DoxyItemize}
+\item ✅ Core architecture and class structure designed (see ARCHITECTURE.\+md)
+\item ✅ Basic header files in place for all major components
+\item ✅ Class declarations for Message, Server, Server\+Thread, Address, Time\+Tag, etc.
+\item ✅ Partial implementation of Message class (core methods and standard types)
+\item ✅ Server\+Thread implementation for running Server in background thread
+\item ✅ Bundle class implementation complete with serialization/deserialization and nesting
+\item ✅ Value system implementation with accessors and type conversions
+\item ✅ OSCException handling consolidated in Exceptions.\+h
+\item ❌ Pattern matching for address dispatching not fully implemented
+\item ❌ TCP framing for message boundaries not implemented
+\end{DoxyItemize}\hypertarget{md__t_o_d_o_autotoc_md61}{}\doxysection{\texorpdfstring{Core Implementation Priorities (Ordered by Dependency)}{Core Implementation Priorities (Ordered by Dependency)}}\label{md__t_o_d_o_autotoc_md61}
+
+\begin{DoxyEnumerate}
+\item {\bfseries{Implement OSC Address Pattern Matching (HIGH)\+:}}
+\begin{DoxyItemize}
+\item Implement pattern matching logic in {\ttfamily Server\+Impl} for {\ttfamily ?}, {\ttfamily \texorpdfstring{$\ast$}{*}}, {\ttfamily \mbox{[}\mbox{]}}, {\ttfamily \{\}} wildcards per OSC spec
+\item Integrate pattern matching with server\textquotesingle{}s message dispatch system
+\item Optimize matching algorithm if needed for performance
+\end{DoxyItemize}
+\item {\bfseries{Implement TCP Message Framing (HIGH)\+:}}
+\begin{DoxyItemize}
+\item Choose and implement framing strategy (SLIP encoding or length-\/prefixing)
+\item Add framing to {\ttfamily Address\+Impl\+::send} for TCP connections
+\item Implement de-\/framing in {\ttfamily Server\+Impl} for TCP reception
+\item Test with various message sizes and connection scenarios
+\end{DoxyItemize}
+\item {\bfseries{Complete {\ttfamily osc\+::\+Value} Implementation (LOW)\+:}}
+\begin{DoxyItemize}
+\item Verify edge cases for all type conversions
+\item Ensure proper error handling for invalid type conversions
+\item Optimize serialization/deserialization for performance
+\item Add support for OSC Arrays ({\ttfamily \mbox{[}} and {\ttfamily \mbox{]}}) within {\ttfamily Value} implementation
+\end{DoxyItemize}
+\item {\bfseries{Complete {\ttfamily osc\+::\+Message} Implementation (LOW)\+:}}
+\begin{DoxyItemize}
+\item Fix serialization/deserialization issues
+\item Add any missing {\ttfamily Message\+::add...()} methods for OSC 1.\+1 types
+\item Enhance type tag handling for better performance
+\end{DoxyItemize}
+\item {\bfseries{Create Comprehensive Unit Tests (MEDIUM)\+:}}
+\begin{DoxyItemize}
+\item Expand tests for {\ttfamily Bundle} serialization/deserialization with complex nested structures
+\item Add tests for pattern matching logic with complex patterns
+\item Test networking with various protocols (UDP, TCP, UNIX sockets)
+\item Add performance benchmarks for high-\/frequency messaging
+\end{DoxyItemize}
+\item {\bfseries{Expand Examples \& Documentation (MEDIUM)\+:}}
+\begin{DoxyItemize}
+\item Create fully-\/functional examples demonstrating real-\/world use cases
+\item Ensure Doxygen comments are comprehensive for all public APIs
+\item Update README.\+md with current implementation status and usage examples
+\item Verify and update SPECIFICATION.\+md and ARCHITECTURE.\+md for accuracy
+\end{DoxyItemize}
+\end{DoxyEnumerate}\hypertarget{md__t_o_d_o_autotoc_md62}{}\doxysection{\texorpdfstring{Secondary Improvements \& Features (Post-\/\+Core Implementation)}{Secondary Improvements \& Features (Post-\/\+Core Implementation)}}\label{md__t_o_d_o_autotoc_md62}
+
+\begin{DoxyItemize}
+\item {\bfseries{API Refinements\+:}}
+\begin{DoxyItemize}
+\item Add a generic {\ttfamily Message\+::add\+Value(\+Value)} method for type flexibility
+\item Consider template-\/based accessors like {\ttfamily message.\+get\texorpdfstring{$<$}{<}float\texorpdfstring{$>$}{>}(0)}
+\item Review method naming for consistency across classes
+\end{DoxyItemize}
+\item {\bfseries{Performance Optimization\+:}}
+\begin{DoxyItemize}
+\item Profile and optimize serialization/deserialization
+\item Consider buffer pooling for high-\/frequency messaging scenarios
+\item Optimize pattern matching for common cases
+\end{DoxyItemize}
+\item {\bfseries{Extended Features\+:}}
+\begin{DoxyItemize}
+\item Implement optional type coercion in {\ttfamily Server}
+\item Add support for OSC query namespace extension
+\item Consider Web\+Socket transport support
+\end{DoxyItemize}
+\item {\bfseries{Quality Assurance\+:}}
+\begin{DoxyItemize}
+\item Add static analysis to build process
+\item Implement stress testing and benchmarks
+\item Ensure cross-\/platform testing (Windows, Linux, mac\+OS)
+\end{DoxyItemize}
+\end{DoxyItemize}\hypertarget{md__t_o_d_o_autotoc_md63}{}\doxysection{\texorpdfstring{Long-\/term Goals}{Long-\/term Goals}}\label{md__t_o_d_o_autotoc_md63}
+
+\begin{DoxyItemize}
+\item Web\+Socket and MQTT transport support
+\item Visual debugging and message inspection tools
+\item Integration with audio frameworks (JUCE, Rt\+Audio, etc.)
+\item Higher-\/level abstraction for common OSC-\/based applications 
+\end{DoxyItemize}

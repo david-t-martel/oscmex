@@ -1,77 +1,81 @@
 # OSC Implementation TODO List
 
-This list tracks the remaining work, prioritizing the core features needed for a functional OSC library based on the current status.
+This list tracks the remaining work, prioritizing the core features needed for a functional OSC library based on the current status as of April 27, 2025.
 
-## Core Implementation Priorities (Aligned with README Roadmap)
+## Current Status & Progress
 
-1. **Complete `osc::Value` Implementation:**
-    * Implement constructors, type-checkers (`is...`), and accessors (`as...`) for *all* OSC 1.0/1.1 types (`i, h, f, d, s, S, b, t, c, r, m, T, F, N, I`).
-    * Implement `Value::serialize()` to correctly format each type (big-endian, padding).
-    * Implement `Value::typeTag()` to return the correct character.
-    * Add support for OSC Arrays (`[` and `]`) within `osc::Value` (likely via `std::vector<osc::Value>`).
+- ✅ Core architecture and class structure designed (see ARCHITECTURE.md)
+- ✅ Basic header files in place for all major components
+- ✅ Class declarations for Message, Server, ServerThread, Address, TimeTag, etc.
+- ✅ Partial implementation of Message class (core methods and standard types)
+- ✅ ServerThread implementation for running Server in background thread
+- ✅ Bundle class implementation complete with serialization/deserialization and nesting
+- ✅ Value system implementation with accessors and type conversions
+- ✅ OSCException handling consolidated in Exceptions.h
+- ❌ Pattern matching for address dispatching not fully implemented
+- ❌ TCP framing for message boundaries not implemented
 
-2. **Complete `osc::Message` and `osc::Bundle` Handling:**
-    * Implement `Message::serialize()` using `Value::serialize()` for arguments, ensuring correct path, type tag string, and argument data formatting/alignment.
-    * Implement static `Message::deserialize()` to parse binary data into a `Message`.
-    * Add `Message::add...()` methods for all missing OSC 1.1 types (Int64, Double, Symbol, Char, Color, Midi, Bool, Nil, Infinitum, Array).
-    * Implement `Bundle::serialize()` formatting (`#bundle`, time tag, size-prefixed elements).
-    * Implement static `Bundle::deserialize()` to parse binary bundles, including nested elements.
-    * Implement `Bundle::forEach` or similar iteration mechanism.
+## Core Implementation Priorities (Ordered by Dependency)
 
-3. **Implement OSC Address Pattern Matching:**
-    * Implement matching logic within `ServerImpl` to handle `?`, `*`, `[]`, `{}` according to OSC spec.
-    * Integrate matching into the server's message dispatch routine to select the correct `MethodHandler`.
-    * Consider optimizations (e.g., pattern tree) if performance becomes an issue later.
+1. **Implement OSC Address Pattern Matching (HIGH):**
+    - Implement pattern matching logic in `ServerImpl` for `?`, `*`, `[]`, `{}` wildcards per OSC spec
+    - Integrate pattern matching with server's message dispatch system
+    - Optimize matching algorithm if needed for performance
 
-4. **Implement TCP Message Framing:**
-    * Choose a framing method (e.g., SLIP encoding or length-prefixing).
-    * Implement framing in `AddressImpl::send` for TCP connections.
-    * Implement de-framing in `ServerImpl`'s TCP receiving logic to reconstruct complete OSC packets.
+2. **Implement TCP Message Framing (HIGH):**
+    - Choose and implement framing strategy (SLIP encoding or length-prefixing)
+    - Add framing to `AddressImpl::send` for TCP connections
+    - Implement de-framing in `ServerImpl` for TCP reception
+    - Test with various message sizes and connection scenarios
 
-5. **Consolidate & Integrate Error Handling:**
-    * Remove redundant exception definitions (`Exceptions.h`).
-    * Standardize on `osc::OSCException` from `Types.h`.
-    * Throw `OSCException` for critical errors (parsing, network setup, invalid arguments/types).
-    * Ensure `Server::ErrorHandler` callback is invoked for relevant non-fatal runtime errors.
-    * Review and refine error codes (`OSCException::ErrorCode`) and messages.
+3. **Complete `osc::Value` Implementation (LOW):**
+    - Verify edge cases for all type conversions
+    - Ensure proper error handling for invalid type conversions
+    - Optimize serialization/deserialization for performance
+    - Add support for OSC Arrays (`[` and `]`) within `Value` implementation
 
-6. **Add Unit Tests:**
-    * Create comprehensive unit tests for `Value` (all types, serialization/deserialization).
-    * Test `Message` serialization/deserialization with various argument combinations.
-    * Test `Bundle` serialization/deserialization, including nesting.
-    * Test pattern matching logic thoroughly.
-    * Test `Address` and `Server` with UDP, TCP (once framing is done), and UNIX sockets.
-    * Test `TimeTag` conversions and comparisons.
+4. **Complete `osc::Message` Implementation (LOW):**
+    - Fix serialization/deserialization issues
+    - Add any missing `Message::add...()` methods for OSC 1.1 types
+    - Enhance type tag handling for better performance
 
-7. **Expand Examples & Documentation:**
-    * Update `README.md` examples to be fully functional once dependencies are met.
-    * Add more examples covering different use cases (sending bundles, various data types, error handling).
-    * Add Doxygen comments or similar for comprehensive API documentation.
-    * Verify `SPECIFICATION.md` and `ARCHITECTURE.md` remain accurate.
+5. **Create Comprehensive Unit Tests (MEDIUM):**
+    - Expand tests for `Bundle` serialization/deserialization with complex nested structures
+    - Add tests for pattern matching logic with complex patterns
+    - Test networking with various protocols (UDP, TCP, UNIX sockets)
+    - Add performance benchmarks for high-frequency messaging
+
+6. **Expand Examples & Documentation (MEDIUM):**
+    - Create fully-functional examples demonstrating real-world use cases
+    - Ensure Doxygen comments are comprehensive for all public APIs
+    - Update README.md with current implementation status and usage examples
+    - Verify and update SPECIFICATION.md and ARCHITECTURE.md for accuracy
 
 ## Secondary Improvements & Features (Post-Core Implementation)
 
-* **API Consistency & Refinements:**
-  * Review method naming across classes.
-  * Consider adding a generic `Message::add(Value)` or template `add<T>()`.
-  * Refine argument access in `Message` (e.g., `message.get<float>(0)`).
-* **Performance Optimization:**
-  * Profile serialization/deserialization.
-  * Consider message/buffer pooling for high-frequency scenarios.
-* **Features:**
-  * Implement automatic type coercion in `Server` (optional).
-  * Add support for OSC query namespace extension.
-* **Cross-Platform Compatibility:**
-  * Thoroughly test on Windows, Linux, macOS.
-  * Address any discovered endianness or socket handling issues.
-* **Code Quality:**
-  * Add static analysis (e.g., Clang-Tidy) to CI.
-  * Ensure C++17 best practices.
-* **CI/CD:**
-  * Set up a robust CI/CD pipeline (GitHub Actions, etc.) for building and testing.
+- **API Refinements:**
+  - Add a generic `Message::addValue(Value)` method for type flexibility
+  - Consider template-based accessors like `message.get<float>(0)`
+  - Review method naming for consistency across classes
+
+- **Performance Optimization:**
+  - Profile and optimize serialization/deserialization
+  - Consider buffer pooling for high-frequency messaging scenarios
+  - Optimize pattern matching for common cases
+
+- **Extended Features:**
+  - Implement optional type coercion in `Server`
+  - Add support for OSC query namespace extension
+  - Consider WebSocket transport support
+
+- **Quality Assurance:**
+  - Add static analysis to build process
+  - Implement stress testing and benchmarks
+  - Ensure cross-platform testing (Windows, Linux, macOS)
 
 ## Long-term Goals
 
-* Extended Protocol Support (WebSockets, MQTT)
-* Tooling (Debugging, Visualization)
-* Benchmarking
+- WebSocket and MQTT transport support
+- Visual debugging and message inspection tools
+- Integration with audio frameworks (JUCE, RtAudio, etc.)
+- Higher-level abstraction for common OSC-based applications

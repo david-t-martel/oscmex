@@ -1,0 +1,21 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find dependencies
+if(WIN32)
+    find_dependency(WS2_32)
+endif()
+
+# Include the exported targets
+include("${CMAKE_CURRENT_LIST_DIR}/oscppTargets.cmake")
+
+# Additional configuration settings
+set(OSCPP_VERSION "@PROJECT_VERSION@")
+set(OSCPP_INCLUDE_DIRS "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+
+# Check if the proper OS-specific libraries are available
+check_required_components(oscpp)
+
+# Print a message for debugging
+message(STATUS "Found oscpp: ${OSCPP_VERSION} (${CMAKE_CURRENT_LIST_DIR})")

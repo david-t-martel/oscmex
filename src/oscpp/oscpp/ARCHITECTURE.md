@@ -1,7 +1,3 @@
-/*
-* OSCPP - Open Sound Control C++ (OSCPP) Library.
- */
-
 # Modern C++ OSC Library Architecture
 
 This document outlines the architecture of our modern C++ implementation of the Open Sound Control (OSC) protocol. The library is designed with SOLID principles, modern C++ features, and cross-platform compatibility in mind.
@@ -12,18 +8,19 @@ This document outlines the architecture of our modern C++ implementation of the 
 graph TD
     subgraph "OSC Core Modules"
         Types[Types]
-        Value[Value (Variant)]
+        TimeTag[TimeTag]
         Message[Message]
         Bundle[Bundle]
         Address[Address]
         Server[Server]
+        ServerThread[ServerThread]
     end
 
     subgraph "Transport Layer (Abstracted by Address/Server)"
-        AddressImpl[AddressImpl (PIMPL)]
-        ServerImpl[ServerImpl (PIMPL)]
+        AddressImpl[AddressImpl]
+        ServerImpl[ServerImpl]
         UDP[UDP Support]
-        TCP[TCP Support (Framing Pending)]
+        TCP[TCP Support]
         UNIX[UNIX Socket Support]
         Address --> AddressImpl
         Server --> ServerImpl
@@ -35,119 +32,122 @@ graph TD
         ServerImpl --> UNIX
     end
 
-    subgraph "High-Level API & Dispatch"
-        ServerThread[ServerThread]
-        Method[Method Handling]
-        Pattern[Pattern Matching (Pending)]
-        ServerThread --> Server
-        Server --> Method
-        Method -- Needs --> Pattern
+    subgraph "Error Handling"
+        Exceptions[OSCExceptions]
     end
 
-    subgraph "Utilities & Base Types"
-        Error[Error Handling (OSCException)]
-        TimeTag[TimeTag]
-        Blob[Blob]
-    end
-
-    Value --> Types
     Message --> Types
-    Message --> Value
     Bundle --> Message
     Bundle --> TimeTag
-    Server --> Error
-    Address --> Error
-    Types --> Blob
-    Types --> TimeTag
-    Types --> Error
+    ServerThread --> Server
+    AddressImpl --> Exceptions
+    ServerImpl --> Exceptions
+    Message --> Exceptions
+    Bundle --> Exceptions
 ```
 
-## Module Dependencies and Responsibilities
+## Component Overview
 
-### Core Data Types (`Types.h`)
+### Core Components
 
-* Defines fundamental data types: `TimeTag`, `Blob`, `Protocol`, `MethodId`.
-* Defines the core `osc::Value` class structure (using `std::variant`). *(Implementation Pending)*
-* Defines the standard `osc::OSCException` class for error handling. *(Integration Pending)*
+- **[OSC.h](include/osc/OSC.h)**: Main include file for the library, providing a convenient single header to include all components.
+- **[Types.h](include/osc/Types.h)**: Defines fundamental types and enumerations used throughout the library.
+- **[TimeTag.h](include/osc/TimeTag.h)** / **[TimeTag.cpp](src/TimeTag.cpp)**: Implements OSC time tags for message scheduling.
+- **[Message.h](include/osc/Message.h)** / **[Message.cpp](src/Message.cpp)**: Core class for creating, manipulating, and serializing OSC messages.
+- **[Bundle.h](include/osc/Bundle.h)** / **[Bundle.cpp](src/Bundle.cpp)**: Implements OSC bundles for grouping messages with a common time tag.
+- **[Address.h](include/osc/Address.h)** / **[Address.cpp](src/Address.cpp)**: Client-side class for sending OSC messages to a specific destination.
+- **[Server.h](include/osc/Server.h)** / **[Server.cpp](src/Server.cpp)**: Server-side class for receiving and dispatching OSC messages.
+- **[ServerThread.h](include/osc/ServerThread.h)** / **[ServerThread.cpp](src/ServerThread.cpp)**: Threaded wrapper for the Server class.
 
-### Value System (`Value`)
+### Implementation Details
 
-* Uses `std::variant` to represent all OSC 1.0/1.1 argument types. *(Implementation Pending)*
-* Provides type-safe accessors (`asInt32`, `isFloat`, etc.). *(Implementation Pending)*
-* Handles serialization/deserialization for each type, including alignment/padding. *(Implementation Pending)*
+- **[AddressImpl.h](include/osc/AddressImpl.h)** / **[AddressImpl.cpp](src/AddressImpl.cpp)**: Implementation details for the Address class (PIMPL pattern).
+- **[ServerImpl.h](include/osc/ServerImpl.h)** / **[ServerImpl.cpp](src/ServerImpl.cpp)**: Implementation details for the Server class (PIMPL pattern).
+- **[Exceptions.h](include/osc/Exceptions.h)** / **[OSCException.cpp](src/OSCException.cpp)**: Exception handling for the library.
+- **[Value.cpp](src/Value.cpp)**: Implementation of the OSC value system, supporting type conversions and serialization.
+- **[main.cpp](src/main.cpp)**: Core library entry points including initialization, cleanup, and utility functions.
 
-### Message Class (`Message`)
+### Core Entry Points
 
-* Represents an OSC message (address pattern, type tag string, arguments).
-* Provides methods to add arguments (`addInt32`, etc.). *(Needs methods for all types)*
-* Provides access to arguments (`getArguments`).
-* Handles serialization to/deserialization from binary format. *(Implementation Pending)*
+The library is designed with an easy-to-use API:
 
-### Bundle Class (`Bundle`)
+```cpp
+// Initialize the library
+osc::initialize();
 
-* Represents an OSC bundle (`#bundle`, time tag, elements).
-* Contains `osc::Message` or nested `osc::Bundle` elements.
-* Handles serialization/deserialization of the bundle structure. *(Implementation Pending)*
+// Create and send a message
+osc::Message message("/address/pattern");
+message.addInt32(42).addFloat(3.14f).addString("hello");
 
-### Address Class (`Address`)
+osc::Address destination("localhost", "8000", osc::Protocol::UDP);
+destination.send(message);
 
-* Manages network destination information (host, port, protocol).
-* Provides interface for sending serialized `Message` or `Bundle` data.
-* Uses PIMPL (`AddressImpl`) to hide platform-specific socket details (Winsock/POSIX).
-* Handles address resolution and URL parsing.
-* Abstracts UDP, TCP, UNIX socket sending logic. *(TCP Framing Pending)*
+// Create a server to receive messages
+osc::Server server("8000", osc::Protocol::UDP);
+server.addMethod("/address/pattern", "", [](const osc::Message& msg) {
+    // Handle incoming message
+});
 
-### Server Class (`Server`)
+// Use ServerThread for background processing
+osc::ServerThread thread(server);
+thread.start();
 
-* Listens for incoming OSC packets on a specified port/protocol.
-* Uses PIMPL (`ServerImpl`) to hide platform-specific socket details.
-* Manages method registration (`addMethod`, `addDefaultMethod`).
-* Dispatches incoming messages to registered handlers based on address patterns. *(Pattern Matching Logic Pending)*
-* Handles bundle processing (start/end callbacks).
-* Abstracts UDP, TCP, UNIX socket receiving logic. *(TCP Framing Pending)*
+// ...later...
+thread.stop();
 
-### Method Handling (`Server`/`ServerImpl`)
+// Clean up when done
+osc::cleanup();
+```
 
-* Stores registered callbacks (`MethodHandler`) associated with address patterns and type specs.
-* Requires the Pattern Matching system to select the correct handler.
+## Design Patterns
 
-### High-Level Server (`ServerThread`)
+The library employs several design patterns to promote maintainability and flexibility:
 
-* Wraps a `Server` instance to run it in a dedicated background thread.
-* Provides thread management (`start`, `stop`) and convenience methods mirroring `Server`.
+1. **PIMPL (Pointer to Implementation)**: Used in Address and Server classes to hide platform-specific details and maintain ABI compatibility.
+2. **Factory Methods**: Static creation methods like `TimeTag::now()`, `TimeTag::immediate()`, and `Address::fromUrl()`.
+3. **Builder Pattern**: Method chaining in Message and Bundle for fluent construction.
+4. **Observer Pattern**: Callback-based message dispatching in Server.
+5. **Façade Pattern**: OSC.h provides a simple interface to the entire library.
 
-### Pattern Matching System (`Pattern` - within `ServerImpl`)
+## Cross-Platform Support
 
-* Implements OSC pattern matching rules (`?`, `*`, `[]`, `{}`). *(Implementation Pending)*
-* Used by the `Server` to dispatch messages to the correct `MethodHandler`.
+Platform-specific code is isolated in the implementation files:
 
-### Error Handling Strategy (`OSCException`)
+- Windows: Using Winsock2 for networking
+- Unix/Linux: Using POSIX sockets
+- macOS: Using BSD sockets with platform-specific extensions
 
-* Standardize on `osc::OSCException` defined in `Types.h`. *(Integration Pending)*
-* Use exceptions for critical errors (e.g., setup, parsing failures).
-* Provide error callbacks (`Server::ErrorHandler`) for non-fatal runtime issues.
+The CMake build system ([CMakeLists.txt](CMakeLists.txt)) handles platform detection and configuration with platform-specific options in the [cmake](cmake) directory.
 
-## Implementation Details
+## Error Handling
 
-### Modern C++ Features
+The library employs a consistent error handling approach using custom exceptions:
 
-* Uses C++17 features (`std::variant`, `std::optional`, `std::string_view`, `std::byte`).
-* Employs RAII for resource management (sockets, threads).
-* Uses smart pointers (`std::unique_ptr`) for PIMPL and resource ownership.
+- **OSCException**: Base exception class with error codes for different failure categories
+- All public methods document their exception behavior
+- Functions that may fail without being exceptional return boolean success indicators
 
-### Cross-Platform Considerations
+## Memory Management
 
-* Abstracts platform-specific socket APIs via PIMPL (`AddressImpl`, `ServerImpl`).
-* Handles endianness conversion during serialization/deserialization. *(Implementation Pending)*
+- Modern C++ smart pointers and RAII principles are used throughout
+- Custom allocators are avoided in favor of standard containers
+- Serialization functions avoid unnecessary copies with std::byte vectors
 
-### Design Patterns
+## Protocol Support
 
-* **PIMPL** (Pointer to Implementation): Used in `Address` and `Server` for ABI stability and platform abstraction.
-* **Strategy** (Implicit): Different protocols handled within `AddressImpl`/`ServerImpl`.
-* **Callback/Observer**: Used for message handling (`MethodHandler`) and error reporting (`ErrorHandler`).
+The library implements:
 
-### Thread Safety Considerations
+- OSC 1.0 and 1.1 specifications
+- UDP transport (primary)
+- TCP transport with packet framing
+- UNIX domain sockets (where available)
+- Full OSC type system including standard, extended, and array types
 
-* `ServerThread` provides a thread-safe server interface using mutexes.
-* `Server` itself is not inherently thread-safe for modification (e.g., adding methods) while running; modifications should ideally happen before starting or be synchronized externally if modified while polled manually. `ServerThread` handles this synchronization internally.
-* `Message` and `Bundle` objects are generally designed to be value types or used immutably after creation/deserialization.
+## Future Enhancements
+
+See [TODO.md](TODO.md) for planned enhancements, including:
+
+- WebSocket transport support
+- OSC query support (zeroconf/discovery)
+- Additional pattern matching algorithms
+- Performance optimizations

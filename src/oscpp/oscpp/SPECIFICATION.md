@@ -4,6 +4,12 @@
 
 Open Sound Control (OSC) is a content format and protocol designed for communication among computers, sound synthesizers, and other multimedia devices. It is optimized for modern networking technology and provides high-resolution, flexible, and time-sensitive control. Originally developed at CNMAT (Center for New Music and Audio Technologies, UC Berkeley), it offers advantages over MIDI in terms of networkability, data types, and namespace flexibility.
 
+## OSCPP Library Conformance Note
+
+This document summarizes the OSC 1.0 and 1.1 specifications. The `oscpp` library aims to implement these specifications fully.
+
+* **Current Status:** Please refer to the project's [`README.md`](README.md) and [`TODO.md`](TODO.md) for the specific features and data types currently implemented and those that are pending (e.g., full pattern matching, TCP framing, array support).
+
 ## Core Concepts (OSC 1.0 & 1.1)
 
 OSC communication is based on sending **OSC Packets** over a network (or other transport layers).
@@ -26,9 +32,9 @@ There are two fundamental types of OSC Packets:
 
 * **Address Space:** OSC uses a hierarchical, symbolic naming scheme similar to URLs or file paths (e.g., `/synthesizers/granular/grain_rate`). Parts are separated by `/`. The receiving entity maintains a set of OSC Addresses corresponding to its controllable methods or parameters.
 * **Pattern Matching:** Receiving applications match incoming OSC Address Patterns against the OSC Addresses of their controllable elements. OSC defines a powerful pattern matching syntax:
-  * `?`: Matches any single character.
-  * `*`: Matches any sequence of zero or more characters.
-  * `[]`: Matches any single character listed within the brackets (e.g., `[abc]`). Ranges are allowed (e.g., `[0-9]`). `!` as the first character negates the set (e.g., `[!abc]`).
+  * `?`: Matches any single character except `/`.
+  * `*`: Matches any sequence of zero or more characters except `/`.
+  * `[]`: Matches any single character listed within the brackets (e.g., `[abc]`). Ranges are allowed (e.g., `[0-9]`). `!` or `^` as the first character negates the set (e.g., `[!abc]`).
   * `{}`: Matches any string from a comma-separated list within the braces (e.g., `{foo,bar}`).
 * **Dispatching:** When an OSC Message arrives, the receiving server attempts to match the Address Pattern against all known OSC Addresses in its address space. For every matching address, the corresponding OSC Method (function/procedure) is invoked with the arguments from the OSC Message. If multiple addresses match, the corresponding methods should ideally be invoked concurrently or in an undefined order.
 
@@ -52,22 +58,22 @@ OSC 1.1 builds upon OSC 1.0, adding new data types and clarifications without br
 
 ### New Data Types in OSC 1.1
 
-| Tag  | Type         | Description                                                                            | Alignment |
-| :--- | :----------- | :------------------------------------------------------------------------------------- | :-------- |
-| `h`  | int64        | 64-bit big-endian two's complement integer                                             | 8 bytes   |
-| `d`  | float64      | 64-bit big-endian IEEE 754 double-precision float                                      | 8 bytes   |
-| `S`  | Symbol       | Alternate representation for OSC-string (semantics may differ by implementation)       | 4 bytes   |
-| `c`  | char         | 32-bit ASCII character (represented as an int32)                                       | 4 bytes   |
-| `r`  | RGBA color   | 32-bit RGBA color (8 bits per component: red, green, blue, alpha)                      | 4 bytes   |
-| `m`  | MIDI message | 4 bytes: Port ID (byte 0), Status byte (byte 1), Data1 (byte 2), Data2 (byte 3)        | 4 bytes   |
-| `T`  | True         | Represents the value True (no argument data)                                           | 0 bytes   |
-| `F`  | False        | Represents the value False (no argument data)                                          | 0 bytes   |
-| `N`  | Nil / Null   | Represents Null (no argument data)                                                     | 0 bytes   |
-| `I`  | Infinitum    | Represents Infinity (no argument data)                                                 | 0 bytes   |
-| `[`  | Array Begin  | Indicates the beginning of an array; type tags between `[` and `]` belong to the array | 0 bytes   |
-| `]`  | Array End    | Indicates the end of an array                                                          | 0 bytes   |
+| Tag  | Type         | Description                                                                            | Argument Data | Alignment |
+| :--- | :----------- | :------------------------------------------------------------------------------------- | :------------ | :-------- |
+| `h`  | int64        | 64-bit big-endian two's complement integer                                             | Yes           | 8 bytes   |
+| `d`  | float64      | 64-bit big-endian IEEE 754 double-precision float                                      | Yes           | 8 bytes   |
+| `S`  | Symbol       | Alternate representation for OSC-string (semantics may differ by implementation)       | Yes           | 4 bytes   |
+| `c`  | char         | 32-bit ASCII character (represented as an int32)                                       | Yes           | 4 bytes   |
+| `r`  | RGBA color   | 32-bit RGBA color (8 bits per component: red, green, blue, alpha)                      | Yes           | 4 bytes   |
+| `m`  | MIDI message | 4 bytes: Port ID (byte 0), Status byte (byte 1), Data1 (byte 2), Data2 (byte 3)        | Yes           | 4 bytes   |
+| `T`  | True         | Represents the value True                                                              | No            | 0 bytes   |
+| `F`  | False        | Represents the value False                                                             | No            | 0 bytes   |
+| `N`  | Nil / Null   | Represents Null                                                                        | No            | 0 bytes   |
+| `I`  | Infinitum    | Represents Infinity                                                                    | No            | 0 bytes   |
+| `[`  | Array Begin  | Indicates the beginning of an array; type tags between `[` and `]` belong to the array | No            | 0 bytes   |
+| `]`  | Array End    | Indicates the end of an array                                                          | No            | 0 bytes   |
 
-*Note: While `T`, `F`, `N`, `I`, `[`, `]` require no argument data, their presence in the type tag string still signifies an argument conceptually. Array arguments are simply listed sequentially.*
+*Note: Argument data alignment applies relative to the start of the argument data section.*
 
 ### Clarifications in OSC 1.1
 
@@ -82,7 +88,7 @@ OSC 1.1 also provides clearer definitions for certain aspects, improves error co
 OSC itself only defines the *content format*. It is transport-independent. Common transport methods include:
 
 * **UDP:** Most common due to low overhead and speed, suitable for real-time control. Packet loss and ordering are potential issues. Maximum packet size is limited by the underlying network MTU (Maximum Transmission Unit).
-* **TCP:** Provides reliable, ordered transmission, useful when data integrity is paramount, but introduces latency and overhead. Requires a streaming format (e.g., SLIP encoding or length-prefixing) to delineate packet boundaries.
+* **TCP:** Provides reliable, ordered transmission, useful when data integrity is paramount, but introduces latency and overhead. Requires a streaming format (e.g., SLIP encoding or length-prefixing) to delineate packet boundaries. *(Note: Framing required for oscpp)*
 * **SLIP (Serial Line IP):** A simple protocol (RFC 1055) for sending IP datagrams over serial lines. OSC packets can be framed using SLIP's END (0xC0) and ESC (0xDB) characters.
 * Other transports (like Files, Pipes, USB, Shared Memory) are also possible.
 
@@ -106,7 +112,3 @@ The authoritative sources for the OSC protocol are:
 2. **OSC 1.1 Specification:**
     * URL: [http://opensoundcontrol.org/spec-1_1](http://opensoundcontrol.org/spec-1_1)
     * Extends OSC 1.0 with additional data types and provides clarifications. It is recommended to consult this for modern implementations.
-
-## Implementations
-
-Numerous libraries exist for various programming languages (including Python, C/C++, Java, JavaScript, Max/MSP, Pure Data, etc.) that handle the details of OSC message encoding/decoding and network transport. The official OSC website often links to community implementations.
