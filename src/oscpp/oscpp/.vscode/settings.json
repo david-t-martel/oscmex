@@ -102,5 +102,6 @@
     "doxdocgen.file.copyrightTag": [
         "@copyright Copyright (c) 2022-2025 Auricle Inc."
     ],
-    "C_Cpp.doxygen.generateOnType": true
+    "C_Cpp.doxygen.generateOnType": true,
+    "github.copilot.chat.codesearch.enabled": true
 }

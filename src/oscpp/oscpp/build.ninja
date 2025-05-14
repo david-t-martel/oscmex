@@ -12,7 +12,7 @@
 
 # =============================================================================
 # Project: oscpp
-# Configurations: 
+# Configurations: Release
 # =============================================================================
 
 #############################################
@@ -20,6 +20,11 @@
 
 ninja_required_version = 1.5
 
+
+#############################################
+# Set configuration variable for custom commands.
+
+CONFIGURATION = Release
 # =============================================================================
 # Include auxiliary files.
 
@@ -44,90 +49,101 @@ cmake_ninja_workdir = C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/
 
 build cmake_object_order_depends_target_oscpp: phony || .
 
-build CMakeFiles/oscpp.dir/src/Address.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Address.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/Address.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Address.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\Address.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/AddressImpl.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/AddressImpl.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/AddressImpl.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/AddressImpl.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\AddressImpl.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/Bundle.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Bundle.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/Bundle.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Bundle.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\Bundle.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/Message.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Message.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/Message.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Message.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\Message.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/OSCException.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/OSCException.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/OSCException.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/OSCException.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\OSCException.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/Server.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Server.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/Server.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Server.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\Server.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/ServerImpl.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/ServerImpl.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/ServerImpl.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/ServerImpl.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\ServerImpl.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/ServerThread.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/ServerThread.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/ServerThread.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/ServerThread.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\ServerThread.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/TimeTag.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/TimeTag.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/TimeTag.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/TimeTag.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\TimeTag.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/Value.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Value.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/Value.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/Value.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\Value.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
 
-build CMakeFiles/oscpp.dir/src/main.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/main.cpp || cmake_object_order_depends_target_oscpp
+build CMakeFiles/oscpp.dir/src/main.cpp.obj: CXX_COMPILER__oscpp_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/src/main.cpp || cmake_object_order_depends_target_oscpp
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = CMakeFiles\oscpp.dir\src\main.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = CMakeFiles\oscpp.dir
   OBJECT_FILE_DIR = CMakeFiles\oscpp.dir\src
@@ -140,7 +156,9 @@ build CMakeFiles/oscpp.dir/src/main.cpp.obj: CXX_COMPILER__oscpp_unscanned_ C$:/
 #############################################
 # Link the static library liboscpp.a
 
-build liboscpp.a: CXX_STATIC_LIBRARY_LINKER__oscpp_ CMakeFiles/oscpp.dir/src/Address.cpp.obj CMakeFiles/oscpp.dir/src/AddressImpl.cpp.obj CMakeFiles/oscpp.dir/src/Bundle.cpp.obj CMakeFiles/oscpp.dir/src/Message.cpp.obj CMakeFiles/oscpp.dir/src/OSCException.cpp.obj CMakeFiles/oscpp.dir/src/Server.cpp.obj CMakeFiles/oscpp.dir/src/ServerImpl.cpp.obj CMakeFiles/oscpp.dir/src/ServerThread.cpp.obj CMakeFiles/oscpp.dir/src/TimeTag.cpp.obj CMakeFiles/oscpp.dir/src/Value.cpp.obj CMakeFiles/oscpp.dir/src/main.cpp.obj
+build liboscpp.a: CXX_STATIC_LIBRARY_LINKER__oscpp_Release CMakeFiles/oscpp.dir/src/Address.cpp.obj CMakeFiles/oscpp.dir/src/AddressImpl.cpp.obj CMakeFiles/oscpp.dir/src/Bundle.cpp.obj CMakeFiles/oscpp.dir/src/Message.cpp.obj CMakeFiles/oscpp.dir/src/OSCException.cpp.obj CMakeFiles/oscpp.dir/src/Server.cpp.obj CMakeFiles/oscpp.dir/src/ServerImpl.cpp.obj CMakeFiles/oscpp.dir/src/ServerThread.cpp.obj CMakeFiles/oscpp.dir/src/TimeTag.cpp.obj CMakeFiles/oscpp.dir/src/Value.cpp.obj CMakeFiles/oscpp.dir/src/main.cpp.obj
+  CONFIG = Release
+  LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   OBJECT_DIR = CMakeFiles\oscpp.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
@@ -152,7 +170,7 @@ build liboscpp.a: CXX_STATIC_LIBRARY_LINKER__oscpp_ CMakeFiles/oscpp.dir/src/Add
 # Utility command for test
 
 build CMakeFiles/test.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\ctest.exe" "
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\ctest.exe" "
   DESC = Running tests...
   pool = console
   restat = 1
@@ -164,7 +182,7 @@ build test: phony CMakeFiles/test.util
 # Utility command for edit_cache
 
 build CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake-gui.exe" -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake-gui.exe" -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
   DESC = Running CMake cache editor...
   pool = console
   restat = 1
@@ -176,7 +194,7 @@ build edit_cache: phony CMakeFiles/edit_cache.util
 # Utility command for rebuild_cache
 
 build CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake.exe" --regenerate-during-build -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake.exe" --regenerate-during-build -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -194,7 +212,7 @@ build list_install_components: phony
 # Utility command for install
 
 build CMakeFiles/install.util: CUSTOM_COMMAND all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake.exe" -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake.exe" -P cmake_install.cmake"
   DESC = Install the project...
   pool = console
   restat = 1
@@ -206,7 +224,7 @@ build install: phony CMakeFiles/install.util
 # Utility command for install/local
 
 build CMakeFiles/install/local.util: CUSTOM_COMMAND all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake"
   DESC = Installing only the local directory...
   pool = console
   restat = 1
@@ -218,7 +236,7 @@ build install/local: phony CMakeFiles/install/local.util
 # Utility command for install/strip
 
 build CMakeFiles/install/strip.util: CUSTOM_COMMAND all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake"
   DESC = Installing the project stripped...
   pool = console
   restat = 1
@@ -239,10 +257,11 @@ build install/strip: phony CMakeFiles/install/strip.util
 
 build cmake_object_order_depends_target_client_example: phony || cmake_object_order_depends_target_oscpp
 
-build examples/CMakeFiles/client_example.dir/client_example.cpp.obj: CXX_COMPILER__client_example_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/examples/client_example.cpp || cmake_object_order_depends_target_client_example
+build examples/CMakeFiles/client_example.dir/client_example.cpp.obj: CXX_COMPILER__client_example_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/examples/client_example.cpp || cmake_object_order_depends_target_client_example
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = examples\CMakeFiles\client_example.dir\client_example.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = examples\CMakeFiles\client_example.dir
   OBJECT_FILE_DIR = examples\CMakeFiles\client_example.dir
@@ -255,13 +274,15 @@ build examples/CMakeFiles/client_example.dir/client_example.cpp.obj: CXX_COMPILE
 #############################################
 # Link the executable bin\client_example.exe
 
-build bin/client_example.exe: CXX_EXECUTABLE_LINKER__client_example_ examples/CMakeFiles/client_example.dir/client_example.cpp.obj | liboscpp.a || liboscpp.a
+build bin/client_example.exe: CXX_EXECUTABLE_LINKER__client_example_Release examples/CMakeFiles/client_example.dir/client_example.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = examples\CMakeFiles\client_example.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\client_example.exe
-  TARGET_IMPLIB = examples\libclient_example.dll.a
+  TARGET_IMPLIB = lib\libclient_example.dll.a
   TARGET_PDB = client_example.exe.dbg
 
 # =============================================================================
@@ -273,10 +294,11 @@ build bin/client_example.exe: CXX_EXECUTABLE_LINKER__client_example_ examples/CM
 
 build cmake_object_order_depends_target_server_example: phony || cmake_object_order_depends_target_oscpp
 
-build examples/CMakeFiles/server_example.dir/server_example.cpp.obj: CXX_COMPILER__server_example_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/examples/server_example.cpp || cmake_object_order_depends_target_server_example
+build examples/CMakeFiles/server_example.dir/server_example.cpp.obj: CXX_COMPILER__server_example_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/examples/server_example.cpp || cmake_object_order_depends_target_server_example
+  CONFIG = Release
   DEFINES = -DNOMINMAX -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = examples\CMakeFiles\server_example.dir\server_example.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = examples\CMakeFiles\server_example.dir
   OBJECT_FILE_DIR = examples\CMakeFiles\server_example.dir
@@ -289,13 +311,15 @@ build examples/CMakeFiles/server_example.dir/server_example.cpp.obj: CXX_COMPILE
 #############################################
 # Link the executable bin\server_example.exe
 
-build bin/server_example.exe: CXX_EXECUTABLE_LINKER__server_example_ examples/CMakeFiles/server_example.dir/server_example.cpp.obj | liboscpp.a || liboscpp.a
+build bin/server_example.exe: CXX_EXECUTABLE_LINKER__server_example_Release examples/CMakeFiles/server_example.dir/server_example.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = examples\CMakeFiles\server_example.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\server_example.exe
-  TARGET_IMPLIB = examples\libserver_example.dll.a
+  TARGET_IMPLIB = lib\libserver_example.dll.a
   TARGET_PDB = server_example.exe.dbg
 
 
@@ -303,7 +327,7 @@ build bin/server_example.exe: CXX_EXECUTABLE_LINKER__server_example_ examples/CM
 # Utility command for test
 
 build examples/CMakeFiles/test.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\ctest.exe" "
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\ctest.exe" "
   DESC = Running tests...
   pool = console
   restat = 1
@@ -315,7 +339,7 @@ build examples/test: phony examples/CMakeFiles/test.util
 # Utility command for edit_cache
 
 build examples/CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake-gui.exe" -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake-gui.exe" -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
   DESC = Running CMake cache editor...
   pool = console
   restat = 1
@@ -327,7 +351,7 @@ build examples/edit_cache: phony examples/CMakeFiles/edit_cache.util
 # Utility command for rebuild_cache
 
 build examples/CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake.exe" --regenerate-during-build -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake.exe" --regenerate-during-build -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -345,7 +369,7 @@ build examples/list_install_components: phony
 # Utility command for install
 
 build examples/CMakeFiles/install.util: CUSTOM_COMMAND examples/all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake.exe" -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake.exe" -P cmake_install.cmake"
   DESC = Install the project...
   pool = console
   restat = 1
@@ -357,7 +381,7 @@ build examples/install: phony examples/CMakeFiles/install.util
 # Utility command for install/local
 
 build examples/CMakeFiles/install/local.util: CUSTOM_COMMAND examples/all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake"
   DESC = Installing only the local directory...
   pool = console
   restat = 1
@@ -369,7 +393,7 @@ build examples/install/local: phony examples/CMakeFiles/install/local.util
 # Utility command for install/strip
 
 build examples/CMakeFiles/install/strip.util: CUSTOM_COMMAND examples/all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\examples && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake"
   DESC = Installing the project stripped...
   pool = console
   restat = 1
@@ -390,10 +414,11 @@ build examples/install/strip: phony examples/CMakeFiles/install/strip.util
 
 build cmake_object_order_depends_target_test_address: phony || cmake_object_order_depends_target_oscpp
 
-build tests/CMakeFiles/test_address.dir/test_address.cpp.obj: CXX_COMPILER__test_address_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_address.cpp || cmake_object_order_depends_target_test_address
+build tests/CMakeFiles/test_address.dir/test_address.cpp.obj: CXX_COMPILER__test_address_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_address.cpp || cmake_object_order_depends_target_test_address
+  CONFIG = Release
   DEFINES = -DNOMINMAX -DSIMPLE_TEST_FRAMEWORK -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = tests\CMakeFiles\test_address.dir\test_address.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = tests\CMakeFiles\test_address.dir
   OBJECT_FILE_DIR = tests\CMakeFiles\test_address.dir
@@ -406,13 +431,15 @@ build tests/CMakeFiles/test_address.dir/test_address.cpp.obj: CXX_COMPILER__test
 #############################################
 # Link the executable bin\tests\test_address.exe
 
-build bin/tests/test_address.exe: CXX_EXECUTABLE_LINKER__test_address_ tests/CMakeFiles/test_address.dir/test_address.cpp.obj | liboscpp.a || liboscpp.a
+build bin/tests/test_address.exe: CXX_EXECUTABLE_LINKER__test_address_Release tests/CMakeFiles/test_address.dir/test_address.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = tests\CMakeFiles\test_address.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\tests\test_address.exe
-  TARGET_IMPLIB = tests\libtest_address.dll.a
+  TARGET_IMPLIB = lib\libtest_address.dll.a
   TARGET_PDB = test_address.exe.dbg
 
 # =============================================================================
@@ -424,10 +451,11 @@ build bin/tests/test_address.exe: CXX_EXECUTABLE_LINKER__test_address_ tests/CMa
 
 build cmake_object_order_depends_target_test_bundle: phony || cmake_object_order_depends_target_oscpp
 
-build tests/CMakeFiles/test_bundle.dir/test_bundle.cpp.obj: CXX_COMPILER__test_bundle_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_bundle.cpp || cmake_object_order_depends_target_test_bundle
+build tests/CMakeFiles/test_bundle.dir/test_bundle.cpp.obj: CXX_COMPILER__test_bundle_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_bundle.cpp || cmake_object_order_depends_target_test_bundle
+  CONFIG = Release
   DEFINES = -DNOMINMAX -DSIMPLE_TEST_FRAMEWORK -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = tests\CMakeFiles\test_bundle.dir\test_bundle.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = tests\CMakeFiles\test_bundle.dir
   OBJECT_FILE_DIR = tests\CMakeFiles\test_bundle.dir
@@ -440,13 +468,15 @@ build tests/CMakeFiles/test_bundle.dir/test_bundle.cpp.obj: CXX_COMPILER__test_b
 #############################################
 # Link the executable bin\tests\test_bundle.exe
 
-build bin/tests/test_bundle.exe: CXX_EXECUTABLE_LINKER__test_bundle_ tests/CMakeFiles/test_bundle.dir/test_bundle.cpp.obj | liboscpp.a || liboscpp.a
+build bin/tests/test_bundle.exe: CXX_EXECUTABLE_LINKER__test_bundle_Release tests/CMakeFiles/test_bundle.dir/test_bundle.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = tests\CMakeFiles\test_bundle.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\tests\test_bundle.exe
-  TARGET_IMPLIB = tests\libtest_bundle.dll.a
+  TARGET_IMPLIB = lib\libtest_bundle.dll.a
   TARGET_PDB = test_bundle.exe.dbg
 
 # =============================================================================
@@ -458,10 +488,11 @@ build bin/tests/test_bundle.exe: CXX_EXECUTABLE_LINKER__test_bundle_ tests/CMake
 
 build cmake_object_order_depends_target_test_message: phony || cmake_object_order_depends_target_oscpp
 
-build tests/CMakeFiles/test_message.dir/test_message.cpp.obj: CXX_COMPILER__test_message_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_message.cpp || cmake_object_order_depends_target_test_message
+build tests/CMakeFiles/test_message.dir/test_message.cpp.obj: CXX_COMPILER__test_message_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_message.cpp || cmake_object_order_depends_target_test_message
+  CONFIG = Release
   DEFINES = -DNOMINMAX -DSIMPLE_TEST_FRAMEWORK -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = tests\CMakeFiles\test_message.dir\test_message.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = tests\CMakeFiles\test_message.dir
   OBJECT_FILE_DIR = tests\CMakeFiles\test_message.dir
@@ -474,13 +505,15 @@ build tests/CMakeFiles/test_message.dir/test_message.cpp.obj: CXX_COMPILER__test
 #############################################
 # Link the executable bin\tests\test_message.exe
 
-build bin/tests/test_message.exe: CXX_EXECUTABLE_LINKER__test_message_ tests/CMakeFiles/test_message.dir/test_message.cpp.obj | liboscpp.a || liboscpp.a
+build bin/tests/test_message.exe: CXX_EXECUTABLE_LINKER__test_message_Release tests/CMakeFiles/test_message.dir/test_message.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = tests\CMakeFiles\test_message.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\tests\test_message.exe
-  TARGET_IMPLIB = tests\libtest_message.dll.a
+  TARGET_IMPLIB = lib\libtest_message.dll.a
   TARGET_PDB = test_message.exe.dbg
 
 # =============================================================================
@@ -492,10 +525,11 @@ build bin/tests/test_message.exe: CXX_EXECUTABLE_LINKER__test_message_ tests/CMa
 
 build cmake_object_order_depends_target_test_pattern_matching: phony || cmake_object_order_depends_target_oscpp
 
-build tests/CMakeFiles/test_pattern_matching.dir/test_pattern_matching.cpp.obj: CXX_COMPILER__test_pattern_matching_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_pattern_matching.cpp || cmake_object_order_depends_target_test_pattern_matching
+build tests/CMakeFiles/test_pattern_matching.dir/test_pattern_matching.cpp.obj: CXX_COMPILER__test_pattern_matching_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_pattern_matching.cpp || cmake_object_order_depends_target_test_pattern_matching
+  CONFIG = Release
   DEFINES = -DNOMINMAX -DSIMPLE_TEST_FRAMEWORK -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = tests\CMakeFiles\test_pattern_matching.dir\test_pattern_matching.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = tests\CMakeFiles\test_pattern_matching.dir
   OBJECT_FILE_DIR = tests\CMakeFiles\test_pattern_matching.dir
@@ -508,13 +542,15 @@ build tests/CMakeFiles/test_pattern_matching.dir/test_pattern_matching.cpp.obj: 
 #############################################
 # Link the executable bin\tests\test_pattern_matching.exe
 
-build bin/tests/test_pattern_matching.exe: CXX_EXECUTABLE_LINKER__test_pattern_matching_ tests/CMakeFiles/test_pattern_matching.dir/test_pattern_matching.cpp.obj | liboscpp.a || liboscpp.a
+build bin/tests/test_pattern_matching.exe: CXX_EXECUTABLE_LINKER__test_pattern_matching_Release tests/CMakeFiles/test_pattern_matching.dir/test_pattern_matching.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = tests\CMakeFiles\test_pattern_matching.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\tests\test_pattern_matching.exe
-  TARGET_IMPLIB = tests\libtest_pattern_matching.dll.a
+  TARGET_IMPLIB = lib\libtest_pattern_matching.dll.a
   TARGET_PDB = test_pattern_matching.exe.dbg
 
 # =============================================================================
@@ -526,10 +562,11 @@ build bin/tests/test_pattern_matching.exe: CXX_EXECUTABLE_LINKER__test_pattern_m
 
 build cmake_object_order_depends_target_test_server: phony || cmake_object_order_depends_target_oscpp
 
-build tests/CMakeFiles/test_server.dir/test_server.cpp.obj: CXX_COMPILER__test_server_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_server.cpp || cmake_object_order_depends_target_test_server
+build tests/CMakeFiles/test_server.dir/test_server.cpp.obj: CXX_COMPILER__test_server_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_server.cpp || cmake_object_order_depends_target_test_server
+  CONFIG = Release
   DEFINES = -DNOMINMAX -DSIMPLE_TEST_FRAMEWORK -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = tests\CMakeFiles\test_server.dir\test_server.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = tests\CMakeFiles\test_server.dir
   OBJECT_FILE_DIR = tests\CMakeFiles\test_server.dir
@@ -542,13 +579,15 @@ build tests/CMakeFiles/test_server.dir/test_server.cpp.obj: CXX_COMPILER__test_s
 #############################################
 # Link the executable bin\tests\test_server.exe
 
-build bin/tests/test_server.exe: CXX_EXECUTABLE_LINKER__test_server_ tests/CMakeFiles/test_server.dir/test_server.cpp.obj | liboscpp.a || liboscpp.a
+build bin/tests/test_server.exe: CXX_EXECUTABLE_LINKER__test_server_Release tests/CMakeFiles/test_server.dir/test_server.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = tests\CMakeFiles\test_server.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\tests\test_server.exe
-  TARGET_IMPLIB = tests\libtest_server.dll.a
+  TARGET_IMPLIB = lib\libtest_server.dll.a
   TARGET_PDB = test_server.exe.dbg
 
 # =============================================================================
@@ -560,10 +599,11 @@ build bin/tests/test_server.exe: CXX_EXECUTABLE_LINKER__test_server_ tests/CMake
 
 build cmake_object_order_depends_target_test_tcp_framing: phony || cmake_object_order_depends_target_oscpp
 
-build tests/CMakeFiles/test_tcp_framing.dir/test_tcp_framing.cpp.obj: CXX_COMPILER__test_tcp_framing_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_tcp_framing.cpp || cmake_object_order_depends_target_test_tcp_framing
+build tests/CMakeFiles/test_tcp_framing.dir/test_tcp_framing.cpp.obj: CXX_COMPILER__test_tcp_framing_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_tcp_framing.cpp || cmake_object_order_depends_target_test_tcp_framing
+  CONFIG = Release
   DEFINES = -DNOMINMAX -DSIMPLE_TEST_FRAMEWORK -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = tests\CMakeFiles\test_tcp_framing.dir\test_tcp_framing.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = tests\CMakeFiles\test_tcp_framing.dir
   OBJECT_FILE_DIR = tests\CMakeFiles\test_tcp_framing.dir
@@ -576,13 +616,15 @@ build tests/CMakeFiles/test_tcp_framing.dir/test_tcp_framing.cpp.obj: CXX_COMPIL
 #############################################
 # Link the executable bin\tests\test_tcp_framing.exe
 
-build bin/tests/test_tcp_framing.exe: CXX_EXECUTABLE_LINKER__test_tcp_framing_ tests/CMakeFiles/test_tcp_framing.dir/test_tcp_framing.cpp.obj | liboscpp.a || liboscpp.a
+build bin/tests/test_tcp_framing.exe: CXX_EXECUTABLE_LINKER__test_tcp_framing_Release tests/CMakeFiles/test_tcp_framing.dir/test_tcp_framing.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = tests\CMakeFiles\test_tcp_framing.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\tests\test_tcp_framing.exe
-  TARGET_IMPLIB = tests\libtest_tcp_framing.dll.a
+  TARGET_IMPLIB = lib\libtest_tcp_framing.dll.a
   TARGET_PDB = test_tcp_framing.exe.dbg
 
 # =============================================================================
@@ -594,10 +636,11 @@ build bin/tests/test_tcp_framing.exe: CXX_EXECUTABLE_LINKER__test_tcp_framing_ t
 
 build cmake_object_order_depends_target_test_timetag: phony || cmake_object_order_depends_target_oscpp
 
-build tests/CMakeFiles/test_timetag.dir/test_timetag.cpp.obj: CXX_COMPILER__test_timetag_unscanned_ C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_timetag.cpp || cmake_object_order_depends_target_test_timetag
+build tests/CMakeFiles/test_timetag.dir/test_timetag.cpp.obj: CXX_COMPILER__test_timetag_unscanned_Release C$:/codedev/auricleinc/oscmex/src/oscpp/oscpp/tests/test_timetag.cpp || cmake_object_order_depends_target_test_timetag
+  CONFIG = Release
   DEFINES = -DNOMINMAX -DSIMPLE_TEST_FRAMEWORK -D_WINSOCK_DEPRECATED_NO_WARNINGS
   DEP_FILE = tests\CMakeFiles\test_timetag.dir\test_timetag.cpp.obj.d
-  FLAGS = -std=c++17
+  FLAGS = -O3 -DNDEBUG -std=c++17
   INCLUDES = -IC:/codedev/auricleinc/oscmex/src/oscpp/oscpp/include
   OBJECT_DIR = tests\CMakeFiles\test_timetag.dir
   OBJECT_FILE_DIR = tests\CMakeFiles\test_timetag.dir
@@ -610,13 +653,15 @@ build tests/CMakeFiles/test_timetag.dir/test_timetag.cpp.obj: CXX_COMPILER__test
 #############################################
 # Link the executable bin\tests\test_timetag.exe
 
-build bin/tests/test_timetag.exe: CXX_EXECUTABLE_LINKER__test_timetag_ tests/CMakeFiles/test_timetag.dir/test_timetag.cpp.obj | liboscpp.a || liboscpp.a
+build bin/tests/test_timetag.exe: CXX_EXECUTABLE_LINKER__test_timetag_Release tests/CMakeFiles/test_timetag.dir/test_timetag.cpp.obj | liboscpp.a || liboscpp.a
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = liboscpp.a  -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = tests\CMakeFiles\test_timetag.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
   TARGET_FILE = bin\tests\test_timetag.exe
-  TARGET_IMPLIB = tests\libtest_timetag.dll.a
+  TARGET_IMPLIB = lib\libtest_timetag.dll.a
   TARGET_PDB = test_timetag.exe.dbg
 
 
@@ -624,7 +669,7 @@ build bin/tests/test_timetag.exe: CXX_EXECUTABLE_LINKER__test_timetag_ tests/CMa
 # Utility command for test
 
 build tests/CMakeFiles/test.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\ctest.exe" "
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\ctest.exe" "
   DESC = Running tests...
   pool = console
   restat = 1
@@ -636,7 +681,7 @@ build tests/test: phony tests/CMakeFiles/test.util
 # Utility command for edit_cache
 
 build tests/CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake-gui.exe" -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake-gui.exe" -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
   DESC = Running CMake cache editor...
   pool = console
   restat = 1
@@ -648,7 +693,7 @@ build tests/edit_cache: phony tests/CMakeFiles/edit_cache.util
 # Utility command for rebuild_cache
 
 build tests/CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake.exe" --regenerate-during-build -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake.exe" --regenerate-during-build -SC:\codedev\auricleinc\oscmex\src\oscpp\oscpp -BC:\codedev\auricleinc\oscmex\src\oscpp\oscpp"
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -666,7 +711,7 @@ build tests/list_install_components: phony
 # Utility command for install
 
 build tests/CMakeFiles/install.util: CUSTOM_COMMAND tests/all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake.exe" -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake.exe" -P cmake_install.cmake"
   DESC = Install the project...
   pool = console
   restat = 1
@@ -678,7 +723,7 @@ build tests/install: phony tests/CMakeFiles/install.util
 # Utility command for install/local
 
 build tests/CMakeFiles/install/local.util: CUSTOM_COMMAND tests/all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake"
   DESC = Installing only the local directory...
   pool = console
   restat = 1
@@ -690,7 +735,7 @@ build tests/install/local: phony tests/CMakeFiles/install/local.util
 # Utility command for install/strip
 
 build tests/CMakeFiles/install/strip.util: CUSTOM_COMMAND tests/all
-  COMMAND = cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake"
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D C:\codedev\auricleinc\oscmex\src\oscpp\oscpp\tests && "C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake"
   DESC = Installing the project stripped...
   pool = console
   restat = 1

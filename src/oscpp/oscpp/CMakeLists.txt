@@ -2,6 +2,15 @@
 
 cmake_minimum_required(VERSION 3.14)
 
+# Set up vcpkg integration if available
+if(DEFINED ENV{VCPKG_ROOT})
+    set(VCPKG_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+
+    if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+        set(CMAKE_TOOLCHAIN_FILE ${VCPKG_TOOLCHAIN_FILE})
+    endif()
+endif()
+
 # Set the project name and version
 project(oscpp
     VERSION 1.0.0

@@ -1,0 +1,110 @@
+<svg width="800" height="650" viewBox="0 0 800 650"
+    xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="12">
+
+    <title>Smart Monitor Station Architecture</title>
+
+    <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+        </marker>
+    </defs>
+
+    <style>
+    .station-box { fill: #e0f2fe; stroke: #0ea5e9; stroke-width: 1.5; rx: 8; ry: 8; }
+    .internal-module { fill: #f0f9ff; stroke: #7dd3fc; stroke-width: 1; rx: 4; ry: 4; }
+    .external-system { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 1; rx: 4; ry: 4; }
+    .data-flow { stroke: #333; stroke-width: 1.5; marker-end: url(#arrowhead); fill: none; }
+    .secure-flow { stroke: #059669; stroke-width: 1.5; marker-end: url(#arrowhead); fill: none; stroke-dasharray: 4 2; }
+    .label { fill: #1e293b; font-weight: bold; }
+    .sub-label { fill: #475569; font-size: 10px; }
+    .secure-label { fill: #047857; font-size: 10px; font-style: italic; }
+    .hw-label { fill: #be123c; font-size: 10px; font-style: italic; }
+    </style>
+
+    <rect x="50" y="50" width="700" height="550" class="station-box"/>
+    <text x="400" y="80" text-anchor="middle" class="label" font-size="16">Smart Monitor Station (Hardened Workstation)</text>
+
+    <rect x="80" y="120" width="180" height="80" class="internal-module"/>
+    <text x="170" y="145" text-anchor="middle" class="label">Randomization Engine</text>
+    <text x="170" y="165" text-anchor="middle" class="sub-label">Generates Study Arms</text>
+    <text x="170" y="180" text-anchor="middle" class="sub-label">(e.g., Stratified, Block)</text>
+
+    <rect x="310" y="120" width="180" height="80" class="internal-module"/>
+    <text x="400" y="145" text-anchor="middle" class="label">Blinding Module</text>
+    <text x="400" y="165" text-anchor="middle" class="sub-label">Applies Blinding Info</text>
+    <text x="400" y="180" text-anchor="middle" class="sub-label">(Metadata Obscuration, GUIDs)</text>
+
+    <rect x="540" y="120" width="180" height="80" class="internal-module"/>
+    <text x="630" y="145" text-anchor="middle" class="label">Secure File Loader</text>
+    <text x="630" y="165" text-anchor="middle" class="sub-label">Programs TKHMD</text>
+    <text x="630" y="180" text-anchor="middle" class="sub-label">(Signed/Encrypted Files)</text>
+
+    <rect x="80" y="230" width="180" height="80" class="internal-module"/>
+    <text x="170" y="255" text-anchor="middle" class="label">Role-Based Access</text>
+    <text x="170" y="275" text-anchor="middle" class="sub-label">Control (RBAC)</text>
+    <text x="170" y="290" text-anchor="middle" class="sub-label">(User Permissions)</text>
+
+    <rect x="310" y="230" width="180" height="80" class="internal-module"/>
+    <text x="400" y="255" text-anchor="middle" class="label">Audit Logging Module</text>
+    <text x="400" y="275" text-anchor="middle" class="sub-label">Immutable Logs (WORM)</text>
+    <text x="400" y="290" text-anchor="middle" class="sub-label">(Hashing, Timestamping)</text>
+
+    <rect x="540" y="230" width="180" height="80" class="internal-module"/>
+    <text x="630" y="255" text-anchor="middle" class="label">Compliance / Reporting</text>
+    <text x="630" y="275" text-anchor="middle" class="sub-label">Dashboards, Exports</text>
+    <text x="630" y="290" text-anchor="middle" class="sub-label">(21 CFR 11 Support)</text>
+
+    <rect x="80" y="340" width="640" height="100" class="internal-module"/>
+    <text x="400" y="365" text-anchor="middle" class="label">Secure Operating Environment</text>
+    <text x="170" y="390" text-anchor="middle" class="sub-label hw-label">Hardened OS</text>
+    <text x="310" y="390" text-anchor="middle" class="sub-label hw-label">TPM / Secure Boot</text>
+    <text x="480" y="390" text-anchor="middle" class="sub-label hw-label">Encrypted Storage (AES)</text>
+    <text x="650" y="390" text-anchor="middle" class="sub-label hw-label">Hardware Port Control</text>
+    <text x="170" y="415" text-anchor="middle" class="sub-label secure-label">mTLS Communication</text>
+    <text x="310" y="415" text-anchor="middle" class="sub-label secure-label">Secure Key Store</text>
+    <text x="480" y="415" text-anchor="middle" class="sub-label secure-label">Data Integrity Checks</text>
+    <text x="650" y="415" text-anchor="middle" class="sub-label secure-label">(Optional Kill Switch)</text>
+
+    <rect x="80" y="470" width="180" height="60" class="external-system"/>
+    <text x="170" y="495" text-anchor="middle" class="label">ProtocolGenerator</text>
+    <text x="170" y="510" text-anchor="middle" class="sub-label">Software</text>
+
+    <rect x="310" y="470" width="180" height="60" class="external-system"/>
+    <text x="400" y="495" text-anchor="middle" class="label">TKHMD Device</text>
+    <text x="400" y="510" text-anchor="middle" class="sub-label">(via USB/Dock)</text>
+
+    <rect x="540" y="470" width="180" height="60" class="external-system"/>
+    <text x="630" y="495" text-anchor="middle" class="label">EDC / Database</text>
+    <text x="630" y="510" text-anchor="middle" class="sub-label">(e.g., REDCap, FHIR)</text>
+
+    <path d="M 170 470 Q 170 300 355 200" class="data-flow"/>
+    <text x="240" y="340" class="sub-label">Therapy Files (Unblinded)</text>
+
+    <path d="M 260 160 H 310" class="data-flow"/>
+    <text x="285" y="155" text-anchor="middle" class="sub-label">Randomization</text>
+    <text x="285" y="170" text-anchor="middle" class="sub-label">Assignment</text>
+
+    <path d="M 490 160 H 540" class="data-flow"/>
+    <text x="515" y="155" text-anchor="middle" class="sub-label">Blinded File</text>
+    <text x="515" y="170" text-anchor="middle" class="sub-label">Info (GUID)</text>
+
+    <path d="M 630 200 V 470" class="secure-flow"/>
+    <text x="640" y="350" class="secure-label">Load Blinded</text>
+    <text x="640" y="365" class="secure-label">Therapy File</text>
+
+    <path d="M 400 470 V 310" class="secure-flow"/>
+    <text x="410" y="400" class="secure-label">Session Logs,</text>
+    <text x="410" y="415" class="secure-label">Device Status</text>
+
+    <path d="M 490 270 H 540" class="data-flow"/>
+    <text x="515" y="265" text-anchor="middle" class="sub-label">Log Data</text>
+
+    <path d="M 630 310 V 470" class="secure-flow"/>
+    <text x="640" y="400" class="secure-label">Reports,</text>
+    <text x="640" y="415" class="secure-label">Aggregated Data</text>
+
+    <text x="170" y="320" text-anchor="middle" class="secure-label">(Controls Access to All Functions)</text>
+
+    <text x="400" y="450" text-anchor="middle" class="hw-label">(Hardware &amp; OS Security Foundation)</text>
+
+</svg>

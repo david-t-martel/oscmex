@@ -1,16 +1,52 @@
 # Tests CMakeLists.txt
 cmake_minimum_required(VERSION 3.14)
 
-# Try to find GTest with CMake's built-in module
-find_package(GTest QUIET)
+# Set path to vcpkg toolchain file if VCPKG_ROOT is defined
+if(DEFINED ENV{VCPKG_ROOT})
+    set(VCPKG_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+
+    if(NOT CMAKE_TOOLCHAIN_FILE)
+        set(CMAKE_TOOLCHAIN_FILE ${VCPKG_TOOLCHAIN_FILE})
+    endif()
+endif()
+
+# First try to find GTest using vcpkg/CMake's built-in config
+find_package(GTest CONFIG QUIET)
+
+# If the CONFIG mode doesn't work, try the module mode
+if(NOT GTest_FOUND)
+    find_package(GTest QUIET)
+endif()
 
 # If CMake's FindGTest didn't find it, try with pkg-config as fallback
-if(NOT GTEST_FOUND)
+if(NOT GTest_FOUND AND NOT GTEST_FOUND)
     find_package(PkgConfig QUIET)
 
     if(PkgConfig_FOUND)
         pkg_check_modules(GTEST QUIET gtest)
     endif()
+endif()
+
+# If GTest still not found, download and build it
+if(NOT GTest_FOUND AND NOT GTEST_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.14.0 # Updated to a newer version that's compatible with modern CMake
+    )
+
+    # Configure gtest to use shared CRT on Windows
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+    # Use FetchContent_MakeAvailable instead of FetchContent_Populate to avoid deprecation warning
+    FetchContent_MakeAvailable(googletest)
+
+    # Set GTest as found and set variables for backwards compatibility
+    set(GTEST_FOUND TRUE)
+    set(GTEST_INCLUDE_DIRS ${googletest_SOURCE_DIR}/googletest/include)
+    set(GTEST_LIBRARIES GTest::gtest)
+    set(GTEST_MAIN_LIBRARIES GTest::gtest_main)
 endif()
 
 # Define the test executables
@@ -25,8 +61,19 @@ set(TEST_SOURCES
 )
 
 # If GTest was found via either method
-if(GTEST_FOUND)
-    include_directories(${GTEST_INCLUDE_DIRS})
+if(GTest_FOUND OR GTEST_FOUND)
+    # Include GoogleTest-specific CMake module to support the gtest_discover_tests command
+    include(GoogleTest)
+
+    # For modern CMake, use GTest namespace, for older use variables
+    if(TARGET GTest::gtest)
+        set(GTEST_LIBRARIES GTest::gtest)
+        set(GTEST_MAIN_LIBRARIES GTest::gtest_main)
+    endif()
+
+    if(DEFINED GTEST_INCLUDE_DIRS)
+        include_directories(${GTEST_INCLUDE_DIRS})
+    endif()
 
     # Create a test executable for each test source
     foreach(test_source ${TEST_SOURCES})
